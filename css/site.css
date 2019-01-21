@@ -46,8 +46,9 @@ html,body
 
 
 .phoneNum {
-    opacity:0;
-    color: blue;
+    
+    opacity:1;
+    color: white;
     font-size: 50px;
     transition: all 1s;
 }
