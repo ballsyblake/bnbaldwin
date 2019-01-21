@@ -1,0 +1,38 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="row" style="height:100%;" onmouseout="expandBoxes(this)">
+    <div id="topBar" onmouseover="expandBoxes(this)" class="col-md-12 col-xs-12" style="background-color:black; margin:0px;margin-right: 0px;height:20%;">
+        <div class="row">
+            <div class="col-md-2">
+                <img class="contrast avatarImg" src="~/images/me.jpg" alt="Avatar" />
+            </div>
+                
+            <h1 style="color:floralwhite; padding-left:5px;">Blake Baldwin - Software Professional</h1>
+            <div class="col-md-7">
+                <h4 style="color:floralwhite; ">Currently working in Web development and support | Focusing on small businesses | Contact me for more information</h4>
+            </div>
+            <div class="col-md-3 text-right">
+                <button onmouseover="" class="phoneBtn">
+                    <img class="phoneIcon" src="~/images/phoneIcon.png" alt="Phone" />
+                    <h2 class="phoneNum">0400974058</h2>
+                </button>
+                <h4 style="color:floralwhite; padding-left:5px;">0400974058 | bnbaldwin1@gmail.com</h4>
+            </div>
+        </div>
+    </div>
+
+    <div id="top1" onmouseover="expandBoxes(this)" class="topLeft col-md-6 col-xs-12">
+        <h1 style="text-align:center;">Showcase</h1>
+    </div>
+    <div id="top2" onmouseover="expandBoxes(this)" class="topRight col-md-6 col-xs-12">
+        <h1 style="text-align:center;">Experience</h1>
+    </div>
+    <div id="bottom1" onmouseover="expandBoxes(this)" class="bottomLeft col-md-6 col-xs-12">
+        <h1 style="text-align:center;">Education</h1>
+    </div>
+    <div id="bottom2" onmouseover="expandBoxes(this)" class="bottomRight col-md-6 col-xs-12">
+        <h1 style="text-align:center;">References</h1>
+    </div>
+</div>

@@ -1,0 +1,35 @@
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.deps.json
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.runtimeconfig.json
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.runtimeconfig.dev.json
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.dll
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.pdb
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.Views.dll
+D:\GitHubRepos\Resume Website\Resume Website\bin\Debug\netcoreapp2.1\Resume Website.Views.pdb
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.csprojAssemblyReference.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.csproj.CoreCompileInputs.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.RazorAssemblyInfo.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.RazorAssemblyInfo.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\UserSecretsAssemblyInfo.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.AssemblyInfoInputs.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.AssemblyInfo.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.TagHelpers.input.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.TagHelpers.output.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.RazorCoreGenerate.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Areas\Identity\Pages\_ViewStart.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Home\About.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Home\Contact.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Home\Index.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Home\Privacy.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Shared\Error.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Shared\_CookieConsentPartial.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Shared\_Layout.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Shared\_LoginPartial.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\Shared\_ValidationScriptsPartial.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\_ViewImports.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Razor\Views\_ViewStart.g.cshtml.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.RazorTargetAssemblyInfo.cache
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.RazorTargetAssemblyInfo.cs
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.Views.pdb
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.dll
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.pdb
+D:\GitHubRepos\Resume Website\Resume Website\obj\Debug\netcoreapp2.1\Resume Website.csproj.CopyComplete

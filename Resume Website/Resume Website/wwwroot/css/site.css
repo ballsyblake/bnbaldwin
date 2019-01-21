@@ -1,0 +1,95 @@
+﻿/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification\ 
+for details on configuring this project to bundle and minify static web assets. */
+body {
+    
+    
+}
+
+/* Wrapping element */
+/* Set some basic padding to keep content from hitting the edges */
+.body-content {
+    
+}
+
+.phoneIcon {
+    transform: rotate(-45deg);
+    width: 25px;
+    height: 25px;
+    position: relative;
+    left: -6px;
+    opacity: 1;
+    transition: all 1s;
+}
+
+.avatarImg {
+    border-radius: 50%;
+    padding: 10px;
+    height: 190px;
+    width: 190px;
+}
+
+.phoneBtn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transition: all .3s ease-in-out;
+}
+
+.phoneBtn:hover {
+    border-radius: 0;
+    width: 100px;
+}
+
+
+.phoneNum {
+    opacity:0;
+    color: blue;
+    font-size: 50px;
+    transition: all 1s;
+}
+
+.contrast {
+    -webkit-filter: contrast(120%);
+    filter: contrast(120%);
+}
+
+.topLeft {
+    height: 40%;
+    background-color:blue;
+    transition: height 1s, width 1s;
+}
+
+.phoneBtn:hover ~ .phoneIcon {
+    opacity: 0;
+}
+
+.phoneBtn:hover ~ .phoneNum {
+    opacity: 1;
+}
+
+
+
+.topRight {
+    height: 40%;
+    background-color: yellow;
+    transition: height 1s, width 1s;
+}
+
+
+
+
+.bottomLeft {
+    height: 40%;
+    background-color: green;
+    transition: height 1s, width 1s;
+}
+
+
+
+.bottomRight {
+    height: 40%;
+    background-color: red;
+    transition: height 1s, width 1s;
+}
+
+
