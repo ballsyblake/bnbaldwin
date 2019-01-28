@@ -61,11 +61,7 @@ html,body
 .topLeft {
     height: 40%;
     
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center center;
-    filter: blur(5px);
-    -webkit-filter: blur(5px);
+    
     transition: height 1s, width 1s;
 }
 
