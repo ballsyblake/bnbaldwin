@@ -1,101 +1,327 @@
 ﻿/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification\ 
 for details on configuring this project to bundle and minify static web assets. */
-html,body
-{
+html, body {
+    height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 50px;
+    font-weight: 800;
+    text-transform: none;
+    color: black;
+    line-height: 1em;
+    letter-spacing: 0px;
+}
+
+p {
+    font-family: "Roboto";
+    font-size: 30px;
+    font-weight: 500;
+    text-transform: none;
+    color: black;
+    line-height: 1.4em;
+}
+
+.zIndex {
+    z-index: 1;
+}
+
+#topBanner {
+    opacity: 0.7;
+    position: fixed;
+    left: 21%;
+    border-top: 100px solid black;
+    border-left: 40px solid transparent;
+    border-right: 40px solid transparent;
+    height: 0;
+    width: 56%;
+    transition: all 0.25s;
+}
+
+#titleLeft {
+    color: white;
+    position: fixed;
+    top: 1%;
+    left: 27%;
+    max-width: 1000px;
+    opacity: 0;
+    transition: all 0.25s;
+}
+
+#titleMiddle {
+    color: white;
+    z-index: 1;
+    position: fixed;
+    top: 1%;
+    left: 25%;
+    max-width: 50%;
+    opacity: 0;
+    transition: all 0.25s;
+    animation: slideinTop ease-out 1s;
+}
+
+#titleRight {
+    color: white;
+    position: fixed;
+    top: 1%;
+    left: 37%;
+    max-width: 1000px;
+    opacity: 0;
+    transition: all 0.25s;
+}
+
+#paragraphLeft {
+    position: fixed;
+    top: 20%;
+    left: 25%;
+    max-width: 1000px;
+    opacity: 0;
+    transition: all 0.25s;
+}
+
+#paragraphMiddle {
+    position: fixed;
+    top: 18%;
+    left: 25%;
+    max-width: 1000px;
+    opacity: 0;
+    transition: all 0.25s;
+    animation: slideinTop ease-out 1s;
+}
+
+#paragraphRight {
+    position: fixed;
+    top: 20%;
+    left: 25%;
+    max-width: 1000px;
+    opacity: 0;
+    transition: all 0.25s;
+}
+
+@keyframes slideinTop {
+    0% {transform: translateY(-100%);}
+    100% {transform: translateY(0%);}
+}
+
+.contentMain {
+    
+    height: 100%;
+    overflow-x: hidden;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    transition: all 1s;
+}
+
+.contentLeft {
+    overflow: hidden;
+    background-image: url(../images/handShake.jpg);
+    background-size: 1920px 100%;
+    background-repeat: no-repeat;
+    border: none;
+    width: 0%;
+    height: 100%;
+    padding-top: 0px;
+    visibility: visible;
+    transition: all 1s;
+    filter: blur(5px);
+    transform: scale(1.1);
+}
+
+.contentMiddle {
+    overflow: hidden;
+    background-image: url(../images/Laptop.jpg);
+    background-size: 1920px 100%;
+    background-repeat: no-repeat;
+    border: none;
     width: 100%;
     height: 100%;
-    margin: 0px;
-    padding: 0px;
-    overflow-x: hidden; 
+    padding-top: 0px;
+    visibility: visible;
+    transition: all 1s;
+    filter: blur(5px);
+    transform: scale(1.1);
 }
 
-/* Wrapping element */
-/* Set some basic padding to keep content from hitting the edges */
-.body-content {
-    
+.contentRight {
+    overflow: hidden;
+    background-image: url(../images/uni.jpg);
+    background-size: 1920px 100%;
+    background-repeat: no-repeat;
+    border: none;
+    width: 0%;
+    height: 100%;
+    padding-top: 0px;
+    visibility: visible;
+    transition: all 1s;
+    filter: blur(5px);
+    transform: scale(1.1);
 }
 
-.phoneIcon {
-    transform: rotate(-45deg);
+.contentBottom {
+    background-color: green;
+    border: none;
+    width: 100%;
+    height: 0%;
+    padding-top: 0px;
+    visibility: visible;
+    transition: all 1s;
+}
+
+#scrollLeft {
+    transform: rotate(-90deg);
+    width: 20px;
+    height: 20px;
+    font-size: 30px;
+    position: fixed;
+    bottom: 50%;
+    left: 3%;
+    transition: all 1s;
+    z-index: 2;
+    animation: arrowFade 3s infinite;
+}
+
+
+
+#scrollRight {
+    transform: rotate(90deg);
+    width: 20px;
+    height: 20px;
+    font-size: 30px;
+    position: fixed;
+    bottom: 50%;
+    right: 3%;
+    transition: all 1s;
+    z-index: 2;
+    animation: arrowFade 3s infinite;
+}
+
+#avatar {
+    position:fixed;
+    top: 5px;
+    left: 5px;
+}
+
+#avatarIcon {
+    border-radius: 50%;
+    border: solid black;
+}
+
+#phone {
+    position: fixed;
+    top: 20px;
+    left: 200px;
+}
+
+#phoneIcon {
+    transition: ease-in-out 3000ms ease all;
+    width: 30px;
+    height: 30px;
+    z-index: 1;
+}
+
+#phoneIcon:hover ~ #phoneText {
+    margin-left: 50%;
+    width: 100%;
+    opacity: 1;
+}
+
+#phoneText {
+    font-size: 20px;
+    position: absolute;
+    top: 0px;
+    left: 20px;
+    z-index: -1;
+    opacity: 0;
+    margin-left: -80%;
+    width: 300%;
+    transition: all 300ms ease;
+}
+
+#email {
+    position: fixed;
+    top: 180px;
+    left: 200px;
+}
+
+#emailIcon {
+    transition: ease-in-out 3000ms ease all;
     width: 25px;
     height: 25px;
-    position: relative;
-    left: -6px;
+}
+
+#emailIcon:hover ~ #emailText {
+    margin-left: 50%;
+    width: 100%;
     opacity: 1;
-    transition: all 1s;
 }
 
-.avatarImg {
-    border-radius: 50%;
-    padding: 10px;
-    height: 190px;
-    width: 190px;
-}
-
-.phoneBtn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    transition: all .3s ease-in-out;
-}
-
-.phoneBtn:hover {
-    border-radius: 0;
-    width: 100px;
-}
-
-
-.phoneNum {
-    
-    opacity:1;
-    color: white;
-    font-size: 50px;
-    transition: all 1s;
-}
-
-.contrast {
-    -webkit-filter: contrast(120%);
-    filter: contrast(120%);
-}
-
-.topLeft {
-    height: 40%;
-    
-    
-    transition: height 1s, width 1s;
-}
-
-.phoneBtn:hover ~ .phoneIcon {
+#emailText {
+    font-size: 20px;
+    position: absolute;
+    top: -1px;
+    left: 20px;
+    z-index: -1;
     opacity: 0;
+    margin-left: -100%;
+    width: 300%;
+    transition: all 300ms ease;
 }
 
-.phoneBtn:hover ~ .phoneNum {
+#circle1 {
+    font-size: 30px;
+    position: fixed;
+    bottom: 5%;
+    left: 48%;
+    transition: all 300ms;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
     opacity: 1;
+    background-color: transparent;
+    border-radius: 50%;
+    border: 2px solid #000000;
+}
+#circle2 {
+    font-size: 30px;
+    position: fixed;
+    bottom: 5%;
+    left: 50%;
+    transition: all 300ms;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    opacity: 1;
+    background-color: #000000;
+    border-radius: 50%;
+    border: 2px solid #000000;
+}
+#circle3 {
+    font-size: 30px;
+    position: fixed;
+    bottom: 5%;
+    left: 52%;
+    transition: all 300ms;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    opacity: 1;
+    background-color: transparent;
+    border-radius: 50%;
+    border: 2px solid #000000;
 }
 
-
-
-.topRight {
-    height: 40%;
-    background-color: yellow;
-    transition: height 1s, width 1s;
+@keyframes arrowFade {
+    0% {filter:opacity(0.5);}
+    50% {filter:opacity(0.1);}
+    100% {filter:opacity(0.5);}
+    
 }
 
-
-
-
-.bottomLeft {
-    height: 40%;
-    background-color: green;
-    transition: height 1s, width 1s;
+.boxShadowEffect {
+    -webkit-box-shadow: 0 10px 6px -6px #777;
+    -moz-box-shadow: 0 10px 6px -6px #777;
+    box-shadow: 0 10px 6px -6px #777;
 }
-
-
-
-.bottomRight {
-    height: 40%;
-    background-color: red;
-    transition: height 1s, width 1s;
-}
-
-
