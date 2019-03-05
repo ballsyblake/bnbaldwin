@@ -18,113 +18,334 @@
 <body>
   <script src="js/site.js"></script>
   <script src="js/bootstrap.js"></script>
-  <div class="row" style="height:100%;" onmouseout="expandBoxes(this)">
-    <div id="topBar" onmouseover="expandBoxes(this)" class="col-md-12 col-xs-12" style="background-color:black; margin:0px;margin-right: 0px;height:20%;">
-        <div class="row">
-            <div class="col-md-2">
-                <img class="contrast avatarImg" src="images/me.jpg" alt="Avatar" />
-            </div>
-                
-            <h1 style="color:floralwhite; padding-left:5px;">Blake Baldwin - Software Professional</h1>
-            <div class="col-md-7">
-                <h4 style="color:floralwhite; ">Currently working in Web development and support | Focusing on small businesses | Contact me for more information</h4>
-            </div>
-            <div class="col-md-3 text-right">
-                <button onmouseover="" class="phoneBtn">
-                    
-                    <img class="phoneIcon" src="images/phoneIcon.png" alt="Phone" />
-                    <h2 class="phoneNum">0400974058</h2>
-                </button>
-                <h4 style="color:floralwhite; padding-left:5px;">0400974058 | bnbaldwin1@gmail.com</h4>
-            </div>
-        </div>
+  <div id="avatar" class="zIndex">
+    <img id="avatarIcon" src="~/images/me.jpg" alt="Avatar" />
+</div>
+<div id="phone" class="zIndex">
+    <img id="phoneIcon"  src="~/images/phone-round-control-dial-mobile-512.png" alt="Phone" onmouseover="rotateIcon(this)" onmouseout="rotateBack(this)" />
+    <p id="phoneText">0400974058</p>
+</div>
+<div id="email" class="zIndex">
+    <img id="emailIcon" src="~/images/Mail_black-512.png" alt="Email" onmouseover="rotateIcon(this)" onmouseout="rotateBack(this)" />
+    <p id="emailText">bnbaldwin1@gmail.com</p>
+</div>
+<div id="circle1" onclick="CirlceNavigation(this)">
+
+</div>
+<div id="circle2" onclick="CirlceNavigation(this)">
+
+</div>
+<div id="circle3" onclick="CirlceNavigation(this)">
+
+</div>
+
+
+
+<div id="topBanner" class="zIndex"></div>
+
+<img src="~/images/arrow_transparent.png" id="scrollLeft" class="zIndex"/>
+<img src="~/images/arrow_transparent.png" id="scrollRight" class="zIndex"/>
+<h1 id="titleLeft" class="zIndex">Professional and Sophisticated</h1>
+<p id="paragraphLeft" class="zIndex">Here are people who have found the software they required for their business</p>
+
+
+<h1 id="titleMiddle" class="zIndex">Blake Baldwin Software Solutions</h1>
+<p id="paragraphMiddle" class="zIndex">I provide professional software support, from designing and developing stylish websites to creating booking and payment systems. Does your business feel a bit like a disconnected mess? A business system might be what you are looking for. Contact me through the information in the top left</p>
+
+<h1 id="titleRight" class="zIndex">Find Your Website</h1>
+<p id="paragraphRight" class="zIndex">All the websites I create are designed to meet your needs. Bursting with colour, sleak and concise, I provide all.</p>
+<div id="contentMain" class="contentMain">
+    <div id="contentLeft" class="contentLeft">
+
+    </div>
+    <div id="contentMiddle" class="contentMiddle">
+
+    </div>
+    <div id="contentRight" class="contentRight">
     </div>
 
-    <div id="top1" onmouseover="expandBoxes(this)" class="topLeft col-md-6 col-xs-12" style="background-image: url('images/education.jpg');">
-        <h1 style="text-align:center;">Showcase</h1>
-    </div>
-    <div id="top2" onmouseover="expandBoxes(this)" class="topRight col-md-6 col-xs-12">
-        <h1 style="text-align:center;">Experience</h1>
-    </div>
-    <div id="bottom1" onmouseover="expandBoxes(this)" class="bottomLeft col-md-6 col-xs-12">
-        <h1 style="text-align:center;">Education</h1>
-    </div>
-    <div id="bottom2" onmouseover="expandBoxes(this)" class="bottomRight col-md-6 col-xs-12">
-        <h1 style="text-align:center;">References</h1>
-    </div>
-  </div>
+</div>
 <script>
-var top1 = document.getElementById("top1");
-var top2 = document.getElementById("top2");
-var bottom1 = document.getElementById("bottom1");
-var bottom2 = document.getElementById("bottom2");
-var topBar = document.getElementById("topBar");
+const contentMain = document.getElementById("contentMain");
+const contentLeft = document.getElementById("contentLeft");
+const contentMiddle = document.getElementById("contentMiddle");
+const contentRight = document.getElementById("contentRight");
+const scrollLeft = document.getElementById("scrollLeft");
+const scrollRight = document.getElementById("scrollRight");
+const phoneIcon = document.getElementById("phoneIcon");
+const emailIcon = document.getElementById("emailIcon");
+const circle1 = document.getElementById("circle1");
+const circle2 = document.getElementById("circle2");
+const circle3 = document.getElementById("circle3");
+const titleMiddle = document.getElementById("titleMiddle");
+const paragraphMiddle = document.getElementById("paragraphMiddle");
+const titleLeft = document.getElementById("titleLeft");
+const paragraphLeft = document.getElementById("paragraphLeft");
+const titleRight = document.getElementById("titleRight");
+const paragraphRight = document.getElementById("paragraphRight");
+const topBanner = document.getElementById("topBanner");
 
-function expandBoxes(box){
-    if (box == top1) {
-        top1.style.height = "60%";
-        top1.style.width = "80%";
-        top2.style.height = "60%";
-        top2.style.width = "20%";
-        bottom1.style.height = "20%";
-        bottom1.style.width = "80%";
-        bottom2.style.height = "20%";
-        bottom2.style.width = "20%";
+var locked = new Boolean(false);
+
+function moveObject() {
+    /*if (locked == false) {
+        if (obj == scrollLeft) {
+            locked = true;
+            
+           
+            scrollLeft.style.WebkitAnimationPlayState = "paused";
+            scrollLeft.style.animationPlayState = "paused";
+            contentLeft.style.width = "100%";
+            contentMiddle.style.width = "0%";
+            
+            scrollLeft.style.opacity = 0;
+        }
+        else if (obj == scrollRight) {
+            locked = true;
+            scrollRight.style.WebkitAnimationPlayState = "paused";
+            scrollRight.style.animationPlayState = "paused";
+            
+            contentMiddle.style.width = "0%";
+            contentRight.style.width = "100%";
+            
+            scrollRight.style.opacity = 0;
+        }
     }
-    else if (box == top2) {
-        top1.style.height = "60%";
-        top1.style.width = "25%";
-        top2.style.height = "60%";
-        top2.style.width = "75%";
-        bottom1.style.height = "20%";
-        bottom1.style.width = "25%";
-        bottom2.style.height = "20%";
-        bottom2.style.width = "75%";
+    else if (locked == true) {
+        locked = false;
+        }
+        */
+        contentLeft.style.width = "0%";
+        contentMiddle.style.width = "100%";
+        contentRight.style.width = "0%";
+        
+        
+    
+}
+
+function HorizontalScroll(obj, direction) {
+    
+    scrollLeft.style.pointerEvents = "none";
+    scrollRight.style.pointerEvents = "none";
+    if (direction == "left") {
+        if (obj == "contentMiddle") {
+            contentLeft.style.width = "100%";
+            contentMiddle.style.width = "0%";
+            contentRight.style.width = "0%";
+            setTimeout(function () {
+                scrollLeft.style.pointerEvents = "auto";
+                scrollRight.style.pointerEvents = "auto";
+            }, 1000);
+        }
+        else if (obj == "contentRight") {
+            contentLeft.style.width = "0%";
+            contentMiddle.style.width = "100%";
+            contentRight.style.width = "0%";
+            setTimeout(function () {
+                contentLeft.style.width = "100%";
+                contentMiddle.style.width = "0%";
+                contentRight.style.width = "0%";
+                setTimeout(function () {
+                    scrollLeft.style.pointerEvents = "auto";
+                    scrollRight.style.pointerEvents = "auto";
+                }, 1000);
+            }, 1000);
+        }
     }
-    else if (box == bottom1) {
-        top1.style.height = "20%";
-        top1.style.width = "78%";
-        top2.style.height = "20%";
-        top2.style.width = "22%";
-        bottom1.style.height = "60%";
-        bottom1.style.width = "78%";
-        bottom2.style.height = "60%";
-        bottom2.style.width = "22%";
+    else if (direction == "right") {
+        if (obj == "contentMiddle") {
+            contentLeft.style.width = "0%";
+            contentMiddle.style.width = "0%";
+            contentRight.style.width = "100%";
+            setTimeout(function () {
+                scrollLeft.style.pointerEvents = "auto";
+                scrollRight.style.pointerEvents = "auto";
+            }, 1000);
+        }
+        else if (obj == "contentLeft") {
+            contentLeft.style.width = "0%";
+            contentMiddle.style.width = "100%";
+            contentRight.style.width = "0%";
+            setTimeout(function () {
+                contentLeft.style.width = "0%";
+                contentMiddle.style.width = "0%";
+                contentRight.style.width = "100%";
+                setTimeout(function () {
+                    scrollLeft.style.pointerEvents = "auto";
+                    scrollRight.style.pointerEvents = "auto";
+                }, 1000);
+            }, 1000);
+        }
     }
-    else if (box == bottom2) {
-        top1.style.height = "20%";
-        top1.style.width = "27%";
-        top2.style.height = "20%";
-        top2.style.width = "73%";
-        bottom1.style.height = "60%";
-        bottom1.style.width = "27%";
-        bottom2.style.height = "60%";
-        bottom2.style.width = "73%";
+    
+}
+
+function TextManagement(text, ioo) {
+    if (text == 'middle') {
+        if (ioo == 'out') {
+            paragraphMiddle.style.opacity = 0;
+            titleMiddle.style.opacity = 0;
+        }
+        else if (ioo == 'in') {
+            paragraphMiddle.style.opacity = 1;
+            titleMiddle.style.opacity = 1;
+        }
     }
-    else if (box == topBar) {
-        top1.style.height = "40%";
-        top1.style.width = "50%";
-        top2.style.height = "40%";
-        top2.style.width = "50%";
-        bottom1.style.height = "40%";
-        bottom1.style.width = "50%";
-        bottom2.style.height = "40%";
-        bottom2.style.width = "50%";
+    else if (text == 'left') {
+        if (ioo == 'out') {
+            paragraphLeft.style.opacity = 0;
+            titleLeft.style.opacity = 0;
+        }
+        else if (ioo == 'in') {
+            paragraphLeft.style.opacity = 1;
+            titleLeft.style.opacity = 1;
+        }
     }
-    else {
-        top1.style.height = "40%";
-        top1.style.width = "50%";
-        top2.style.height = "40%";
-        top2.style.width = "50%";
-        bottom1.style.height = "40%";
-        bottom1.style.width = "50%";
-        bottom2.style.height = "40%";
-        bottom2.style.width = "50%";
+    else if (text == 'right') {
+        if (ioo == 'out') {
+            paragraphRight.style.opacity = 0;
+            titleRight.style.opacity = 0;
+        }
+        else if (ioo == 'in') {
+            paragraphRight.style.opacity = 1;
+            titleRight.style.opacity = 1;
+        }
+    }
+    
+}
+
+function CirlceNavigation(item) {
+    circle1.style.pointerEvents = "none";
+    circle2.style.pointerEvents = "none";
+    circle3.style.pointerEvents = "none";
+    bannerResize('out');
+    if (item == circle1) {
+
+        scrollLeft.style.opacity = 0;
+        scrollRight.style.opacity = 1;
+        topBanner.style.width = "50%";
+        topBanner.style.left = "24%";
+        HorizontalScroll('contentMiddle','left');
+        circle1.style.backgroundColor = "black";
+        circle2.style.backgroundColor = "transparent";
+        circle3.style.backgroundColor = "transparent";
+        TextManagement('middle', 'out');
+        TextManagement('right', 'out');
+        
+    }
+    else if (item == circle2) {
+        scrollLeft.style.opacity = 1;
+        scrollRight.style.opacity = 1;
+        moveObject();
+        circle1.style.backgroundColor = "transparent";
+        circle2.style.backgroundColor = "black";
+        circle3.style.backgroundColor = "transparent";
+        topBanner.style.width = "56%";
+        topBanner.style.left = "21%";
+        TextManagement('left', 'out');
+        TextManagement('right', 'out');
+        
+    }
+    else if (item == circle3) {
+        scrollRight.style.opacity = 0;
+        scrollLeft.style.opacity = 1;
+        topBanner.style.width = "31%";
+        topBanner.style.left = "34%";
+        HorizontalScroll('contentMiddle', 'right');
+        circle1.style.backgroundColor = "transparent";
+        circle2.style.backgroundColor = "transparent";
+        circle3.style.backgroundColor = "black";
+        TextManagement('middle', 'out');
+        TextManagement('left', 'out');
+        
+        
+        
+    }
+    setTimeout(function () {
+        circle1.style.pointerEvents = "auto";
+        circle2.style.pointerEvents = "auto";
+        circle3.style.pointerEvents = "auto";
+        bannerResize('in');
+        if (item == circle1) {
+            TextManagement('left', 'in');
+        }
+        else if (item == circle2) {
+            TextManagement('middle', 'in');
+        }
+        else if (item == circle3) {
+            TextManagement('right', 'in');
+            
+        }
+    }, 1000);
+    
+}
+
+function bannerResize(ioo) {
+    if (ioo == 'in') {
+        document.getElementById("topBanner").style.borderTop = "100px solid black";
+    }
+    else if (ioo == 'out') {
+        document.getElementById("topBanner").style.borderTop = "0px solid black";
+    }
+    
+    
+}
+
+function Reable() {
+    
+    circle1.style.pointerEvents = "auto";
+    circle2.style.pointerEvents = "auto";
+    circle3.style.pointerEvents = "auto";
+}
+
+function rotateIcon(name) {
+    if (name == phoneIcon) {
+        phoneIcon.style.transform = "rotate(90deg)";
+    }
+    else if (name == emailIcon) {
+        emailIcon.style.transform = "rotate(90deg)";
     }
 }
 
-function clipboard() {
+function rotateBack(name1) {
+    if (name1 == phoneIcon) {
+        phoneIcon.style.transform = "rotate(0deg)";
+    }
+    else if (name1 == emailIcon) {
+        emailIcon.style.transform = "rotate(0deg)";
+    }
+}
 
+function FillCircle(obj) {
+    if (obj == circle1) {
+        obj.style.backgroundColor = "black";
+        circle2.style.backgroundColor = "transparent";
+        circle3.style.backgroundColor = "transparent";
+    }
+    else if (obj == circle2) {
+        obj.style.backgroundColor = "black";
+        circle1.style.backgroundColor = "transparent";
+        circle3.style.backgroundColor = "transparent";
+    }
+    else if (obj == circle3) {
+        obj.style.backgroundColor = "black";
+        circle1.style.backgroundColor = "transparent";
+        circle2.style.backgroundColor = "transparent";
+    }
+    
+
+}
+
+function TextPhaseIn() {
+    
+    titleMiddle.style.opacity = 1;
+    paragraphMiddle.style.opacity = 1;
+    titleMiddle.top = "2%";
+    paragraphMiddle.top = "25%";
+}
+
+function TextPhaseOut(item) {
+    item.style.opacity = 0;
 }
 </script>
 </body>
