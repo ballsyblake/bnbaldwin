@@ -1,4 +1,4 @@
-﻿/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification\ 
+/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification\ 
 for details on configuring this project to bundle and minify static web assets. */
 html, body {
     height: 100vh;
@@ -15,33 +15,59 @@ h1 {
     letter-spacing: 0px;
 }
 
+@media screen and (max-width: 1600px) {
+    h1 {
+        font-size: 20px;
+    }
+   
+}
+
 p {
+    max-width: 70%;
+    text-align: center;
+    padding-right: 10%;
     font-family: "Roboto";
     font-size: 30px;
     font-weight: 500;
     text-transform: none;
-    color: black;
+    color: white;
     line-height: 1.4em;
 }
+
+
+
+@media screen and (max-width: 800px) {
+    p {
+        font-size: 15px;
+    }
+    h1 {
+        font-size: 20px;
+    }
+}
+
+
+
+
+
 
 .zIndex {
     z-index: 1;
 }
 
 #topBanner {
+    
     opacity: 0.7;
     position: fixed;
-    left: 21%;
-    border-top: 100px solid black;
-    border-left: 40px solid transparent;
-    border-right: 40px solid transparent;
+    z-index: 0;
+    border-top: 100px solid white;
+    
     height: 0;
-    width: 56%;
+    width: 100%;
     transition: all 0.25s;
 }
 
 #titleLeft {
-    color: white;
+    color: black;
     position: fixed;
     top: 1%;
     left: 27%;
@@ -51,19 +77,19 @@ p {
 }
 
 #titleMiddle {
-    color: white;
+    color: black;
     z-index: 1;
     position: fixed;
     top: 1%;
     left: 25%;
-    max-width: 50%;
+    max-width: 60%;
     opacity: 0;
     transition: all 0.25s;
     animation: slideinTop ease-out 1s;
 }
 
 #titleRight {
-    color: white;
+    color: black;
     position: fixed;
     top: 1%;
     left: 37%;
@@ -74,7 +100,7 @@ p {
 
 #paragraphLeft {
     position: fixed;
-    top: 20%;
+    top: 15%;
     left: 25%;
     max-width: 1000px;
     opacity: 0;
@@ -82,20 +108,22 @@ p {
 }
 
 #paragraphMiddle {
+    color: black;
     position: fixed;
-    top: 18%;
-    left: 25%;
-    max-width: 1000px;
+    top: 15%;
+    left: 20%;
+    text-align: center;
     opacity: 0;
     transition: all 0.25s;
     animation: slideinTop ease-out 1s;
 }
 
 #paragraphRight {
+    text-align: center;
     position: fixed;
-    top: 20%;
+    top: 15%;
     left: 25%;
-    max-width: 1000px;
+    max-width: 75%;
     opacity: 0;
     transition: all 0.25s;
 }
@@ -108,7 +136,7 @@ p {
 .contentMain {
     
     height: 100%;
-    overflow-x: hidden;
+    overflow: hidden;
     display: flex;
     flex-wrap: nowrap;
     align-items: stretch;
@@ -117,7 +145,7 @@ p {
 
 .contentLeft {
     overflow: hidden;
-    background-image: url(../images/handShake.jpg);
+    background-image: url(../images/flowerDark.jpg);
     background-size: 1920px 100%;
     background-repeat: no-repeat;
     border: none;
@@ -126,13 +154,13 @@ p {
     padding-top: 0px;
     visibility: visible;
     transition: all 1s;
-    filter: blur(5px);
-    transform: scale(1.1);
+    /*filter: blur(5px);*/
+    
 }
 
 .contentMiddle {
     overflow: hidden;
-    background-image: url(../images/Laptop.jpg);
+    background-image: url(../images/web-design.jpeg);
     background-size: 1920px 100%;
     background-repeat: no-repeat;
     border: none;
@@ -141,13 +169,13 @@ p {
     padding-top: 0px;
     visibility: visible;
     transition: all 1s;
-    filter: blur(5px);
-    transform: scale(1.1);
+    /*filter: blur(5px);*/
+    
 }
 
 .contentRight {
     overflow: hidden;
-    background-image: url(../images/uni.jpg);
+    background-image: url(../images/stairsDark.jpg);
     background-size: 1920px 100%;
     background-repeat: no-repeat;
     border: none;
@@ -156,8 +184,8 @@ p {
     padding-top: 0px;
     visibility: visible;
     transition: all 1s;
-    filter: blur(5px);
-    transform: scale(1.1);
+    /*filter: blur(5px);*/
+    
 }
 
 .contentBottom {
@@ -168,6 +196,15 @@ p {
     padding-top: 0px;
     visibility: visible;
     transition: all 1s;
+}
+
+#inskincare {
+    background-image: url(../images/inskincare_fullWebsitePhoto.png);
+    background-repeat: no-repeat;
+    background-size: cover;
+    
+    width: 110%;
+    
 }
 
 #scrollLeft {
@@ -199,27 +236,36 @@ p {
 }
 
 #avatar {
-    position:fixed;
-    top: 5px;
-    left: 5px;
+    z-index: 1;
+    color: white;
+    position: fixed;
+    top: 2%;
+    left: 1%;
 }
 
 #avatarIcon {
+    background-color: white;
     border-radius: 50%;
-    border: solid black;
+    border: solid white;
+    width: auto;
+    height: auto;
 }
 
 #phone {
+    color: white;
     position: fixed;
     top: 20px;
     left: 200px;
+    
 }
 
 #phoneIcon {
+    background-color: white;
     transition: ease-in-out 3000ms ease all;
     width: 30px;
     height: 30px;
     z-index: 1;
+    border-radius: 50%;
 }
 
 #phoneIcon:hover ~ #phoneText {
@@ -229,6 +275,7 @@ p {
 }
 
 #phoneText {
+    color: white;
     font-size: 20px;
     position: absolute;
     top: 0px;
@@ -241,15 +288,19 @@ p {
 }
 
 #email {
+    color: white;
     position: fixed;
-    top: 180px;
+    top: 200px;
     left: 200px;
 }
 
 #emailIcon {
+    background-color: white;
     transition: ease-in-out 3000ms ease all;
     width: 25px;
     height: 25px;
+    border-radius: 90%;
+    z-index: 1;
 }
 
 #emailIcon:hover ~ #emailText {
@@ -259,6 +310,7 @@ p {
 }
 
 #emailText {
+    color: white;
     font-size: 20px;
     position: absolute;
     top: -1px;
@@ -282,7 +334,7 @@ p {
     opacity: 1;
     background-color: transparent;
     border-radius: 50%;
-    border: 2px solid #000000;
+    border: 2px solid white;
 }
 #circle2 {
     font-size: 30px;
@@ -294,9 +346,9 @@ p {
     width: 20px;
     height: 20px;
     opacity: 1;
-    background-color: #000000;
+    background-color: white;
     border-radius: 50%;
-    border: 2px solid #000000;
+    border: 2px solid white;
 }
 #circle3 {
     font-size: 30px;
@@ -310,7 +362,7 @@ p {
     opacity: 1;
     background-color: transparent;
     border-radius: 50%;
-    border: 2px solid #000000;
+    border: 2px solid white;
 }
 
 @keyframes arrowFade {
@@ -325,3 +377,32 @@ p {
     -moz-box-shadow: 0 10px 6px -6px #777;
     box-shadow: 0 10px 6px -6px #777;
 }
+
+figure {
+    height: auto;
+    width: auto;
+    position: relative;
+}
+
+figcaption {
+    margin: 0px;
+    background-color: black;
+    opacity: 0.8;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font-size: 2em;
+    text-align: center;
+    top: 0px;
+    bottom: 0px;
+    left: 0px;
+    right: 0px;
+    position: absolute;
+    padding-top: 10%;
+    visibility: hidden;
+    color: white;
+}
+
+figure:hover > figcaption {
+    visibility: visible;
+}
+
+
