@@ -159,6 +159,7 @@ function moveObject() {
             
             scrollLeft.style.opacity = 0;
         }
+
         else if (obj == scrollRight) {
             locked = true;
             scrollRight.style.WebkitAnimationPlayState = "paused";
@@ -282,10 +283,9 @@ function CirlceNavigation(item) {
 
         scrollLeft.style.opacity = 0;
         scrollRight.style.opacity = 1;
-        topBanner.style.width = "50%";
-        topBanner.style.left = "24%";
+        
         HorizontalScroll('contentMiddle','left');
-        circle1.style.backgroundColor = "black";
+        circle1.style.backgroundColor = "white";
         circle2.style.backgroundColor = "transparent";
         circle3.style.backgroundColor = "transparent";
         TextManagement('middle', 'out');
@@ -297,10 +297,9 @@ function CirlceNavigation(item) {
         scrollRight.style.opacity = 1;
         moveObject();
         circle1.style.backgroundColor = "transparent";
-        circle2.style.backgroundColor = "black";
+        circle2.style.backgroundColor = "white";
         circle3.style.backgroundColor = "transparent";
-        topBanner.style.width = "56%";
-        topBanner.style.left = "21%";
+        
         TextManagement('left', 'out');
         TextManagement('right', 'out');
         
@@ -308,12 +307,11 @@ function CirlceNavigation(item) {
     else if (item == circle3) {
         scrollRight.style.opacity = 0;
         scrollLeft.style.opacity = 1;
-        topBanner.style.width = "31%";
-        topBanner.style.left = "34%";
+        
         HorizontalScroll('contentMiddle', 'right');
         circle1.style.backgroundColor = "transparent";
         circle2.style.backgroundColor = "transparent";
-        circle3.style.backgroundColor = "black";
+        circle3.style.backgroundColor = "white";
         TextManagement('middle', 'out');
         TextManagement('left', 'out');
         
@@ -341,10 +339,10 @@ function CirlceNavigation(item) {
 
 function bannerResize(ioo) {
     if (ioo == 'in') {
-        document.getElementById("topBanner").style.borderTop = "100px solid black";
+        document.getElementById("topBanner").style.borderTop = "100px solid white";
     }
     else if (ioo == 'out') {
-        document.getElementById("topBanner").style.borderTop = "0px solid black";
+        document.getElementById("topBanner").style.borderTop = "0px solid white";
     }
     
     
@@ -377,17 +375,17 @@ function rotateBack(name1) {
 
 function FillCircle(obj) {
     if (obj == circle1) {
-        obj.style.backgroundColor = "black";
+        obj.style.backgroundColor = "white";
         circle2.style.backgroundColor = "transparent";
         circle3.style.backgroundColor = "transparent";
     }
     else if (obj == circle2) {
-        obj.style.backgroundColor = "black";
+        obj.style.backgroundColor = "white";
         circle1.style.backgroundColor = "transparent";
         circle3.style.backgroundColor = "transparent";
     }
     else if (obj == circle3) {
-        obj.style.backgroundColor = "black";
+        obj.style.backgroundColor = "white";
         circle1.style.backgroundColor = "transparent";
         circle2.style.backgroundColor = "transparent";
     }
