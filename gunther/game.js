@@ -14,7 +14,7 @@
   let portrait = false;
 
   // ---------------------------------------------------------------- assets
-  const ASSET_NAMES = ['gunther-idle', 'gunther-run', 'gunther-death', 'orc-yellow', 'orc-red',
+  const ASSET_NAMES = ['gunther', 'orc-yellow', 'orc-red',
     'trees', 'keep', 'houses', 'grass', 'orc-tent', 'big-tree'];
   const img = {};
 
@@ -107,13 +107,28 @@
     ctx.restore();
   }
 
-  // Gunther's art sits in the middle of a 150x150 frame, with his feet near y=95.
+  // Gunther and the orcs share one sheet layout: 32x32 frames, 10 columns,
+  // rows for idle (0), walk (2), attack (3) and death (4). Feet are at the bottom of the frame.
   function drawGunther(x, y, scale, anim, time, flip) {
-    const sheets = { idle: ['gunther-idle', 8], run: ['gunther-run', 8], death: ['gunther-death', 6] };
-    const [name, count] = sheets[anim];
-    let frame = Math.floor(time * 10);
-    frame = anim === 'death' ? Math.min(frame, count - 1) : frame % count;
-    drawFrame(img[name], 150, 150, frame, 0, x, y - 20 * scale, scale, flip);
+    let row = 0, col = Math.floor(time * 8) % 10;
+    if (anim === 'run') { row = 2; col = Math.floor(time * 12) % 10; }
+    else if (anim === 'shoot') { row = 3; col = 3 + Math.min(Math.floor(time * 24), 5); }
+    else if (anim === 'death') { row = 4; col = Math.min(Math.floor(time * 10), 9); }
+    shadow(x, y + 2 * scale, 7 * scale);
+    drawFrame(img.gunther, 32, 32, col, row, x, y - 13 * scale, scale, flip);
+  }
+
+  // Soft oval shadow so characters and trees look planted on the ground.
+  function shadow(x, y, r) {
+    ctx.fillStyle = 'rgba(20, 40, 20, 0.28)';
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // One grass tile. Mostly plain, with a few tufts picked by a hash so it doesn't look like a chessboard.
+  function drawGrass(sx, sy, tx, ty) {
+    const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
+    const v = h % 11;
+    ctx.drawImage(img.grass, v === 0 ? 16 : (v === 1 ? 32 : 0), 0, 16, 16, sx, sy, 48, 48);
   }
 
   function text(str, x, y, size, colour, align) {
@@ -289,13 +304,13 @@
             !isLand((tx + 0.5) * TILE, (ty + 1.5) * TILE) || !isLand((tx + 0.5) * TILE, (ty - 0.5) * TILE);
           if (edge) { ctx.fillStyle = '#e7d593'; ctx.fillRect(sx, sy, TILE, TILE); }
           else {
-            const v = (tx * 7 + ty * 13) % 5;
-            ctx.drawImage(img.grass, v === 0 ? 16 : (v === 1 ? 32 : 0), v === 2 ? 16 : 0, 16, 16, sx, sy, TILE, TILE);
+            drawGrass(sx, sy, tx, ty);
           }
         }
       }
       // Places, scenery and Gunther, sorted so things lower on screen draw in front.
       const things = decor.map(d => ({ y: d.y, draw: () => {
+        shadow(d.x - cam.x, d.y - cam.y + 12, 16);
         if (d.kind === 'tree') ctx.drawImage(img.trees, d.variant * 16, 0, 16, 16, d.x - cam.x - 24, d.y - cam.y - 34, 48, 48);
         else ctx.drawImage(img.houses, d.variant * 16, 0, 16, 16, d.x - cam.x - 24, d.y - cam.y - 30, 48, 48);
       } }));
@@ -313,7 +328,7 @@
         } });
       });
       const p = this.player;
-      things.push({ y: p.y, draw: () => drawGunther(p.x - cam.x, p.y - cam.y - 14, 1.3, p.moving ? 'run' : 'idle', p.time, p.flip) });
+      things.push({ y: p.y, draw: () => drawGunther(p.x - cam.x, p.y - cam.y, 2, p.moving ? 'run' : 'idle', p.time, p.flip) });
       things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
 
       drawStats(24, 16);
@@ -344,7 +359,7 @@
     enter() {
       // A battle never starts below half health, so a loss can never leave you stuck.
       game.health = Math.max(game.health, game.maxHealth * 0.5);
-      this.p = { x: W / 2, y: H / 2, flip: false, time: 0, moving: false, dead: false, deadTime: 0, hurtFlash: 0 };
+      this.p = { x: W / 2, y: H / 2, flip: false, time: 0, moving: false, dead: false, deadTime: 0, hurtFlash: 0, shootTime: 9 };
       this.orcs = [];
       this.arrows = [];
       this.kills = 0;
@@ -383,6 +398,7 @@
       const p = this.p;
       p.time += dt;
       p.hurtFlash = Math.max(0, p.hurtFlash - dt);
+      p.shootTime += dt;
       if (p.dead) { p.deadTime += dt; }
 
       if (!this.over) {
@@ -407,16 +423,17 @@
         let wantFire = false;
         if (pointer.touch) {
           const o = this.nearestOrc();
-          if (o) { this.aim = Math.atan2(o.y - 16 - (p.y - 48), o.x - p.x); wantFire = dist(o.x, o.y, p.x, p.y) < 520; }
+          if (o) { this.aim = Math.atan2(o.y - 16 - (p.y - 28), o.x - p.x); wantFire = dist(o.x, o.y, p.x, p.y) < 520; }
         } else {
-          this.aim = Math.atan2(pointer.y - (p.y - 48), pointer.x - p.x);
+          this.aim = Math.atan2(pointer.y - (p.y - 28), pointer.x - p.x);
           wantFire = pointer.down || keys[' '];
         }
         p.flip = Math.cos(this.aim) < 0;
         this.fireTimer -= dt;
         if (wantFire && this.fireTimer <= 0) {
           this.fireTimer = rules.fireDelay();
-          this.arrows.push({ x: p.x + Math.cos(this.aim) * 26, y: p.y - 48 + Math.sin(this.aim) * 26, a: this.aim, travelled: 0 });
+          p.shootTime = 0;
+          this.arrows.push({ x: p.x + Math.cos(this.aim) * 26, y: p.y - 28 + Math.sin(this.aim) * 26, a: this.aim, travelled: 0 });
         }
 
         // Spawning.
@@ -507,18 +524,23 @@
       const p = this.p;
       for (let y = 0; y < H; y += 48) {
         for (let x = 0; x < W; x += 48) {
-          const v = ((x / 48) * 7 + (y / 48) * 13) % 5;
-          ctx.drawImage(img.grass, v === 0 ? 16 : (v === 1 ? 32 : 0), v === 2 ? 16 : 0, 16, 16, x, y, 48, 48);
+          drawGrass(x, y, x / 48, y / 48);
         }
       }
       const things = [];
-      for (const t of TREES) things.push({ y: t.y, draw: () => ctx.drawImage(img['big-tree'], t.x - 65, t.y - 176, 130, 188) });
+      // Darker ground towards the edges so the arena reads as a forest clearing.
+      const shade = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
+      shade.addColorStop(0, 'rgba(30, 70, 30, 0)');
+      shade.addColorStop(1, 'rgba(30, 70, 30, 0.45)');
+      ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+      for (const t of TREES) things.push({ y: t.y, draw: () => { shadow(t.x, t.y + 6, 44); ctx.drawImage(img['big-tree'], t.x - 65, t.y - 176, 130, 188); } });
       for (const o of this.orcs) {
         things.push({ y: o.y, draw: () => {
           let col, row;
           if (o.state === 'dead') { row = 4; col = Math.min(Math.floor(o.stateTime * 10), 9); ctx.globalAlpha = clamp((1.6 - o.stateTime) / 0.6, 0, 1); }
           else if (o.state === 'attack') { row = 3; col = 5 + Math.floor(o.stateTime * 12) % 5; }
           else { row = 2; col = Math.floor(o.time * 8) % 10; }
+          if (o.state !== 'dead') shadow(o.x, o.y + 6, 13);
           if (o.flash > 0) ctx.filter = 'brightness(2.2)';
           drawFrame(img[o.red ? 'orc-red' : 'orc-yellow'], 32, 32, col, row, o.x, o.y - 26, 2, o.flip);
           ctx.filter = 'none';
@@ -526,14 +548,15 @@
         } });
       }
       things.push({ y: p.y, draw: () => {
-        if (p.hurtFlash > 0) ctx.filter = 'brightness(1.8) saturate(2)';
-        drawGunther(p.x, p.y - 22, 2, p.dead ? 'death' : (p.moving ? 'run' : 'idle'), p.dead ? p.deadTime : p.time, p.flip);
+        if (p.hurtFlash > 0) ctx.filter = 'brightness(1.7)';
+        const shooting = !p.dead && p.shootTime < 0.25;
+        drawGunther(p.x, p.y, 2, p.dead ? 'death' : (shooting ? 'shoot' : (p.moving ? 'run' : 'idle')),
+          p.dead ? p.deadTime : (shooting ? p.shootTime : p.time), p.flip);
         ctx.filter = 'none';
-        if (!p.dead) drawBow(p.x, p.y - 48, this.aim);
         // Health bar above his head.
-        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(p.x - 26, p.y - 100, 52, 7);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(p.x - 26, p.y - 74, 52, 7);
         ctx.fillStyle = game.health > game.maxHealth * 0.3 ? '#50f08b' : '#f05a50';
-        ctx.fillRect(p.x - 25, p.y - 99, 50 * game.health / game.maxHealth, 5);
+        ctx.fillRect(p.x - 25, p.y - 73, 50 * game.health / game.maxHealth, 5);
       } });
       things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
       for (const a of this.arrows) drawArrow(a.x, a.y, a.a);
@@ -559,15 +582,6 @@
     if (d < r && d > 0) { obj.x = cx + (obj.x - cx) / d * r; obj.y = cy + (obj.y - cy) / d * r; }
   }
 
-  function drawBow(x, y, angle) {
-    ctx.save();
-    ctx.translate(x, y); ctx.rotate(angle);
-    ctx.strokeStyle = '#e9e4d8'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(14, -16); ctx.lineTo(14, 16); ctx.stroke();
-    ctx.strokeStyle = '#8a4b1f'; ctx.lineWidth = 3.5;
-    ctx.beginPath(); ctx.moveTo(14, -16); ctx.quadraticCurveTo(30, 0, 14, 16); ctx.stroke();
-    ctx.restore();
-  }
   function drawArrow(x, y, angle) {
     ctx.save();
     ctx.translate(x, y); ctx.rotate(angle);
