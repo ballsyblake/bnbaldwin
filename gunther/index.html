@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Gunther</title>
+  <meta name="description" content="Gunther: clear orc camps, earn gold and gear up in town. A small browser action game by Blake Baldwin.">
+  <meta property="og:title" content="Gunther">
+  <meta property="og:description" content="Clear orc camps, earn gold and gear up in town.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #14161a; color: #eceef2; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
+    #stage { position: relative; width: min(100%, calc((100vh - 56px) * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+    #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10, 12, 16, 0.72); padding: 12px; }
+    #overlay.show { display: flex; }
+    .panel { background: #1f232b; border: 2px solid #c9a24a; border-radius: 12px; padding: clamp(12px, 3vw, 28px); width: min(100%, 460px); max-height: 100%; overflow: auto; text-align: center; }
+    .panel h1 { font-size: clamp(1.6rem, 6vw, 3rem); letter-spacing: 0.08em; color: #f0cf7a; }
+    .panel h2 { font-size: clamp(1.2rem, 4vw, 1.7rem); color: #f0cf7a; }
+    .panel p { color: #c5cad6; margin: 8px 0; font-size: clamp(0.8rem, 2.4vw, 1rem); }
+    .panel .stats { color: #eceef2; font-weight: 600; }
+    .panel button { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; font: inherit; font-weight: 600; color: #14161a; background: #f0cf7a; border: 0; border-radius: 8px; cursor: pointer; }
+    .panel button:hover:not(:disabled) { background: #ffe19a; }
+    .panel button:disabled { background: #4a4f5c; color: #9097a6; cursor: default; }
+    .panel button.secondary { background: #343a47; color: #eceef2; }
+    .panel .msg { min-height: 1.5em; color: #9fd99a; }
+    @media (max-height: 460px) {
+      body { padding: 2px; gap: 2px; }
+      #stage { width: min(100%, calc((100vh - 28px) * 16 / 9)); }
+      .panel { padding: 8px 14px; width: min(100%, 560px); }
+      .panel p { margin: 2px 0; font-size: 0.78rem; line-height: 1.3; }
+      .panel h1, .panel h2 { font-size: 1.2rem; }
+      .panel button { padding: 5px 10px; margin-top: 5px; font-size: 0.85rem; }
+    }
+    footer { font-size: 0.8rem; color: #8b91a0; }
+    footer a { color: #9db8ff; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="960" height="540"></canvas>
+    <div id="overlay"></div>
+  </div>
+  <footer><a href="../">Back to bnbaldwin.com</a></footer>
+  <script src="game.js"></script>
+</body>
+</html>
