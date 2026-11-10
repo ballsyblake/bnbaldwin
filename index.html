@@ -4,7 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Blake Baldwin</title>
-  <meta name="description" content="Blake Baldwin: games and apps I build on the side.">
+  <meta name="description" content="Blake Baldwin: IT graduate studying a Master of Cyber Security, building games and apps on the side.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bnbaldwin.com/">
+  <meta property="og:title" content="Blake Baldwin">
+  <meta property="og:description" content="IT graduate studying a Master of Cyber Security, building games and apps on the side.">
+  <meta property="og:image" content="https://bnbaldwin.com/images/me.jpg">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
@@ -74,7 +81,8 @@
     }
     .card h3 { font-size: 1.1rem; }
     .card p { color: var(--muted); font-size: 0.95rem; flex: 1; }
-    .card img { width: 100%; border-radius: 8px; image-rendering: pixelated; }
+    .card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .card img.pixel { image-rendering: pixelated; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .tags span { font-size: 0.75rem; background: var(--tag); padding: 2px 8px; border-radius: 6px; }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.9rem; font-weight: 600; }
@@ -86,6 +94,7 @@
 
     .list { list-style: none; display: grid; gap: 14px; }
     .list li { display: grid; grid-template-columns: 1fr; gap: 2px; }
+    .list em { font-style: normal; color: var(--muted); font-size: 0.85rem; }
     .list strong { font-weight: 600; }
     .list span { color: var(--muted); font-size: 0.95rem; }
 
@@ -98,7 +107,7 @@
       <img src="images/me.jpg" alt="Blake Baldwin">
       <div>
         <h1>Blake Baldwin</h1>
-        <p>Developer and referee. I build games and small apps on the side.</p>
+        <p>IT graduate studying a Master of Cyber Security. I build games and small apps on the side.</p>
         <div class="links">
           <a href="https://github.com/ballsyblake">GitHub</a>
           <a href="https://www.linkedin.com/in/blake-baldwin-22b68ba9/">LinkedIn</a>
@@ -111,6 +120,7 @@
       <h2>Projects</h2>
       <div class="grid">
         <article class="card">
+          <a href="https://ballsyblake.github.io/A-little-to-the-left/"><img src="images/just-so.jpg" alt="Just So: a row of mugs to turn so their handles match" loading="lazy"></a>
           <h3>Just So</h3>
           <p>A cozy tidying puzzle for your phone. 100 levels where everything has a right place.</p>
           <div class="tags"><span>TypeScript</span><span>Vite</span><span>Mobile web</span></div>
@@ -121,6 +131,7 @@
         </article>
 
         <article class="card">
+          <a href="https://ballsyblake.github.io/croc-2/"><img class="pixel" src="images/bimbles-bounce.jpg" alt="Bimble's Bounce: the mascot in a low-poly grassy level" loading="lazy"></a>
           <h3>Bimble's Bounce</h3>
           <p>A low-poly 3D collect-a-thon platformer that runs in iPhone Safari. Early test level.</p>
           <div class="tags"><span>three.js</span><span>Rapier physics</span><span>PWA</span></div>
@@ -139,7 +150,7 @@
 
         <article class="card">
           <h3>Gunther</h3>
-          <a href="https://github.com/ballsyblake/Gunther"><img src="images/Gunther.gif" alt="Gunther gameplay"></a>
+          <a href="https://github.com/ballsyblake/Gunther"><img class="pixel" src="images/Gunther.gif" alt="Gunther title screen" loading="lazy"></a>
           <p>A 2D action game, first built in MonoGame and now being rebuilt in Godot.</p>
           <div class="tags"><span>C#</span><span>MonoGame</span><span>Godot</span></div>
           <div class="actions">
@@ -149,21 +160,34 @@
       </div>
     </section>
 
+    <section id="about">
+      <h2>About</h2>
+      <p>I'm an IT graduate from the University of Canberra, now studying a Master of Cyber Security at QUT. My day job is in football administration: running competitions, managing data and reporting, and working with a lot of stakeholders. On the side I build games and small web apps to keep learning.</p>
+    </section>
+
     <section id="experience">
       <h2>Experience</h2>
       <ul class="list">
-        <li><strong>Head Website Developer, InSkinCare</strong><span>Designed, built and maintained <a href="https://www.inskincare.com.au">the business website</a>.</span></li>
-        <li><strong>Appointments Manager, North Canberra Futsal</strong><span>Appointed 60+ referees across 200+ teams' fixtures.</span></li>
-        <li><strong>Football and Futsal Referee, Capital Football</strong><span>Fast decisions, clear communication, conflict resolution.</span></li>
-        <li><strong>IT Instructor, ScopeIT Education</strong><span>Planned and taught programming classes in schools.</span></li>
+        <li><strong>Coach Education Administrator, Football Queensland</strong><em>Jan 2025 to present</em><span>Stakeholder support, feedback analysis and reporting to improve service delivery.</span></li>
+        <li><strong>Competitions Coordinator (Futsal), Football Queensland and Capital Football</strong><em>Jul 2023 to Jan 2025</em><span>Ran Canberra's futsal competitions end to end. Grew participation 18% and launched a new elite pathway competition.</span></li>
+        <li><strong>Club Administrator and Referee Coordinator, North Canberra Futsal</strong><em>Aug 2019 to Jul 2023</em><span>Built a data-driven system for scheduling staff and tracking performance, automating manual processing.</span></li>
+        <li><strong>Front-End Web Developer, InSkinCare</strong><span>Built and maintained <a href="https://www.inskincare.com.au">the business website</a>.</span></li>
+        <li><strong>Futsal and Football Referee, Football Australia</strong><em>2018 to present</em></li>
       </ul>
+    </section>
+
+    <section id="skills">
+      <h2>Skills</h2>
+      <div class="tags">
+        <span>Cyber security fundamentals</span><span>Access control</span><span>System administration</span><span>Cloud and IoT</span><span>Python</span><span>SQL</span><span>TypeScript</span><span>React</span><span>Firebase</span><span>Power BI</span><span>Excel</span>
+      </div>
     </section>
 
     <section id="education">
       <h2>Education</h2>
       <ul class="list">
-        <li><strong>University of Canberra</strong><span>IT studies, from 2018</span></li>
-        <li><strong>University of the Sunshine Coast</strong><span>2015 to 2017, transferred</span></li>
+        <li><strong>Master of Cyber Security, Queensland University of Technology</strong><em>Oct 2025 to present</em></li>
+        <li><strong>Bachelor of Information Technology, University of Canberra</strong><em>2018 to 2020, graduated</em><span>AI, cyber security and system administration, data science, cloud computing and IoT.</span></li>
       </ul>
     </section>
 
