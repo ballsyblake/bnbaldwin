@@ -15,7 +15,7 @@
 
   // ---------------------------------------------------------------- assets
   const ASSET_NAMES = ['gunther', 'orc-yellow', 'orc-red',
-    'trees', 'keep', 'houses', 'grass', 'orc-tent', 'big-tree'];
+    'trees', 'rocks', 'keep', 'houses', 'grass', 'orc-tent', 'big-tree'];
   const img = {};
 
   function loadAssets() {
@@ -196,30 +196,115 @@
   const MAP_H = 30;
   const TOWN = { tx: 14, ty: 17, label: 'Town', colour: '#ffd95a' };
   const CAMP = { tx: 30, ty: 11, label: 'Orc Camp', colour: '#ff5a4a' };
-  const land = [];      // land[y][x] = true where Gunther can walk
-  const decor = [];     // trees and houses scattered on the island
+  const WORLD_W = MAP_W * TILE;
+  const WORLD_H = MAP_H * TILE;
+  const PX = 3;                       // one terrain pixel = 3 world pixels, same chunkiness as the sprites
+  const ISLAND = { x: 1080, y: 744, rx: 880, ry: 590 };
+  const decor = [];                   // trees, rocks and houses
+  const waves = [];                   // spots where little wave glints appear
+  let terrain = null;                 // pre-drawn island, built once at start
+
+  // Smooth random noise: random values on a grid, blended between grid points.
+  const noiseRnd = seeded(31);
+  const NOISE = [];
+  for (let i = 0; i < 64 * 64; i++) NOISE.push(noiseRnd());
+  function noise(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const fx = x - xi, fy = y - yi;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const n = (i, j) => NOISE[((j & 63) * 64) + (i & 63)];
+    const top = n(xi, yi) + (n(xi + 1, yi) - n(xi, yi)) * sx;
+    const bot = n(xi, yi + 1) + (n(xi + 1, yi + 1) - n(xi, yi + 1)) * sx;
+    return top + (bot - top) * sy;
+  }
+
+  // How far a point is from the island's centre: under 1 is land, over 1 is sea.
+  function shoreValue(x, y) {
+    const dx = (x - ISLAND.x) / ISLAND.rx;
+    const dy = (y - ISLAND.y) / ISLAND.ry;
+    const angle = Math.atan2(dy, dx);
+    const wobble = 0.09 * Math.sin(angle * 3 + 0.6) + 0.06 * Math.sin(angle * 7 + 2.1) +
+      0.22 * (noise(x / 260, y / 260) - 0.5) + 0.08 * (noise(x / 90 + 17, y / 90 + 5) - 0.5);
+    return Math.hypot(dx, dy) - wobble;
+  }
+
+  // The dirt road from the town to the orc camp, as a curve.
+  const ROAD = { a: { x: 696, y: 870 }, c: { x: 1000, y: 980 }, b: { x: 1464, y: 590 } };
+  function roadPoint(t) {
+    const u = 1 - t;
+    return { x: u * u * ROAD.a.x + 2 * u * t * ROAD.c.x + t * t * ROAD.b.x,
+             y: u * u * ROAD.a.y + 2 * u * t * ROAD.c.y + t * t * ROAD.b.y };
+  }
+  const ROAD_PTS = [];
+  for (let i = 0; i <= 60; i++) ROAD_PTS.push(roadPoint(i / 60));
+  function roadDist(x, y) {
+    // Quick reject: far outside the road's bounding box.
+    if (x < 640 || x > 1520 || y < 530 || y > 940) return Infinity;
+    let best = Infinity;
+    for (const p of ROAD_PTS) best = Math.min(best, dist(x, y, p.x, p.y));
+    return best;
+  }
 
   function buildMap() {
-    const rnd = seeded(7);
-    const wobble = [];
-    for (let i = 0; i < 64; i++) wobble.push(rnd());
-    for (let y = 0; y < MAP_H; y++) {
-      land.push([]);
-      for (let x = 0; x < MAP_W; x++) {
-        const dx = (x - 22) / 18;
-        const dy = (y - 15) / 11.5;
-        const angle = Math.atan2(dy, dx);
-        const bump = 0.12 * Math.sin(angle * 5 + 1) + 0.08 * Math.sin(angle * 9 + 2);
-        land[y].push(Math.hypot(dx, dy) < 0.86 + bump);
+    const cw = WORLD_W / PX, ch = WORLD_H / PX;
+    terrain = document.createElement('canvas');
+    terrain.width = cw; terrain.height = ch;
+    const tctx = terrain.getContext('2d');
+    const data = tctx.createImageData(cw, ch);
+    const rnd = seeded(11);
+    const set = (i, c) => { data.data[i] = c[0]; data.data[i + 1] = c[1]; data.data[i + 2] = c[2]; data.data[i + 3] = 255; };
+    const DEEP = [46, 128, 160], MID = [58, 156, 176], SHALLOW = [96, 190, 186], FOAM = [214, 238, 226];
+    const SAND = [232, 214, 150], SAND_DARK = [214, 192, 128];
+    const GRASS = [[188, 212, 88], [174, 204, 80], [158, 194, 76]], TUFT = [206, 228, 112];
+    const DIRT = [196, 160, 104], DIRT_EDGE = [178, 170, 92];
+
+    for (let py = 0; py < ch; py++) {
+      for (let px = 0; px < cw; px++) {
+        const x = px * PX + 1, y = py * PX + 1;
+        const v = shoreValue(x, y);
+        const i = (py * cw + px) * 4;
+        if (v > 1.0) {
+          // Water gets darker the further it is from the beach. A thin foam line hugs the sand.
+          if (v < 1.018) set(i, FOAM);
+          else if (v < 1.09) set(i, SHALLOW);
+          else if (v < 1.22) set(i, MID);
+          else set(i, DEEP);
+          continue;
+        }
+        if (v > 0.955) { set(i, v > 0.985 ? SAND_DARK : SAND); continue; }
+        const rd = roadDist(x, y);
+        if (rd < 16) { set(i, DIRT); continue; }
+        if (rd < 20) { set(i, DIRT_EDGE); continue; }
+        // Grass in soft lighter and darker patches, with the odd tuft.
+        const shade = noise(x / 150 + 40, y / 150 + 40);
+        const g = shade < 0.4 ? GRASS[2] : (shade < 0.62 ? GRASS[1] : GRASS[0]);
+        set(i, rnd() < 0.012 ? TUFT : g);
       }
     }
-    const places = [TOWN, CAMP];
-    for (let y = 1; y < MAP_H - 1; y++) {
-      for (let x = 1; x < MAP_W - 1; x++) {
-        if (!land[y][x]) continue;
-        const nearPlace = places.some(p => Math.abs(p.tx - x) < 3 && Math.abs(p.ty - y) < 3);
-        const r = rnd();
-        if (!nearPlace && r < 0.13) decor.push({ x: (x + 0.5) * TILE, y: (y + 0.5) * TILE, kind: 'tree', variant: 1 + Math.floor(rnd() * 3) });
+    tctx.putImageData(data, 0, 0);
+
+    // Wave glints in the shallows.
+    const wr = seeded(5);
+    for (let k = 0; k < 900 && waves.length < 140; k++) {
+      const x = wr() * WORLD_W, y = wr() * WORLD_H, v = shoreValue(x, y);
+      if (v > 1.05 && v < 1.4) waves.push({ x, y, phase: wr() * Math.PI * 2 });
+    }
+
+    // Trees grow in forests (where a second noise layer is high), with a few loners in the fields.
+    const places = [TOWN, CAMP].map(placePos);
+    const tr = seeded(7);
+    for (let y = 40; y < WORLD_H; y += 30) {
+      for (let x = 40; x < WORLD_W; x += 30) {
+        const jx = x + (tr() - 0.5) * 22, jy = y + (tr() - 0.5) * 22;
+        if (shoreValue(jx, jy) > 0.9) continue;
+        if (roadDist(jx, jy) < 40) continue;
+        if (places.some(p => dist(jx, jy, p.x, p.y) < 150)) continue;
+        if (dist(jx, jy, 846, 750) < 90) continue; // keep Gunther's starting spot clear
+        const forest = noise(jx / 220 + 9, jy / 220 + 3);
+        const chance = forest > 0.62 ? 0.7 : (forest > 0.5 ? 0.18 : 0.025);
+        const r = tr();
+        if (r < chance) decor.push({ x: jx, y: jy, kind: 'tree', variant: forest > 0.62 && tr() < 0.6 ? 2 : 1 + Math.floor(tr() * 3) });
+        else if (r > 0.993) decor.push({ x: jx, y: jy, kind: 'rock', variant: Math.floor(tr() * 3) });
       }
     }
     // A few houses around the keep so the town reads as a town.
@@ -230,9 +315,7 @@
   }
 
   function isLand(px, py) {
-    const tx = Math.floor(px / TILE);
-    const ty = Math.floor(py / TILE);
-    return ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W && land[ty][tx];
+    return px > 0 && py > 0 && px < WORLD_W && py < WORLD_H && shoreValue(px, py) < 0.985;
   }
   function placePos(p) { return { x: (p.tx + 0.5) * TILE, y: (p.ty + 0.5) * TILE }; }
 
@@ -248,8 +331,8 @@
     enter() { this.armed = false; this.armTimer = 0.5; pointer.clicked = false; },
     camera() {
       return {
-        x: clamp(this.player.x - W / 2, 0, MAP_W * TILE - W),
-        y: clamp(this.player.y - H / 2, 0, MAP_H * TILE - H)
+        x: clamp(this.player.x - W / 2, 0, WORLD_W - W),
+        y: clamp(this.player.y - H / 2, 0, WORLD_H - H)
       };
     },
     update(dt) {
@@ -286,32 +369,25 @@
     },
     draw() {
       const cam = this.camera();
-      ctx.fillStyle = '#42acaf';
+      ctx.fillStyle = '#2e80a0';
       ctx.fillRect(0, 0, W, H);
-      const x0 = Math.floor(cam.x / TILE), y0 = Math.floor(cam.y / TILE);
-      for (let ty = y0; ty <= y0 + Math.ceil(H / TILE); ty++) {
-        for (let tx = x0; tx <= x0 + Math.ceil(W / TILE); tx++) {
-          const sx = tx * TILE - Math.round(cam.x), sy = ty * TILE - Math.round(cam.y);
-          const here = ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W && land[ty][tx];
-          if (!here) {
-            // Light water next to the shore.
-            const nearLand = isLand((tx + 1.5) * TILE, (ty + 0.5) * TILE) || isLand((tx - 0.5) * TILE, (ty + 0.5) * TILE) ||
-              isLand((tx + 0.5) * TILE, (ty + 1.5) * TILE) || isLand((tx + 0.5) * TILE, (ty - 0.5) * TILE);
-            if (nearLand) { ctx.fillStyle = '#77c0b4'; ctx.fillRect(sx, sy, TILE, TILE); }
-            continue;
-          }
-          const edge = !isLand((tx + 1.5) * TILE, (ty + 0.5) * TILE) || !isLand((tx - 0.5) * TILE, (ty + 0.5) * TILE) ||
-            !isLand((tx + 0.5) * TILE, (ty + 1.5) * TILE) || !isLand((tx + 0.5) * TILE, (ty - 0.5) * TILE);
-          if (edge) { ctx.fillStyle = '#e7d593'; ctx.fillRect(sx, sy, TILE, TILE); }
-          else {
-            drawGrass(sx, sy, tx, ty);
-          }
-        }
+      ctx.drawImage(terrain, Math.round(-cam.x), Math.round(-cam.y), WORLD_W, WORLD_H);
+      // Wave glints fade in and out.
+      ctx.fillStyle = '#e4f4ee';
+      for (const w of waves) {
+        const sx = w.x - cam.x, sy = w.y - cam.y;
+        if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+        const a = Math.sin(this.time * 1.6 + w.phase);
+        if (a < 0.3) continue;
+        ctx.globalAlpha = (a - 0.3) * 1.2;
+        ctx.fillRect(Math.round(sx / 3) * 3, Math.round(sy / 3) * 3, 9 + Math.round(a * 3) * 3, 3);
       }
+      ctx.globalAlpha = 1;
       // Places, scenery and Gunther, sorted so things lower on screen draw in front.
       const things = decor.map(d => ({ y: d.y, draw: () => {
         shadow(d.x - cam.x, d.y - cam.y + 12, 16);
         if (d.kind === 'tree') ctx.drawImage(img.trees, d.variant * 16, 0, 16, 16, d.x - cam.x - 24, d.y - cam.y - 34, 48, 48);
+        else if (d.kind === 'rock') ctx.drawImage(img.rocks, d.variant * 16, 0, 16, 16, d.x - cam.x - 24, d.y - cam.y - 30, 48, 48);
         else ctx.drawImage(img.houses, d.variant * 16, 0, 16, 16, d.x - cam.x - 24, d.y - cam.y - 30, 48, 48);
       } }));
       [TOWN, CAMP].forEach(place => {
