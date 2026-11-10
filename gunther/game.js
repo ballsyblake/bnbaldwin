@@ -7,8 +7,11 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const overlay = document.getElementById('overlay');
-  const W = canvas.width;
-  const H = canvas.height;
+  const stage = document.getElementById('stage');
+  // Logical size of the play area. Wide on desktop and sideways phones, tall on upright phones.
+  let W = 960;
+  let H = 540;
+  let portrait = false;
 
   // ---------------------------------------------------------------- assets
   const ASSET_NAMES = ['gunther-idle', 'gunther-run', 'gunther-death', 'orc-yellow', 'orc-red',
@@ -57,7 +60,7 @@
 
   // ---------------------------------------------------------------- input
   const keys = {};
-  const pointer = { x: W / 2, y: H / 2, down: false, startX: 0, startY: 0, touch: false, clicked: false };
+  const pointer = { x: 480, y: 270, down: false, startX: 0, startY: 0, touch: false, clicked: false };
 
   window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
@@ -123,10 +126,21 @@
     ctx.fillText(str, x, y);
   }
 
-  function statsLine() {
-    return 'Gold ' + game.gold + '   Health ' + Math.ceil(game.health) + '/' + game.maxHealth +
-      '   Bow Lv ' + game.bowLevel + '   Armour Lv ' + game.armourLevel + '   Camps cleared ' + game.campsCleared;
+  function statsParts() {
+    return ['Gold ' + game.gold + '   Health ' + Math.ceil(game.health) + '/' + game.maxHealth,
+      'Bow Lv ' + game.bowLevel + '   Armour Lv ' + game.armourLevel + '   Camps cleared ' + game.campsCleared];
   }
+  function statsLine() { return statsParts().join('   '); }
+  // Draws the stats on one line when wide and two lines when tall. Returns the y of the last line.
+  function drawStats(y, size) {
+    if (!portrait) { text(statsLine(), 12, y, size); return y; }
+    const parts = statsParts();
+    text(parts[0], 12, y, size);
+    text(parts[1], 12, y + size + 6, size);
+    return y + size + 6;
+  }
+  // Bottom-of-screen hint. Pass a shorter string for tall screens.
+  function hint(wide, tall) { text(portrait ? tall : wide, W / 2, H - 16, 15, '#fff', 'center'); }
 
   // ---------------------------------------------------------------- menus (HTML overlay)
   function showPanel(html, handlers) {
@@ -302,14 +316,28 @@
       things.push({ y: p.y, draw: () => drawGunther(p.x - cam.x, p.y - cam.y - 14, 1.3, p.moving ? 'run' : 'idle', p.time, p.flip) });
       things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
 
-      text(statsLine(), 12, 24, 16);
-      text('Click or tap to walk. Town: heal and upgrade. Orc Camp: fight for gold.', 12, H - 14, 15);
+      drawStats(24, 16);
+      hint('Click or tap to walk. Town: heal and upgrade. Orc Camp: fight for gold.', 'Tap to walk. Visit the Town or the Orc Camp.');
     }
   };
 
   // ---- Battle
-  const ARENA = { x0: 30, y0: 60, x1: W - 30, y1: H - 20 };
-  const TREES = [{ x: 200, y: 180 }, { x: 760, y: 150 }, { x: 300, y: 430 }, { x: 700, y: 420 }];
+  const ARENA = { x0: 30, y0: 60, x1: 930, y1: 520 };
+  const TREE_SPOTS = [[0.21, 0.33], [0.79, 0.28], [0.31, 0.8], [0.73, 0.78]]; // as fractions of the play area
+  const TREES = TREE_SPOTS.map(() => ({ x: 0, y: 0 }));
+
+  // Called at start and whenever the window changes shape (for example the phone is rotated).
+  function resize() {
+    portrait = window.innerHeight > window.innerWidth * 1.15;
+    W = portrait ? 540 : 960;
+    H = portrait ? 900 : 540;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    stage.classList.toggle('portrait', portrait);
+    ARENA.x1 = W - 30; ARENA.y1 = H - 20;
+    TREE_SPOTS.forEach((spot, i) => { TREES[i].x = spot[0] * W; TREES[i].y = spot[1] * H; });
+    pointer.down = false;
+  }
+  window.addEventListener('resize', resize);
   const TREE_R = 20;
 
   const battleScene = {
@@ -511,14 +539,17 @@
       for (const a of this.arrows) drawArrow(a.x, a.y, a.a);
 
       text('Orcs slain ' + this.kills + ' / ' + this.target, 12, 24, 18, '#ffe08a');
-      text(statsLine(), 12, 46, 14);
+      drawStats(46, 14);
       if (pointer.touch && pointer.down && !this.over) {
         ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff';
         ctx.beginPath(); ctx.arc(pointer.startX, pointer.startY, 40, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 18, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       }
-      if (this.time < 4) text(pointer.touch ? 'Drag to move. Gunther shoots by himself.' : 'WASD to move, aim with the mouse, hold click to shoot.', W / 2, H - 16, 16, '#fff', 'center');
+      if (this.time < 4) {
+        if (pointer.touch) hint('Drag to move. Gunther shoots by himself.', 'Drag to move. Gunther shoots by himself.');
+        else hint('WASD to move, aim with the mouse, hold click to shoot.', 'WASD to move, hold click to shoot.');
+      }
     }
   };
 
@@ -593,6 +624,7 @@
   }
 
   loadAssets().then(() => {
+    resize();
     buildMap();
     mapScene.reset();
     setScene(titleScene);

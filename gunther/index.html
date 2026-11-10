@@ -13,6 +13,9 @@
     html, body { height: 100%; background: #14161a; color: #eceef2; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
     body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
     #stage { position: relative; width: min(100%, calc((100vh - 56px) * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; }
+    #stage { width: min(100%, calc((100dvh - 56px) * 16 / 9)); }
+    #stage.portrait { aspect-ratio: 3 / 5; width: min(100%, calc((100vh - 56px) * 3 / 5)); }
+    #stage.portrait { width: min(100%, calc((100dvh - 56px) * 3 / 5)); }
     canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
     #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10, 12, 16, 0.72); padding: 12px; }
     #overlay.show { display: flex; }
@@ -29,6 +32,7 @@
     @media (max-height: 460px) {
       body { padding: 2px; gap: 2px; }
       #stage { width: min(100%, calc((100vh - 28px) * 16 / 9)); }
+      #stage { width: min(100%, calc((100dvh - 28px) * 16 / 9)); }
       .panel { padding: 8px 14px; width: min(100%, 560px); }
       .panel p { margin: 2px 0; font-size: 0.78rem; line-height: 1.3; }
       .panel h1, .panel h2 { font-size: 1.2rem; }
