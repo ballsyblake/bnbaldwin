@@ -15,7 +15,7 @@
 
   // ---------------------------------------------------------------- assets
   const ASSET_NAMES = ['gunther', 'orc-yellow', 'orc-red',
-    'trees', 'rocks', 'keep', 'houses', 'grass', 'orc-tent', 'big-tree'];
+    'trees', 'rocks', 'keep', 'houses', 'orc-tent'];
   const img = {};
 
   function loadAssets() {
@@ -122,13 +122,6 @@
   function shadow(x, y, r) {
     ctx.fillStyle = 'rgba(20, 40, 20, 0.28)';
     ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // One grass tile. Mostly plain, with a few tufts picked by a hash so it doesn't look like a chessboard.
-  function drawGrass(sx, sy, tx, ty) {
-    const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
-    const v = h % 11;
-    ctx.drawImage(img.grass, v === 0 ? 16 : (v === 1 ? 32 : 0), 0, 16, 16, sx, sy, 48, 48);
   }
 
   function text(str, x, y, size, colour, align) {
@@ -413,9 +406,14 @@
   };
 
   // ---- Battle
-  const ARENA = { x0: 30, y0: 60, x1: 930, y1: 520 };
-  const TREE_SPOTS = [[0.21, 0.33], [0.79, 0.28], [0.31, 0.8], [0.73, 0.78]]; // as fractions of the play area
-  const TREES = TREE_SPOTS.map(() => ({ x: 0, y: 0 }));
+  const ARENA = { x0: 60, y0: 110, x1: 900, y1: 500 };
+  // Things in the orc camp, placed as fractions of the play area. r is how big they are to bump into.
+  const OBSTACLE_SPOTS = [
+    { fx: 0.2, fy: 0.27, kind: 'tent', r: 30 }, { fx: 0.8, fy: 0.25, kind: 'tent', r: 30 },
+    { fx: 0.5, fy: 0.36, kind: 'fire', r: 18 },
+    { fx: 0.26, fy: 0.76, kind: 'rock', r: 20, v: 0 }, { fx: 0.75, fy: 0.72, kind: 'rock', r: 20, v: 2 }
+  ];
+  const TREES = OBSTACLE_SPOTS.map(o => Object.assign({ x: 0, y: 0 }, o));
 
   // Called at start and whenever the window changes shape (for example the phone is rotated).
   function resize() {
@@ -424,18 +422,83 @@
     H = portrait ? 900 : 540;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     stage.classList.toggle('portrait', portrait);
-    ARENA.x1 = W - 30; ARENA.y1 = H - 20;
-    TREE_SPOTS.forEach((spot, i) => { TREES[i].x = spot[0] * W; TREES[i].y = spot[1] * H; });
+    ARENA.x1 = W - 60; ARENA.y1 = H - 44;
+    TREES.forEach(t => { t.x = t.fx * W; t.y = t.fy * H; });
     pointer.down = false;
   }
   window.addEventListener('resize', resize);
-  const TREE_R = 20;
+
+  // The battle ground: a trampled dirt clearing in the forest, drawn once per screen shape.
+  let arenaGround = null;
+  let arenaTrees = [];
+  function buildArena() {
+    const cw = W / PX, ch = H / PX;
+    arenaGround = document.createElement('canvas');
+    arenaGround.width = cw; arenaGround.height = ch;
+    const actx = arenaGround.getContext('2d');
+    const data = actx.createImageData(cw, ch);
+    const rnd = seeded(23);
+    const GRASS = [[188, 212, 88], [174, 204, 80], [158, 194, 76], [138, 178, 70]];
+    const DIRT = [[204, 170, 112], [192, 158, 102]], DIRT_EDGE = [178, 170, 92], TUFT = [206, 228, 112];
+    for (let py = 0; py < ch; py++) {
+      for (let px = 0; px < cw; px++) {
+        const x = px * PX + 1, y = py * PX + 1;
+        const i = (py * cw + px) * 4;
+        const dx = (x - W / 2) / (W * 0.42), dy = (y - H * 0.55) / (H * 0.42);
+        const clearing = Math.hypot(dx, dy) + 0.3 * (noise(x / 70 + 3, y / 70 + 8) - 0.5);
+        // Distance to the nearest screen edge, for darker forest floor at the sides.
+        const edge = Math.min(x, y, W - x, H - y);
+        let c;
+        if (clearing < 0.62) c = noise(x / 40, y / 40) > 0.55 ? DIRT[1] : DIRT[0];
+        else if (clearing < 0.7) c = DIRT_EDGE;
+        else {
+          const shade = noise(x / 120 + 40, y / 120 + 40) - Math.max(0, (130 - edge) / 130) * 0.4;
+          c = shade < 0.25 ? GRASS[3] : (shade < 0.4 ? GRASS[2] : (shade < 0.62 ? GRASS[1] : GRASS[0]));
+          if (rnd() < 0.012) c = TUFT;
+        }
+        data.data[i] = c[0]; data.data[i + 1] = c[1]; data.data[i + 2] = c[2]; data.data[i + 3] = 255;
+      }
+    }
+    actx.putImageData(data, 0, 0);
+
+    // A wall of trees around the edges.
+    arenaTrees = [];
+    const tr = seeded(41);
+    for (let y = -10; y < H + 40; y += 30) {
+      for (let x = -10; x < W + 40; x += 30) {
+        const jx = x + (tr() - 0.5) * 18, jy = y + (tr() - 0.5) * 18;
+        const inside = jx > 45 && jx < W - 45 && jy > 95 && jy < H - 28;
+        if (inside) continue;
+        if (tr() < 0.82) arenaTrees.push({ x: jx, y: jy, v: tr() < 0.55 ? 2 : 1 + Math.floor(tr() * 3) });
+      }
+    }
+    arenaGround.forW = W; arenaGround.forH = H;
+  }
+
+  function drawCampfire(x, y, t) {
+    const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70);
+    glow.addColorStop(0, 'rgba(255, 190, 90, 0.35)');
+    glow.addColorStop(1, 'rgba(255, 190, 90, 0)');
+    ctx.fillStyle = glow; ctx.fillRect(x - 70, y - 78, 140, 140);
+    ctx.fillStyle = '#7a8088';
+    for (let a = 0; a < 8; a++) ctx.fillRect(Math.round((x + Math.cos(a * 0.785) * 18) / 3) * 3 - 3, Math.round((y + Math.sin(a * 0.785) * 9) / 3) * 3 - 3, 6, 6);
+    ctx.fillStyle = '#6b4424'; ctx.fillRect(x - 15, y - 3, 30, 6);
+    ctx.fillStyle = '#58371d'; ctx.fillRect(x - 3, y - 9, 6, 15);
+    const flames = [['#e8572a', 12, 18], ['#f39a2b', 9, 13], ['#ffe08a', 5, 8]];
+    flames.forEach(([col, wdt, ht], k) => {
+      const flick = Math.round(Math.sin(t * 14 + k * 2) * 1.5) * 3;
+      ctx.fillStyle = col;
+      ctx.fillRect(x - wdt, y - ht - 3 + Math.abs(flick), wdt * 2, ht);
+      ctx.fillRect(x - wdt / 2 + flick, y - ht - 9, wdt, 6);
+    });
+  }
 
   const battleScene = {
     enter() {
       // A battle never starts below half health, so a loss can never leave you stuck.
       game.health = Math.max(game.health, game.maxHealth * 0.5);
-      this.p = { x: W / 2, y: H / 2, flip: false, time: 0, moving: false, dead: false, deadTime: 0, hurtFlash: 0, shootTime: 9 };
+      if (!arenaGround || arenaGround.forW !== W || arenaGround.forH !== H) buildArena();
+      this.p = { x: W / 2, y: H * 0.62, flip: false, time: 0, moving: false, dead: false, deadTime: 0, hurtFlash: 0, shootTime: 9 };
       this.orcs = [];
       this.arrows = [];
       this.kills = 0;
@@ -450,7 +513,9 @@
     spawnOrc() {
       const side = Math.floor(Math.random() * 4);
       const o = { time: Math.random(), state: 'walk', stateTime: 0, attackTimer: 0, flash: 0 };
-      if (side === 0) { o.x = -30; o.y = Math.random() * H; }
+      const tents = TREES.filter(t => t.kind === 'tent');
+      if (Math.random() < 0.35) { const t = tents[Math.floor(Math.random() * tents.length)]; o.x = t.x; o.y = t.y + 34; }
+      else if (side === 0) { o.x = -30; o.y = Math.random() * H; }
       else if (side === 1) { o.x = W + 30; o.y = Math.random() * H; }
       else if (side === 2) { o.x = Math.random() * W; o.y = -30; }
       else { o.x = Math.random() * W; o.y = H + 30; }
@@ -491,7 +556,7 @@
           p.x += mx / len * 190 * dt;
           p.y += my / len * 190 * dt;
         }
-        for (const t of TREES) pushOut(p, t.x, t.y, TREE_R + 12);
+        for (const t of TREES) pushOut(p, t.x, t.y, t.r + 12);
         p.x = clamp(p.x, ARENA.x0, ARENA.x1);
         p.y = clamp(p.y, ARENA.y0, ARENA.y1);
 
@@ -525,7 +590,7 @@
         const step = 760 * dt;
         a.x += Math.cos(a.a) * step; a.y += Math.sin(a.a) * step; a.travelled += step;
         if (a.travelled > 900) a.gone = true;
-        for (const t of TREES) if (dist(a.x, a.y, t.x, t.y - 10) < TREE_R) a.gone = true;
+        for (const t of TREES) if (t.kind !== 'fire' && dist(a.x, a.y, t.x, t.y - 14) < t.r) a.gone = true;
         for (const o of this.orcs) {
           if (a.gone || o.state === 'dead') continue;
           if (dist(a.x, a.y, o.x, o.y - 18) < 22) {
@@ -554,7 +619,7 @@
         } else {
           o.state = 'walk';
           if (!p.dead && d > 1) { o.x += (p.x - o.x) / d * o.speed * dt; o.y += (p.y - o.y) / d * o.speed * dt; }
-          for (const t of TREES) pushOut(o, t.x, t.y, TREE_R + 10);
+          for (const t of TREES) pushOut(o, t.x, t.y, t.r + 10);
         }
       }
       // Keep orcs from stacking on one spot.
@@ -598,18 +663,18 @@
     },
     draw() {
       const p = this.p;
-      for (let y = 0; y < H; y += 48) {
-        for (let x = 0; x < W; x += 48) {
-          drawGrass(x, y, x / 48, y / 48);
-        }
-      }
+      if (!arenaGround || arenaGround.forW !== W || arenaGround.forH !== H) buildArena();
+      ctx.drawImage(arenaGround, 0, 0, W, H);
       const things = [];
-      // Darker ground towards the edges so the arena reads as a forest clearing.
-      const shade = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
-      shade.addColorStop(0, 'rgba(30, 70, 30, 0)');
-      shade.addColorStop(1, 'rgba(30, 70, 30, 0.45)');
-      ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
-      for (const t of TREES) things.push({ y: t.y, draw: () => { shadow(t.x, t.y + 6, 44); ctx.drawImage(img['big-tree'], t.x - 65, t.y - 176, 130, 188); } });
+      for (const t of arenaTrees) things.push({ y: t.y, draw: () => {
+        shadow(t.x, t.y + 12, 16);
+        ctx.drawImage(img.trees, t.v * 16, 0, 16, 16, t.x - 24, t.y - 34, 48, 48);
+      } });
+      for (const t of TREES) things.push({ y: t.y, draw: () => {
+        if (t.kind === 'tent') { shadow(t.x, t.y + 20, 38); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, t.x - 48, t.y - 66, 96, 96); }
+        else if (t.kind === 'rock') { shadow(t.x, t.y + 8, 22); ctx.drawImage(img.rocks, t.v * 16, 0, 16, 16, t.x - 24, t.y - 34, 48, 48); }
+        else drawCampfire(t.x, t.y, this.time);
+      } });
       for (const o of this.orcs) {
         things.push({ y: o.y, draw: () => {
           let col, row;
