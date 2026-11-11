@@ -32,7 +32,7 @@ export const TROOPS = {
   // The Horde.
   grunt: { name: 'Orc grunt', sprite: 'orc-yellow', hp: 30, dmg: 6, cd: 1.0, range: 32, speed: 74, power: 1.6, orc: true },
   brute: { name: 'Orc brute', sprite: 'orc-red', hp: 60, dmg: 11, cd: 1.1, range: 34, speed: 70, power: 3.6, orc: true },
-  shaman: { name: 'Orc shaman', sprite: 'shaman', hp: 24, dmg: 9, cd: 2.2, range: 300, speed: 70, power: 2.6, orc: true, ranged: true, fire: true },
+  shaman: { name: 'Orc skirmisher', sprite: 'shaman', hp: 24, dmg: 9, cd: 2.2, range: 280, speed: 72, power: 2.6, orc: true, ranged: true, javelin: true },
   warlord: { name: 'Warlord Gorrak', sprite: 'orc-red', hp: 360, dmg: 20, cd: 1.0, range: 44, speed: 66, power: 26, orc: true, scale: 3 }
 };
 export const HUMAN_TIERS = ['recruit', 'spearman', 'bowman', 'knight', 'ranger'];
@@ -72,3 +72,27 @@ export const ROADS = [
 
 // Names for roaming orc warbands.
 export const ORC_CHIEFS = ['Gruk', 'Morza', 'Uthak', 'Snagga', 'Bolg', 'Rakha', 'Dushnak', 'Ugra', 'Krimp', 'Zogg', 'Harrug', 'Nazgra'];
+
+// ---------------------------------------------------------------- lords
+// Each kingdom is run by a few named lords who lead its armies. Their traits decide what they do:
+//  bold: picks fights at worse odds.      cautious: only fights when well ahead.
+//  honourable: hunts orcs, respects mercy. cruel: burns enemy villages in wartime.
+//  greedy: preys on enemy caravans, likes gold.
+export const LORDS = [
+  { id: 'isolde', name: 'Queen Isolde', faction: 'vale', ruler: true, traits: ['honourable', 'cautious'], home: 'brightwater' },
+  { id: 'aldric', name: 'Sir Aldric Fenn', faction: 'vale', traits: ['bold', 'honourable'], home: 'oakhollow' },
+  { id: 'maren', name: 'Lady Maren Holt', faction: 'vale', traits: ['greedy', 'cautious'], home: 'millford' },
+  { id: 'brannoc', name: 'Lord Brannoc', faction: 'march', ruler: true, traits: ['cruel', 'bold'], home: 'redcliff' },
+  { id: 'corwen', name: 'Sir Corwen Ashe', faction: 'march', traits: ['honourable', 'cautious'], home: 'stonefold' },
+  { id: 'tamsin', name: 'Lady Tamsin Vey', faction: 'march', traits: ['greedy', 'bold'], home: 'ashby' }
+];
+
+// ---------------------------------------------------------------- skills
+// Gunther's skills improve by doing the thing, not by spending points.
+export const SKILLS = {
+  archery: { name: 'Archery', how: 'hitting enemies with your bow', effect: '+4% bow damage and slightly faster shots per level' },
+  leadership: { name: 'Leadership', how: 'leading your men to victory', effect: '+2 party size and steadier morale per level' },
+  trade: { name: 'Trade', how: 'buying and selling goods', effect: '2% better prices per level' },
+  tactics: { name: 'Tactics', how: 'winning battles against strong enemies', effect: '+6% strength in auto-resolved battles per level' },
+  medicine: { name: 'Medicine', how: 'tending your wounded', effect: 'More of your fallen men survive, and they heal faster' }
+};

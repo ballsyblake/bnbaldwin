@@ -5,7 +5,7 @@
 import { ctx, view, keys, pointer, clamp, dist, rand, text, shadow, bar, hint, setHud, onKeyPress, getScene, noise, seeded, onResize } from './core.js';
 import { img, drawUnit } from './sprites.js';
 import { TROOPS, FACTIONS } from './data.js';
-import { game, playerFit } from './state.js';
+import { game, playerFit, skill, trainSkill } from './state.js';
 
 const PX = 3;
 
@@ -79,7 +79,9 @@ export const battleScene = {
     this.enemyFaction = opts.enemy.faction;
     if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H) buildGround(opts.kind);
     this.units = []; this.shots = []; this.effects = [];
-    this.time = 0; this.over = false; this.order = 'charge';
+    this.time = 0; this.over = false;
+    // Orders are given to two groups: foot soldiers and bowmen. 'group' is who the next order goes to.
+    this.orders = { foot: 'charge', bows: 'charge' }; this.group = 'all';
     this.fireTimer = 0; this.aim = 0;
     this.start = [0, 0];
     this.killed = [{}, {}];     // by side: type -> count
@@ -105,14 +107,21 @@ export const battleScene = {
   },
   bounds() { return { x0: 40, y0: 96, x1: view.W - 40, y1: view.H - (view.portrait ? 70 : 54) }; },
   hud() {
-    const b = o => '<button data-act="order" data-arg="' + o + '"' + (this.order === o ? ' class="on"' : '') + '>' + { charge: 'Charge', hold: 'Hold', follow: 'Follow' }[o] + '</button>';
-    let html = b('charge') + b('hold') + b('follow');
+    const cur = this.group === 'all' ? (this.orders.foot === this.orders.bows ? this.orders.foot : '') : this.orders[this.group];
+    const b = o => '<button data-act="order" data-arg="' + o + '"' + (cur === o ? ' class="on"' : '') + '>' + { charge: 'Charge', hold: 'Hold', follow: 'Follow' }[o] + '</button>';
+    const g = '<button data-act="group">' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</button>';
+    let html = g + b('charge') + b('hold') + b('follow');
     if (this.hero.dead && !this.over) html = '<button data-act="finish">Let your men finish it</button>';
-    setHud(html, { order: o => this.setOrder(o), finish: () => this.autoFinish() });
+    setHud(html, { order: o => this.setOrder(o), group: () => this.nextGroup(), finish: () => this.autoFinish() });
+  },
+  nextGroup() {
+    this.group = { all: 'foot', foot: 'bows', bows: 'all' }[this.group];
+    this.hud();
   },
   setOrder(o) {
-    this.order = o;
-    for (const u of this.units) if (u.side === 0 && !u.isHero) { u.holdX = u.x; u.holdY = u.y; }
+    const groups = this.group === 'all' ? ['foot', 'bows'] : [this.group];
+    for (const g of groups) this.orders[g] = o;
+    for (const u of this.units) if (u.side === 0 && !u.isHero && groups.includes(groupOf(u))) { u.holdX = u.x; u.holdY = u.y; }
     this.hud();
   },
   // Places a soldier on the field at its side's starting edge.
@@ -169,7 +178,7 @@ export const battleScene = {
       if (u.isHero) { this.hud(); return; }
       const side = u.side;
       // Your men often survive their wounds; orcs and enemies who fall are counted as killed.
-      const woundChance = side === 0 ? (u.type === 'knight' ? 0.65 : 0.5) : 0;
+      const woundChance = side === 0 ? Math.min(0.9, (u.type === 'knight' ? 0.65 : 0.5) + skill('medicine') * 0.04) : 0;
       const bucket = Math.random() < woundChance ? this.wounded[side] : this.killed[side];
       bucket[u.type] = (bucket[u.type] || 0) + 1;
       if (side === 1 && source === 'hero') this.heroKills = (this.heroKills || 0) + 1;
@@ -204,9 +213,9 @@ export const battleScene = {
       H.flip = Math.cos(this.aim) < 0;
       this.fireTimer -= dt;
       if (wantFire && this.fireTimer <= 0) {
-        this.fireTimer = Math.max(0.5 * Math.pow(0.8, game.bowLevel - 1), 0.14);
+        this.fireTimer = Math.max(0.5 * Math.pow(0.8, game.bowLevel - 1) * (1 - skill('archery') * 0.02), 0.13);
         H.shootT = 0;
-        this.shoot(H, this.aim, 14 + 2 * (game.bowLevel - 1), 'arrow', 0, 760);
+        this.shoot(H, this.aim, (14 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04), 'arrow', 0, 760);
       }
     }
     H.shootT = (H.shootT || 9) + dt;
@@ -239,8 +248,9 @@ export const battleScene = {
       if (u.retarget <= 0 || !u.target || u.target.dead || u.target.fled) {
         u.retarget = rand(0.3, 0.6);
         let reach = Infinity;
-        if (u.side === 0 && this.order === 'hold') reach = def.ranged ? def.range : 90;
-        if (u.side === 0 && this.order === 'follow') reach = def.ranged ? def.range : 110;
+        const order = u.side === 0 ? this.orders[groupOf(u)] : 'charge';
+        if (order === 'hold') reach = def.ranged ? def.range : 90;
+        if (order === 'follow') reach = def.ranged ? def.range : 110;
         u.target = this.nearestFoe(u, reach);
       }
       const T = u.target;
@@ -258,23 +268,24 @@ export const battleScene = {
         if (def.ranged && d < def.range && d > 50) {
           u.anim = 'idle';
           if (u.cd <= 0) {
-            u.cd = def.cd * rand(0.9, 1.2); u.anim = def.fire ? 'cast' : 'attack'; u.at = 0;
+            u.cd = def.cd * rand(0.9, 1.2); u.anim = 'attack'; u.at = 0;
             // Aim where the target will be, a little wobbly.
-            const lead = d / (def.fire ? 380 : 620);
+            const speed2 = def.javelin ? 460 : 620;
+            const lead = d / speed2;
             const tx = T.x + (T.vx || 0) * lead, ty = T.y - 16 + (T.vy || 0) * lead;
             const a = Math.atan2(ty - (u.y - 26), tx - u.x) + rand(-0.07, 0.07);
-            this.shoot(u, a, def.dmg, def.fire ? 'fire' : 'arrow', u.side, def.fire ? 380 : 620);
+            this.shoot(u, a, def.dmg, def.javelin ? 'javelin' : 'arrow', u.side, speed2);
           }
         } else if (d <= def.range + (def.scale ? 14 : 0)) {
           u.anim = 'idle';
           if (u.cd <= 0) { u.cd = def.cd * rand(0.9, 1.2); u.anim = 'attack'; u.at = 0; u.struck = false; }
         } else this.walk(u, T.x, T.y, speed, dt);
-      } else if (u.side === 0 && this.order === 'follow' && !H.dead) {
+      } else if (u.side === 0 && this.orders[groupOf(u)] === 'follow' && !H.dead) {
         const k = this.units.indexOf(u);
         const ang = k * 2.4, r = 50 + (k % 3) * 22;
         if (dist(u.x, u.y, H.x + Math.cos(ang) * r, H.y + Math.sin(ang) * r * 0.6) > 12) this.walk(u, H.x + Math.cos(ang) * r, H.y + Math.sin(ang) * r * 0.6, speed * 1.1, dt);
         else u.anim = 'idle';
-      } else if (u.side === 0 && this.order !== 'charge') {
+      } else if (u.side === 0 && this.orders[groupOf(u)] !== 'charge') {
         if (dist(u.x, u.y, u.holdX, u.holdY) > 8) this.walk(u, u.holdX, u.holdY, speed, dt); else u.anim = 'idle';
       } else u.anim = 'idle';
     }
@@ -308,7 +319,7 @@ export const battleScene = {
           s.gone = true;
           const block = u.def && u.def.block || 0;
           this.hurt(u, s.dmg * (1 - block * 0.55), s.hero ? 'hero' : 'shot');
-          if (s.kind === 'fire') this.effects.push({ x: s.x, y: s.y, t: 0 });
+          if (s.hero) trainSkill('archery', 1);
           break;
         }
       }
@@ -404,10 +415,8 @@ export const battleScene = {
     }
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
     for (const s of this.shots) {
-      if (s.kind === 'fire') {
-        ctx.fillStyle = '#ff7a2a'; ctx.fillRect(Math.round(s.x) - 5, Math.round(s.y) - 5, 10, 10);
-        ctx.fillStyle = '#ffe08a'; ctx.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4);
-      } else drawArrow(s.x, s.y, s.a);
+      if (s.kind === 'javelin') drawJavelin(s.x, s.y, s.a);
+      else drawArrow(s.x, s.y, s.a);
     }
     for (const e of this.effects) {
       ctx.globalAlpha = 1 - e.t / 0.4; ctx.fillStyle = '#ffb04a';
@@ -421,7 +430,7 @@ export const battleScene = {
     bar(80, 14, 120, 8, game.health / game.maxHealth, game.health > game.maxHealth * 0.3 ? '#50f08b' : '#f05a50');
     text('Your men ' + mine, 12, 46, 15, '#ffe08a');
     text(this.opts.enemy.name + ' ' + theirs, W - 12, 24, 15, '#ffb0a0', 'right');
-    text('Order: ' + this.order, 12, 66, 13, '#d8dce6');
+    text('Foot: ' + this.orders.foot + '   Bows: ' + this.orders.bows, 12, 66, 13, '#d8dce6');
     if (pointer.touch && pointer.down && !this.over && !H.dead) {
       ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff';
       ctx.beginPath(); ctx.arc(pointer.startX, pointer.startY, 40, 0, Math.PI * 2); ctx.fill();
@@ -432,7 +441,7 @@ export const battleScene = {
     if (this.banner && this.banner.t < 2.5) text(this.banner.msg, W / 2, Hh / 2 - 40, 30, '#ffe08a', 'center');
     if (this.time < 5 && !this.over) {
       if (pointer.touch) hint('Drag to move. Gunther shoots by himself. Buttons give orders.', 'Drag to move. Buttons give orders.');
-      else hint('WASD move, mouse aim, hold click to shoot. 1 Charge, 2 Hold, 3 Follow.', 'WASD, click to shoot, 1/2/3 orders.');
+      else hint('WASD move, hold click to shoot. G: Foot/Bows. 1/2/3: orders.', 'WASD, click to shoot, G group, 1/2/3 orders.');
     }
   }
 };
@@ -455,6 +464,19 @@ function drawArrow(x, y, angle) {
   ctx.restore();
 }
 
+function drawJavelin(x, y, angle) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(angle);
+  ctx.strokeStyle = '#5a3a1e'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(8, 0); ctx.stroke();
+  ctx.fillStyle = '#9aa2ac';
+  ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(6, -3); ctx.lineTo(6, 3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// Foot soldiers and bowmen take orders separately.
+function groupOf(u) { return u.def && u.def.ranged ? 'bows' : 'foot'; }
+
 function drawCampfire(x, y, t) {
   const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70);
   glow.addColorStop(0, 'rgba(255, 190, 90, 0.35)');
@@ -474,6 +496,7 @@ function drawCampfire(x, y, t) {
 
 onKeyPress(k => {
   if (getScene() !== battleScene || battleScene.over) return;
+  if (k === 'g' || k === 'tab') battleScene.nextGroup();
   if (k === '1') battleScene.setOrder('charge');
   if (k === '2') battleScene.setOrder('hold');
   if (k === '3') battleScene.setOrder('follow');

@@ -1,6 +1,6 @@
 // Loads the picture files, and makes extra sprites in code:
 //  - soldiers (spearmen, swordsmen, recruits) painted pixel by pixel, in any team colour
-//  - recoloured copies of the archer and orc sheets (team tunics, purple orc shamans)
+//  - recoloured copies of the archer and orc sheets (team cloaks, brown-cloaked orc skirmishers)
 // Painting sprites in code means they are original art and can be recoloured for free.
 
 import { ctx, drawFrame, shadow } from './core.js';
@@ -137,7 +137,7 @@ export function spriteFor(kind, team) {
     const T = hex(team);
     sheet = recolour(img.gunther, [[RANGER_CLOAK[0], shade(T, 0.72)], [RANGER_CLOAK[1], shade(T, 0.45)], [RANGER_CLOAK[2], shade(T, 0.9)], [RANGER_CLOAK[3], shade(T, 0.58)]]);
   } else if (kind === 'shaman') {
-    sheet = recolour(img['orc-yellow'], [[ORC_CLOAK[0], [104, 52, 128]], [ORC_CLOAK[1], [138, 76, 166]]]);
+    sheet = recolour(img['orc-yellow'], [[ORC_CLOAK[0], [92, 70, 50]], [ORC_CLOAK[1], [120, 94, 64]]]);
   } else {
     const looks = {
       recruit: { helm: null, shield: null, weapon: 'fork' },
