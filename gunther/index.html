@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Gunther</title>
-  <meta name="description" content="Gunther: clear orc camps, earn gold and gear up in town. A small browser action game by Blake Baldwin.">
+  <meta name="description" content="Gunther: raise a warband, trade across the island, and break the orc Horde. A small browser sandbox game by Blake Baldwin.">
   <meta property="og:title" content="Gunther">
-  <meta property="og:description" content="Clear orc camps, earn gold and gear up in town.">
+  <meta property="og:description" content="Raise a warband, trade across the island, and break the orc Horde.">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +28,27 @@
     .panel button:hover:not(:disabled) { background: #ffe19a; }
     .panel button:disabled { background: #4a4f5c; color: #9097a6; cursor: default; }
     .panel button.secondary { background: #343a47; color: #eceef2; }
-    .panel .msg { min-height: 1.5em; color: #9fd99a; }
+    .panel .msg { color: #9fd99a; }
+    .panel.wide { width: min(100%, 680px); }
+    .panel h3 { color: #f0cf7a; margin-top: 10px; font-size: 1rem; }
+    .panel .left, .panel ul { text-align: left; }
+    .panel ul { padding-left: 18px; color: #c5cad6; font-size: 0.9rem; }
+    .panel .good { color: #9fd99a; }
+    .panel .bad { color: #ff9a8a; }
+    .panel .warn { color: #ffd27a; }
+    .panel .rumour { font-style: italic; }
+    .panel .small { font-size: 0.75rem; color: #8b91a0; }
+    .panel table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: clamp(0.72rem, 2.2vw, 0.9rem); color: #dfe2ea; }
+    .panel th { text-align: left; color: #8b91a0; font-weight: 600; padding: 2px 4px; }
+    .panel td { text-align: left; padding: 3px 4px; border-top: 1px solid #2e3440; }
+    .panel td.ups { white-space: normal; }
+    .panel button.mini { display: inline-block; width: auto; margin: 1px 2px; padding: 3px 8px; font-size: 0.8rem; white-space: nowrap; }
+    .panel button.secondary:disabled { background: #2a2e37; color: #5c6270; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+    #hud { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+    #hud button { font: inherit; font-size: 0.85rem; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 2px solid #c9a24a; background: rgba(31, 35, 43, 0.9); color: #f0cf7a; cursor: pointer; }
+    #hud button.on { background: #f0cf7a; color: #14161a; }
+    #overlay.show ~ #hud { display: none; }
     @media (max-height: 460px) {
       body { padding: 2px; gap: 2px; }
       #stage { width: min(100%, calc((100vh - 28px) * 16 / 9)); }
@@ -46,8 +66,9 @@
   <div id="stage">
     <canvas id="game" width="960" height="540"></canvas>
     <div id="overlay"></div>
+    <div id="hud"></div>
   </div>
   <footer><a href="../">Back to bnbaldwin.com</a></footer>
-  <script src="game.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
