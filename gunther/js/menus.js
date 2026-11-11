@@ -7,10 +7,13 @@ import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS } from './da
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
-  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName
+  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName,
+  skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
+  enemiesOf, anyWar, warsText, recruitType
 } from './state.js';
-import { mapScene, populate, spawnWarband, partyById, terrainAt, T } from './world.js';
+import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace } from './world.js';
 import { battleScene } from './battle.js';
+import { openHall, openRansom, openCapturedLord, lordBlurb, lordGreeting, skillsTable, prisonersSection, convertPrisoner, contractLine, lordsTable } from './court.js';
 
 // ---------------------------------------------------------------- helpers
 function troopList(troops) {
@@ -29,17 +32,17 @@ function compare(theirs) {
 function statusLine() {
   return '<p class="stats">Gold ' + game.gold + ' &middot; Men ' + troopCount() + '/' + partyLimit() + ' &middot; Food ' + foodStock() + ' (' + Math.floor(foodStock() / foodPerDay()) + ' days) &middot; Health ' + Math.ceil(game.health) + '/' + game.maxHealth + '</p>';
 }
-const plural = (n, word) => n + ' ' + (n === 1 ? word : word.endsWith('man') ? word.slice(0, -3) + 'men' : word.endsWith('y') ? word.slice(0, -1) + 'ies' : word + 's');
+const plural = (n, word) => n + ' ' + (n === 1 ? word : word.endsWith('man') ? word.slice(0, -3) + 'men' : /[^aeiou]y$/.test(word) ? word.slice(0, -1) + 'ies' : word + 's');
 
 // ---------------------------------------------------------------- auto-resolved battles
 // Rolls dice for a whole battle. Each round both sides deal damage based on their strength,
 // and that damage knocks out random soldiers. heroPower is Gunther's share for side A.
-export function autoResolve(a, b, heroPower) {
+export function autoResolve(a, b, heroPower, boostA) {
   const units = troops => { const l = []; for (const t in troops) for (let i = 0; i < troops[t]; i++) l.push({ t, hp: TROOPS[t].power * 10 }); return l; };
   const A = units(a), B = units(b);
   const power = l => l.reduce((s, u) => s + TROOPS[u.t].power, 0);
   for (let round = 0; round < 60 && (A.length || heroPower) && B.length; round++) {
-    const dmgA = (power(A) + heroPower) * rand(1.4, 2.6), dmgB = power(B) * rand(1.4, 2.6);
+    const dmgA = (power(A) + heroPower) * (boostA || 1) * rand(1.4, 2.6), dmgB = power(B) * rand(1.4, 2.6);
     const hit = (list, dmg) => {
       while (dmg > 0 && list.length) {
         const k = Math.floor(Math.random() * list.length);
@@ -60,12 +63,12 @@ export function openTitle() {
   const saved = hasSave();
   showPanel(
     '<h1>GUNTHER</h1>' +
-    '<p>The Gorrak Horde has landed on the isle of Aldmoor. The Vale and the March squabble while orc raiders burn their villages. Raise a warband, earn your coin, and break the Horde at Skullrock.</p>' +
+    '<p>The Gorrak Horde has landed on the isle of Aldmoor. Men of the Vale and the March, the elves of the Elthir Wood and the dwarves of the Dunmar Holds squabble while orc raiders burn their villages. Raise a warband, earn your coin, and break the Horde at Skullrock.</p>' +
     (saved ? '<button data-act="continue">Continue</button>' : '') +
     '<button data-act="new"' + (saved ? ' class="secondary"' : '') + '>New game</button>' +
     '<button data-act="help" class="secondary">How to play</button>',
     {
-      continue: () => { loadSave(); setScene(mapScene); },
+      continue: () => { loadSave(); populate(); setScene(mapScene); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
       help: () => openHelp(openTitle)
     });
@@ -76,9 +79,12 @@ function openHelp(back) {
     '<h2>How to play</h2><div class="left">' +
     '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. The small map in the corner can be clicked too.</p>' +
     '<p><b>Your warband.</b> Hire recruits in villages and towns. Feed them (grain or fish) and pay their wages each week, or morale drops and men desert. Winning battles gives your men experience: train them up from the Party screen.</p>' +
-    '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. Keys 1, 2 and 3 order your men to Charge, Hold or Follow you. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
+    '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. G switches who you are ordering (All, Foot or Bows), and 1, 2 and 3 tell them to Charge, Hold or Follow you. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
+    '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
+    '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
+    '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
     '<p><b>Trade.</b> Each place makes some goods cheaply and pays well for others. Buy low, carry it across the island, sell high.</p>' +
-    '<p><b>Realms.</b> Help a kingdom and its people warm to you. Attack its patrols or caravans and it will turn on you. The two kingdoms go to war with each other from time to time.</p>' +
+    '<p><b>Realms.</b> Help a kingdom and its people warm to you. Attack its lords or caravans and it will turn on you. The four kingdoms make war and peace with each other on their own, but none fights two wars at once. The island carries on without you: check the Chronicle on the Party screen.</p>' +
     '<p><b>Goal.</b> Grow strong enough to storm Skullrock and defeat Warlord Gorrak. Burning the orc camps first stops their raiders for a while.</p>' +
     '</div><button data-act="back">Back</button>', { back });
 }
@@ -100,7 +106,8 @@ export function openSettlement(s, msg) {
   msg = msg ? '<p class="msg">' + msg + '</p>' : '';
   if (s.kind === 'camp' || s.kind === 'stronghold') return openCamp(s, msg);
   const rel = game.relations[s.faction];
-  const head = '<h2>' + s.name + '</h2><p>' + (s.kind === 'town' ? 'Town' : 'Village') + ' of ' + f.name +
+  const mine = game.contract && game.contract.fief === s.id;
+  const head = '<h2>' + s.name + (mine ? ' <span class="good">(your village)</span>' : '') + '</h2><p>' + (s.kind === 'town' ? 'Town' : 'Village') + ' of ' + f.name +
     (rel !== undefined ? ' &middot; ' + relationWord(rel) + ' (' + rel + ')' : '') + (st.raided ? ' &middot; <span class="bad">recently raided</span>' : '') + '</p>' + statusLine();
   if (hostile(s.faction, 'player')) {
     showPanel(head + '<p class="bad">The gates are barred. Nobody here will deal with you.</p><button data-act="leave">Leave</button>', { leave });
@@ -112,8 +119,10 @@ export function openSettlement(s, msg) {
   html += '<button data-act="recruit">Recruit volunteers (' + st.recruits + ' willing)</button>';
   if (quest) html += '<button data-act="deliver"' + ((game.goods[quest.good] || 0) < quest.amount ? ' disabled' : '') + '>Deliver ' + quest.amount + ' ' + GOODS[quest.good].name + ' for the quest</button>';
   if (s.kind === 'town') html += '<button data-act="tavern">Tavern</button><button data-act="smith">Smith</button>';
+  if (s.kind === 'town' && KINGDOMS.includes(s.faction)) html += '<button data-act="hall">Hall of ' + FACTIONS[s.faction].short + '</button>';
   html += '<button data-act="leave" class="secondary">Leave</button>';
   showPanel(html, {
+    hall: () => openHall(s, () => openSettlement(s)),
     market: () => openMarket(s),
     recruit: () => openRecruit(s),
     tavern: () => openTavern(s),
@@ -144,7 +153,7 @@ function openMarket(s, msg) {
     (msg ? '<p class="msg">' + msg + '</p>' : '') +
     '<table><tr><th>Goods</th><th>Have</th><th></th><th></th><th></th></tr>' + rows + '</table>' +
     '<button data-act="back" class="secondary">Back</button>', {
-    buy: g => { const p = buyPrice(s.id, g); if (game.gold >= p && cargo() < cargoLimit()) { game.gold -= p; game.goods[g] = (game.goods[g] || 0) + 1; nudgePrice(s.id, g, 1); } openMarket(s); },
+    buy: g => { const p = buyPrice(s.id, g); if (game.gold >= p && cargo() < cargoLimit()) { game.gold -= p; game.goods[g] = (game.goods[g] || 0) + 1; nudgePrice(s.id, g, 1); trainSkill('trade', p / 25); } openMarket(s); },
     sell: g => sellGoods(s, g, 1),
     sellall: g => sellGoods(s, g, game.goods[g] || 0),
     back: () => openSettlement(s)
@@ -155,12 +164,14 @@ function sellGoods(s, g, n) {
   for (let i = 0; i < n && game.goods[g]; i++) { earned += sellPrice(s.id, g); game.goods[g]--; nudgePrice(s.id, g, -1); }
   if (!game.goods[g]) delete game.goods[g];
   game.gold += earned;
+  trainSkill('trade', earned / 15);
   openMarket(s, earned ? 'Sold for ' + earned + ' gold.' : '');
 }
 
 function recruitCost(s) {
   const rel = game.relations[s.faction] || 0;
-  return Math.max(4, Math.round((s.kind === 'town' ? 14 : 10) * (1 - rel / 200)));
+  const fief = game.contract && game.contract.fief === s.id ? 0.5 : 1;
+  return Math.max(3, Math.round((s.kind === 'town' ? 14 : 10) * (1 - rel / 200) * fief));
 }
 function openRecruit(s, msg) {
   const st = game.sites[s.id], cost = recruitCost(s), room = partyLimit() - troopCount();
@@ -170,7 +181,7 @@ function openRecruit(s, msg) {
   else if (!st.recruits) why = st.raided ? 'The orcs took the young men. Come back when the village recovers.' : 'Nobody else wants to join right now. Come back in a few days.';
   else if (room <= 0) why = 'Your warband is at its limit. Win renown to lead more men.';
   showPanel('<h2>Recruit</h2>' + statusLine() +
-    '<p>' + plural(st.recruits, 'volunteer') + ' will join for ' + cost + ' gold each. Recruits start weak but can be trained into spearmen or bowmen.</p>' +
+    '<p>' + plural(st.recruits, 'volunteer') + ' will join for ' + cost + ' gold each. ' + recruitBlurb(s) + '</p>' +
     (why ? '<p class="warn">' + why + '</p>' : '') + (msg ? '<p class="msg">' + msg + '</p>' : '') +
     '<button data-act="one"' + (why || can < 1 ? ' disabled' : '') + '>Hire 1 (' + cost + ' gold)</button>' +
     '<button data-act="all"' + (why || can < 2 ? ' disabled' : '') + '>Hire ' + Math.max(can, 0) + ' (' + Math.max(can, 0) * cost + ' gold)</button>' +
@@ -178,18 +189,23 @@ function openRecruit(s, msg) {
     one: () => hire(s, 1), all: () => hire(s, can), back: () => openSettlement(s)
   });
 }
+function recruitBlurb(s) {
+  const t = TROOPS[recruitType(s)];
+  const type = recruitType(s), ups = t.upgrades.map(u => troopName(u.to, 2).toLowerCase());
+  return 'Volunteers here are ' + troopName(type, 2).toLowerCase() + '. They start weak but can be trained into ' + ups.join(' or ') + '.';
+}
 function hire(s, n) {
   const cost = recruitCost(s);
   n = Math.min(n, game.sites[s.id].recruits, partyLimit() - troopCount(), Math.floor(game.gold / cost));
   if (n <= 0) return openRecruit(s);
-  game.gold -= n * cost; game.sites[s.id].recruits -= n; addTroops('recruit', n);
-  openRecruit(s, plural(n, 'recruit') + ' joined your warband.');
+  game.gold -= n * cost; game.sites[s.id].recruits -= n; addTroops(recruitType(s), n);
+  openRecruit(s, n + ' ' + troopName(recruitType(s), n).toLowerCase() + ' joined your warband.');
 }
 
 // Sellswords in the tavern: a band of trained troops for hire, refreshed each week.
 function mercs(s) {
   const st = game.sites[s.id], week = Math.floor(game.day / 7);
-  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(['spearman', 'bowman', 'spearman', 'knight', 'ranger']), n: randInt(2, 5) }; }
+  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(['spearman', 'bowman', 'spearman', 'knight', 'ranger', 'elfarcher', 'elfblade', 'dwarfaxe', 'dwarfxbow']), n: randInt(2, 5) }; }
   return st.mercs;
 }
 
@@ -206,7 +222,9 @@ function openTavern(s, msg) {
     '<button data-act="rest"' + (game.gold < restCost ? ' disabled' : '') + '>Rest a night: heal Gunther, men recover (' + restCost + ' gold)</button>' +
     (m.n ? '<button data-act="mercs"' + (hireN < 1 ? ' disabled' : '') + '>Hire sellswords: ' + m.n + ' ' + troopName(m.type, m.n) + ' at ' + mCost + ' gold each' + (hireN < 1 ? (troopCount() >= partyLimit() ? ' (warband full)' : ' (not enough gold)') : hireN < m.n ? ' (you can take ' + hireN + ')' : '') + '</button>' : '<button disabled>No sellswords here this week</button>') +
     questBtn +
+    '<button data-act="ransom"' + (prisonerCount() ? '' : ' disabled') + '>Ransom broker' + (prisonerCount() ? ' (' + prisonerCount() + ' prisoners to sell)' : ' (no prisoners)') + '</button>' +
     '<button data-act="back" class="secondary">Back</button>', {
+    ransom: () => openRansom(s, () => openTavern(s)),
     rest: () => {
       game.gold -= restCost; game.health = game.maxHealth; dailyTick(); populate();
       for (const t in game.troops) game.troops[t].wounded = Math.max(0, game.troops[t].wounded - 2);
@@ -229,11 +247,15 @@ function rumour() {
   r.push('"They say ' + t.name + ' pays well for ' + GOODS[g].name.toLowerCase() + '."');
   const m = pick(towns.filter(x => x.makes)), g2 = pick(m.makes);
   r.push('"' + GOODS[g2].name + ' is cheap in ' + m.name + ', if you can carry it."');
-  r.push(game.atWar ? '"The Vale and the March are at each other\'s throats again. Good time to be a sellsword."' : '"Peace between the Vale and the March, for now."');
+  const w = anyWar();
+  r.push(w.length ? '"' + FACTIONS[w[0][0]].short.replace(/^the /, 'The ') + ' and ' + FACTIONS[w[0][1]].short + ' are at each other\'s throats again. Good time to be a sellsword."' : '"All the kingdoms are at peace, for now."');
   const raided = SETTLEMENTS.filter(x => game.sites[x.id].raided);
   if (raided.length) r.push('"Orcs hit ' + raided[0].name + ' not long ago. Burned the barns."');
   if (!game.hordeBroken) r.push('"Warlord Gorrak sits in Skullrock, up in the northern hills. Takes an army to shift him."');
   r.push('"Burn an orc camp and its raiders stop coming, at least for a while."');
+  // Half the time, gossip about something that actually happened.
+  const recent = game.chronicle.filter(c => game.day - c.day < 12);
+  if (recent.length && Math.random() < 0.6) return '"Did you hear? ' + pick(recent).text + '"';
   return pick(r);
 }
 
@@ -321,14 +343,17 @@ function openCamp(s, msg) {
 // ---------------------------------------------------------------- meeting a party on the map
 export function openEncounter(p, forced) {
   const f = FACTIONS[p.faction];
-  const isHostile = hostile(p.faction, 'player');
-  const desc = { warband: 'Orc raiders looking for easy prey.', patrol: 'Soldiers keeping the roads of ' + f.short + '.', caravan: 'Merchants hauling goods to ' + (p.dest ? site(p.dest).name : 'market') + '.' }[p.kind];
-  let html = '<h2>' + esc(p.name) + '</h2><p>' + f.name + '. ' + desc + '</p><p>' + troopList(p.troops) + '.</p><p>' + compare(strength(p.troops)) + '</p>';
+  const isHostile = enemies(p, { faction: 'player' });
+  const desc = { warband: 'Orc raiders looking for easy prey.', lord: p.lord ? lordBlurb(p.lord) : '', caravan: 'Merchants hauling goods to ' + (p.dest ? site(p.dest).name : 'market') + '.' }[p.kind] || '';
+  let html = '<h2>' + esc(p.name) + (p.lord ? '\'s host' : '') + '</h2><p>' + (p.lord ? '' : f.name + '. ') + desc + '</p>' + (p.lord ? '<p>' + lordGreeting(p.lord) + '</p>' : '') +
+    '<p>' + troopList(p.troops) + '.</p><p>' + compare(strength(p.troops)) + '</p>';
+  if (p.lord && grudge(p.lord) && !hostile(p.faction, 'player')) html += '<p class="warn">This is a personal grudge. Fighting back will not anger ' + f.short + '.</p>';
   if (forced) html += '<p class="bad">They are attacking you!</p>';
   const canSend = troopCount(true) > 0;
   const handlers = {
     fight: () => engage(p),
     send: () => { if (!isHostile) attackPenalty(p); afterBattle({ party: p }, sendTroops(p.troops)); },
+    talk: () => openLordTalk(p),
     sacrifice: () => {
       const lost = sacrifice();
       mapScene.grace = 2; setScene(mapScene);
@@ -344,15 +369,31 @@ export function openEncounter(p, forced) {
     if (forced) html += '<button data-act="sacrifice" class="secondary"' + (troopCount(true) >= 3 ? '' : ' disabled') + '>Leave some men behind and escape</button>';
     else html += '<button data-act="leave" class="secondary">Leave</button>';
   } else {
-    if (p.kind === 'patrol' && game.relations[p.faction] >= 15) html += '<p class="good">"Good to see you, Gunther. The roads are safer with you on them."</p>';
-    html += '<button data-act="leave">Leave them be</button><button data-act="attack" class="secondary">Attack them</button>';
+    html += '<button data-act="leave">Leave them be</button>';
+    if (p.lord) html += '<button data-act="talk" class="secondary">Ask what news they have</button>';
+    html += '<button data-act="attack" class="secondary">Attack them</button>';
   }
   showPanel(html, handlers);
 }
 
+// A short chat with a lord: they share what they have seen, coloured by what they think of you.
+function openLordTalk(p) {
+  const l = lord(p.lord), st = lordState(p.lord);
+  const lines = [];
+  const recent = game.chronicle.filter(c => game.day - c.day < 15);
+  if (recent.length) lines.push('"' + pick(recent).text + '"');
+  const orcs = game.parties.filter(o => o.faction === 'horde').sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0];
+  if (orcs) lines.push('"My scouts saw ' + orcs.name + ' near ' + nearestPlace(orcs.x, orcs.y) + '."');
+  const foes = enemiesOf(l.faction);
+  if (foes.length) lines.push(l.traits.includes('cruel') ? '"This war will be won by burning their fields, not by talk."' : '"This war with ' + FACTIONS[foes[0]].short + ' bleeds us both while the orcs grow fat."');
+  if (st.opinion >= 20 && !game.contract) lines.push('"If you want honest work, the hall in ' + site(LORDSHOME[l.faction]).name + ' hires good swords."');
+  showPanel('<h2>' + l.name + '</h2>' + lines.map(x => '<p>' + x + '</p>').join('') + '<button data-act="back">Back</button>', { back: () => openEncounter(p, false) });
+}
+const LORDSHOME = { vale: 'brightwater', march: 'redcliff', elves: 'elthir', dwarves: 'dunmar' };
+
 function openConfirmAttack(p) {
   const f = FACTIONS[p.faction];
-  showPanel('<h2>Attack ' + esc(p.name) + '?</h2><p>' + f.name + ' will not forget this. Your relation with them will drop sharply' + (p.faction === 'free' ? '.' : ', and their patrols may hunt you.') + '</p>' +
+  showPanel('<h2>Attack ' + esc(p.name) + '?</h2><p>' + f.name + ' will not forget this. Your relation with them will drop sharply' + (p.faction === 'free' ? '.' : ', and their lords may hunt you.') + '</p>' +
     '<button data-act="yes">Attack</button><button data-act="no" class="secondary">Think again</button>', {
     yes: () => { attackPenalty(p); engage(p); },
     no: () => openEncounter(p, false)
@@ -361,7 +402,10 @@ function openConfirmAttack(p) {
 function attackPenalty(p) {
   if (p.penalised) return;
   p.penalised = true;
+  if (p.lord && grudge(p.lord)) return;     // they started it
   changeRelation(p.faction, p.kind === 'caravan' ? -20 : -15);
+  if (p.lord) remember(p.lord, 'Gunther attacked my host without cause', -30);
+  if (p.kind === 'caravan') for (const id in game.lords) if (lord(id).faction === p.faction && lord(id).traits.includes('greedy')) remember(id, 'Gunther robbed one of our caravans', -12);
 }
 
 function engage(p) {
@@ -378,11 +422,12 @@ function startBattle(enemy, kind, onEnd) {
 // Auto-resolve: your men fight without Gunther. Returns the same shape a real battle does.
 function sendTroops(enemyTroops) {
   const mine = playerFit();
-  const res = autoResolve(mine, enemyTroops, 0);
+  // Gunther's Tactics skill makes his men fight smarter without him.
+  const res = autoResolve(mine, enemyTroops, 0, 1 + skill('tactics') * 0.06);
   const killed = {}, wounded = {};
   for (const t in mine) {
     const lost = mine[t] - (res.a[t] || 0);
-    for (let i = 0; i < lost; i++) { if (Math.random() < 0.5) wounded[t] = (wounded[t] || 0) + 1; else killed[t] = (killed[t] || 0) + 1; }
+    for (let i = 0; i < lost; i++) { if (Math.random() < 0.5 + skill('medicine') * 0.04) wounded[t] = (wounded[t] || 0) + 1; else killed[t] = (killed[t] || 0) + 1; }
   }
   const enemyKilled = {};
   for (const t in enemyTroops) enemyKilled[t] = enemyTroops[t] - (res.b[t] || 0);
@@ -421,6 +466,26 @@ function afterBattle(foe, res) {
   game.stats.won++;
   const enemyTroops = foe.party ? foe.party.troops : game.sites[foe.site.id].garrison;
   const enemyPower = strength(enemyTroops);
+  // Learning by doing: leading men to victory, and beating strong enemies.
+  trainSkill('leadership', 4 + troopCount() / 3);
+  trainSkill('tactics', Math.max(1, enemyPower / 3) * Math.min(2, enemyPower / Math.max(1, playerStrength())));
+  // Some of the fallen were only knocked down: they become prisoners if there's room.
+  let took = 0;
+  for (const t in res.enemyKilled) {
+    if (t === 'warlord') continue;
+    for (let i = 0; i < res.enemyKilled[t]; i++) {
+      if (prisonerCount() >= prisonerLimit() || Math.random() > 0.35) continue;
+      game.prisoners[t] = (game.prisoners[t] || 0) + 1; took++;
+    }
+  }
+  if (took) lines.push('You took ' + plural(took, 'prisoner') + '. Sell them to a ransom broker in any town, or persuade them to join you.');
+  // Lords nearby who were fighting the same enemy remember that you stood with them.
+  if (foe.party) {
+    for (const p of game.parties) {
+      if (!p.lord || p === foe.party || dist(p.x, p.y, mapScene.pos.x, mapScene.pos.y) > 500) continue;
+      if (hostile(p.faction, foe.party.faction)) { remember(p.lord, 'Gunther fought ' + foe.party.name + ' near ' + nearestPlace(p.x, p.y), 8); lines.push(lord(p.lord).name + ' saw you fight and will remember it.'); }
+    }
+  }
   let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * 4 + 60);
   const renown = Math.max(1, Math.round(enemyPower / 5));
   game.gold += gold; game.renown += renown;
@@ -438,20 +503,22 @@ function afterBattle(foe, res) {
     let near = null, nd = Infinity;
     for (const s of SETTLEMENTS) if (KINGDOMS.includes(s.faction)) { const d = dist(s.x, s.y, mapScene.pos.x, mapScene.pos.y); if (d < nd) { nd = d; near = s; } }
     if (near && nd < 1000) changeRelation(near.faction, 2);
-  } else if (foe.party && KINGDOMS.includes(foe.party.faction) && game.atWar) {
-    const other = KINGDOMS.find(k => k !== foe.party.faction);
-    changeRelation(other, 4);
+  } else if (foe.party && KINGDOMS.includes(foe.party.faction)) {
+    // Every kingdom at war with the beaten one is grateful; your employer most of all.
+    for (const other of enemiesOf(foe.party.faction)) changeRelation(other, game.contract && game.contract.faction === other ? 6 : 4);
   }
   if (foe.party && foe.party.kind === 'caravan') {
     const g = pick(Object.keys(GOODS)), n = randInt(3, 8);
     const room = cargoLimit() - cargo();
     if (room > 0) { game.goods[g] = (game.goods[g] || 0) + Math.min(n, room); lines.push('You seized ' + Math.min(n, room) + ' ' + GOODS[g].name.toLowerCase() + '.'); }
   }
+  let capturedLord = null;
   if (foe.party) {
     foe.party.gone = true;
     const q = game.quests.find(q => q.party === foe.party.id);
     if (q) completeQuest(q), lines.push('Quest complete! +' + q.reward + ' gold.');
-  }
+    if (foe.party.lord) { capturedLord = foe.party.lord; chronicle('Gunther defeated ' + lord(capturedLord).name + ' near ' + nearestPlace(foe.party.x, foe.party.y) + '.'); }
+  } else if (foe.site) chronicle('Gunther stormed ' + foe.site.name + '.');
   let title = 'Victory';
   if (foe.site) {
     const st = game.sites[foe.site.id];
@@ -474,11 +541,12 @@ function afterBattle(foe, res) {
   const ups = upgradeable();
   if (ups) lines.push('<span class="good">' + ups + ' of your men can be trained up. Open the Party screen.</span>');
   save();
-  showPanel('<h2>' + title + '</h2>' + lines.map(l => '<p>' + l + '</p>').join('') + statusLine() +
+  const report = extra => showPanel('<h2>' + title + '</h2>' + (extra ? '<p class="msg">' + extra + '</p>' : '') + lines.map(l => '<p>' + l + '</p>').join('') + statusLine() +
     '<button data-act="map">Back to the map</button><button data-act="party" class="secondary">Party</button>', {
     map: () => { setScene(mapScene); mapScene.grace = 1.5; },
     party: () => { setScene(mapScene); openParty(); }
   });
+  if (capturedLord) openCapturedLord(capturedLord, report); else report();
 }
 
 function defeat(lines) {
@@ -497,7 +565,7 @@ function defeat(lines) {
   dailyTick(); dailyTick(); populate();
   save();
   showPanel('<h2>Defeat</h2>' + lines.map(l => '<p>' + l + '</p>').join('') +
-    '<p>Your warband is routed. ' + (scattered ? plural(scattered, 'man') + ' scattered or were lost, and ' : '') + 'you lost ' + lostGold + ' gold.' +
+    '<p>Your warband is routed. ' + (scattered ? plural(scattered, 'man') + ' scattered or were lost, and you' : 'You') + ' lost ' + lostGold + ' gold.' +
     (best ? ' Two days later you limp into ' + best.name + '.' : '') + '</p>' + statusLine() +
     '<button data-act="map">Carry on</button>', { map: () => { setScene(mapScene); mapScene.grace = 2; } });
 }
@@ -512,39 +580,55 @@ function upgradeable() {
   return n;
 }
 
-export function openParty(msg) {
-  let rows = '';
-  const order = ['knight', 'ranger', 'spearman', 'bowman', 'recruit'];
-  for (const t of order) {
-    const st = game.troops[t];
-    if (!st) continue;
-    const d = TROOPS[t];
-    let ups = '';
-    for (const u of d.upgrades) {
-      const can = Math.min(st.n - st.wounded, Math.floor(st.xp / u.xp), Math.floor(game.gold / u.cost));
-      ups += '<button class="mini" data-act="up" data-arg="' + t + '>' + u.to + '"' + (can < 1 ? ' disabled' : '') + ' title="Needs ' + u.xp + ' xp and ' + u.cost + ' gold per man">' + TROOPS[u.to].name + ' (' + u.cost + 'g)</button>';
+// The party screen has tabs so it fits on a phone: troops, Gunther himself, and the wider world.
+let partyTab = 'troops';
+export function openParty(msg, tab) {
+  if (tab) partyTab = tab;
+  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Troops', gunther: 'Gunther', world: 'The island' }[t] + '</button>').join('');
+  let body = '';
+  if (partyTab === 'troops') {
+    let rows = '';
+    const order = Object.keys(game.troops).filter(t => TROOPS[t]).sort((a, b) => TROOPS[b].power - TROOPS[a].power);
+    for (const t of order) {
+      const st = game.troops[t];
+      if (!st) continue;
+      const d = TROOPS[t];
+      let ups = '';
+      for (const u of d.upgrades) {
+        const can = Math.min(st.n - st.wounded, Math.floor(st.xp / u.xp), Math.floor(game.gold / u.cost));
+        ups += '<button class="mini" data-act="up" data-arg="' + t + '>' + u.to + '"' + (can < 1 ? ' disabled' : '') + ' title="Needs ' + u.xp + ' xp and ' + u.cost + ' gold per man">' + TROOPS[u.to].name + ' (' + u.cost + 'g)</button>';
+      }
+      const need = d.upgrades.length ? Math.min(...d.upgrades.map(u => u.xp)) : 0;
+      rows += '<tr><td>' + d.name + '</td><td>' + st.n + (st.wounded ? ' <span class="bad">(' + st.wounded + ' hurt)</span>' : '') + '</td><td>' +
+        (need ? Math.min(st.xp, 9999) + '/' + need : '-') + '</td><td>' + d.wage + '</td><td class="ups">' + ups + '</td></tr>';
     }
-    const need = d.upgrades.length ? Math.min(...d.upgrades.map(u => u.xp)) : 0;
-    rows += '<tr><td>' + d.name + '</td><td>' + st.n + (st.wounded ? ' <span class="bad">(' + st.wounded + ' hurt)</span>' : '') + '</td><td>' +
-      (need ? Math.min(st.xp, 9999) + '/' + need : '-') + '</td><td>' + d.wage + '</td><td class="ups">' + ups + '</td></tr>';
+    const goods = Object.keys(game.goods).map(g => game.goods[g] + ' ' + GOODS[g].name.toLowerCase()).join(', ') || 'nothing';
+    body = '<p>Gold ' + game.gold + '. Wages ' + wages() + ' gold a week (next pay day in ' + plural(7 - game.day % 7, 'day') + '). Men ' + troopCount() + '/' + partyLimit() + '. Morale ' + Math.round(game.morale) + '.</p>' +
+      '<table><tr><th>Troops</th><th>Men</th><th>XP</th><th>Wage</th><th>Train</th></tr>' + (rows || '<tr><td colspan="5">No troops. Hire some in a village.</td></tr>') + '</table>' +
+      '<p>Carrying: ' + goods + ' (' + cargo() + '/' + cargoLimit() + '). Food lasts ' + plural(Math.floor(foodStock() / foodPerDay()), 'day') + '.</p>' +
+      '<h3>Prisoners</h3>' + prisonersSection();
+  } else if (partyTab === 'gunther') {
+    const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
+    body = '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + '</p>' +
+      '<p>' + contractLine() + '</p>' +
+      '<h3>Skills</h3>' + skillsTable() +
+      (quests ? '<h3>Quests</h3><ul class="left">' + quests + '</ul>' : '') +
+      '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>';
+  } else {
+    let realms = '';
+    for (const k of KINGDOMS.concat('free')) {
+      const v = game.relations[k];
+      realms += '<tr><td><span class="dot" style="background:' + FACTIONS[k].colour + '"></span>' + FACTIONS[k].name + '</td><td class="' + (v <= -20 ? 'bad' : v >= 15 ? 'good' : '') + '">' + relationWord(v) + ' (' + v + ')</td></tr>';
+    }
+    realms += '<tr><td><span class="dot" style="background:' + FACTIONS.horde.colour + '"></span>' + FACTIONS.horde.name + '</td><td class="bad">' + (game.hordeBroken ? 'Broken' : 'At war with everyone') + '</td></tr>';
+    const chron = game.chronicle.slice(-10).reverse().map(c => '<li><span class="small">Day ' + c.day + '</span> ' + esc(c.text) + '</li>').join('');
+    body = '<p>' + (anyWar().length ? '<span class="bad">' + warsText() + '</span>' : warsText()) + '</p><table>' + realms + '</table>' +
+      '<h3>Lords and what they think of you</h3>' + lordsTable() +
+      '<h3>Chronicle</h3>' + (chron ? '<ul class="left">' + chron + '</ul>' : '<p>Nothing of note has happened yet.</p>');
   }
-  let realms = '';
-  for (const k of ['vale', 'march', 'free']) {
-    const v = game.relations[k];
-    realms += '<tr><td><span class="dot" style="background:' + FACTIONS[k].colour + '"></span>' + FACTIONS[k].name + '</td><td class="' + (v <= -20 ? 'bad' : v >= 15 ? 'good' : '') + '">' + relationWord(v) + ' (' + v + ')</td></tr>';
-  }
-  realms += '<tr><td><span class="dot" style="background:' + FACTIONS.horde.colour + '"></span>' + FACTIONS.horde.name + '</td><td class="bad">' + (game.hordeBroken ? 'Broken' : 'At war with everyone') + '</td></tr>';
-  const goods = Object.keys(game.goods).map(g => game.goods[g] + ' ' + GOODS[g].name.toLowerCase()).join(', ') || 'nothing';
-  const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
-  showPanel('<h2>Gunther\'s warband</h2>' + (msg ? '<p class="msg">' + msg + '</p>' : '') +
-    '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + ' &middot; Morale ' + Math.round(game.morale) + '</p>' +
-    '<p>Gold ' + game.gold + '. Wages ' + wages() + ' gold a week (next pay day in ' + plural(7 - game.day % 7, 'day') + '). Men ' + troopCount() + '/' + partyLimit() + ' (more renown, bigger warband).</p>' +
-    '<table><tr><th>Troops</th><th>Men</th><th>XP</th><th>Wage</th><th>Train</th></tr>' + (rows || '<tr><td colspan="5">No troops. Hire some in a village.</td></tr>') + '</table>' +
-    '<p>Carrying: ' + goods + ' (' + cargo() + '/' + cargoLimit() + '). Food lasts ' + plural(Math.floor(foodStock() / foodPerDay()), 'day') + '.</p>' +
-    (quests ? '<h3>Quests</h3><ul class="left">' + quests + '</ul>' : '') +
-    '<h3>Realms</h3><p>' + (game.atWar ? '<span class="bad">The Vale and the March are at war.</span>' : 'The Vale and the March are at peace.') + '</p><table>' + realms + '</table>' +
-    '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>' +
+  showPanel('<h2>Gunther\'s warband</h2><div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
     '<button data-act="close">Close</button><button data-act="help" class="secondary">How to play</button><button data-act="title" class="secondary">Save and quit to title</button>', {
+    tab: t => openParty('', t),
     up: arg => {
       const [from, to] = arg.split('>');
       const st = game.troops[from], u = TROOPS[from].upgrades.find(x => x.to === to);
@@ -555,6 +639,7 @@ export function openParty(msg) {
       save();
       openParty(n + ' ' + troopName(from, n).toLowerCase() + ' trained as ' + troopName(to, n).toLowerCase() + '.');
     },
+    convert: t => { const m = convertPrisoner(t); save(); openParty(m); },
     close: () => hidePanel(),
     help: () => openHelp(() => openParty()),
     title: () => { save(); setScene(titleScene); }

@@ -3,7 +3,7 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES } from './data.js';
 
 const SAVE_KEY = 'gunther-save-v2';
 const OLD_SAVE_KEY = 'gunther-save-v1';
@@ -19,8 +19,7 @@ export function newGame(migrate) {
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
-    relations: { vale: 0, march: 0, free: 5 },
-    atWar: false, warTimer: 12,
+    relations: { vale: 0, march: 0, free: 5, elves: 0, dwarves: 0 },
     sites: {},
     parties: [],
     player: { x: 1640, y: 1500 },
@@ -30,6 +29,7 @@ export function newGame(migrate) {
     seenIntro: false,
     nextId: 1
   });
+  ensureFields();
   for (const s of SETTLEMENTS) {
     game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
   }
@@ -62,10 +62,84 @@ export function hasSave() {
 export function loadSave() {
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (d && d.version === 2) { for (const k in game) delete game[k]; Object.assign(game, d); return true; }
+    if (d && d.version === 2) { for (const k in game) delete game[k]; Object.assign(game, d); ensureFields(); return true; }
   } catch (e) { /* ignore */ }
   return false;
 }
+
+// Fills in anything a save from an older build doesn't have yet.
+function ensureFields() {
+  if (!game.skills) { game.skills = {}; for (const k in SKILLS) game.skills[k] = 0; }
+  if (!game.prisoners) game.prisoners = {};
+  if (!game.lordCaptives) game.lordCaptives = [];
+  if (!game.chronicle) game.chronicle = [];
+  if (game.contract === undefined) game.contract = null;
+  for (const k of KINGDOMS) if (!(k in game.relations)) game.relations[k] = 0;
+  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
+  // War and peace between each pair of kingdoms. Older saves only tracked the Vale and the March.
+  if (!game.wars) {
+    game.wars = {};
+    for (let i = 0; i < KINGDOMS.length; i++) for (let j = i + 1; j < KINGDOMS.length; j++) game.wars[KINGDOMS[i] + '|' + KINGDOMS[j]] = { on: false, timer: randInt(8, 30) };
+    if (game.atWar !== undefined) { game.wars['vale|march'] = { on: game.atWar, timer: game.warTimer || 10 }; delete game.atWar; delete game.warTimer; }
+  }
+  if (!game.lords) game.lords = {};
+  for (const l of LORDS) if (!game.lords[l.id]) {
+    game.lords[l.id] = { status: 'free', back: 0, opinion: 0, memories: [] };
+  }
+}
+
+// ---------------------------------------------------------------- chronicle
+// Notable things that happen on the island, by anyone. Shown on the party screen and in rumours.
+export function chronicle(text) {
+  game.chronicle.push({ day: game.day, text });
+  if (game.chronicle.length > 30) game.chronicle.shift();
+}
+
+// ---------------------------------------------------------------- skills
+// Each skill has hidden practice points; the level is worked out from them, so doing more
+// of something makes you better at it. Level 1 needs 20 points, level 2 needs 80, level 3 180...
+export function skill(k) { return Math.min(10, Math.floor(Math.sqrt((game.skills[k] || 0) / 20))); }
+export function trainSkill(k, amount) {
+  const before = skill(k);
+  game.skills[k] = (game.skills[k] || 0) + amount;
+  if (skill(k) > before) note('Your ' + SKILLS[k].name + ' improved to ' + skill(k) + '!', '#ffe08a');
+}
+export function skillProgress(k) {
+  const lv = skill(k), now = game.skills[k] || 0, lo = 20 * lv * lv, hi = 20 * (lv + 1) * (lv + 1);
+  return lv >= 10 ? 1 : (now - lo) / (hi - lo);
+}
+
+// ---------------------------------------------------------------- lords
+export function lord(id) { return LORDS.find(l => l.id === id); }
+export function lordState(id) { return game.lords[id]; }
+// A lord remembers what you did, and their opinion of you shifts with it.
+export function remember(id, text, opinion) {
+  const st = game.lords[id];
+  st.memories.push({ day: game.day, text });
+  if (st.memories.length > 6) st.memories.shift();
+  st.opinion = clamp(st.opinion + (opinion || 0), -100, 100);
+}
+export function hasTrait(id, t) { return lord(id).traits.includes(t); }
+
+// ---------------------------------------------------------------- prisoners
+export function prisonerCount() { let n = 0; for (const t in game.prisoners) n += game.prisoners[t]; return n + game.lordCaptives.length; }
+export function prisonerLimit() { return 6 + Math.floor(troopCount() / 2) + skill('leadership') * 2; }
+export function ransomPrice(type) { return Math.round(TROOPS[type].power * (TROOPS[type].orc ? 9 : 13)); }
+export function lordRansom(id) { return lord(id).ruler ? 900 : 450; }
+
+// ---------------------------------------------------------------- contracts
+// Working for a kingdom: first as a paid mercenary, later as a sworn vassal with a village of your own.
+export function contractPay() {
+  const c = game.contract;
+  if (!c) return 0;
+  return c.kind === 'merc' ? 6 + Math.floor(game.renown / 8) : 0;
+}
+export function fiefRent() {
+  const c = game.contract;
+  if (!c || c.kind !== 'vassal' || !c.fief) return 0;
+  return game.sites[c.fief].raided ? 0 : 40;
+}
+export function employer() { return game.contract ? game.contract.faction : null; }
 
 // ---------------------------------------------------------------- messages
 // A short feed of recent events shown on the map.
@@ -83,7 +157,7 @@ export function troopCount(fitOnly) {
   for (const t in game.troops) n += game.troops[t].n - (fitOnly ? game.troops[t].wounded : 0);
   return n;
 }
-export function partyLimit() { return Math.min(12 + Math.floor(game.renown / 8), 90); }
+export function partyLimit() { return Math.min(12 + Math.floor(game.renown / 8) + skill('leadership') * 2, 90); }
 export function addTroops(type, n) {
   if (!game.troops[type]) game.troops[type] = { n: 0, wounded: 0, xp: 0 };
   game.troops[type].n += n;
@@ -113,11 +187,11 @@ export function wages() {
   return w;
 }
 export function foodStock() { let n = 0; for (const g in game.goods) if (GOODS[g].food) n += game.goods[g]; return n; }
-export function foodPerDay() { return Math.ceil((troopCount() + 1) / 6); }
+export function foodPerDay() { return Math.ceil((troopCount() + 1 + prisonerCount()) / 6); }
 export function cargo() { let n = 0; for (const g in game.goods) n += game.goods[g]; return n; }
 export function cargoLimit() { return 30 + troopCount() * 3; }
 // Bigger parties are slower, like a real army on the march.
-export function partySpeed() { return 170 * (1 - Math.min(0.4, troopCount() * 0.006)) * (game.morale < 30 ? 0.85 : 1); }
+export function partySpeed() { return 170 * (1 - Math.min(0.42, troopCount() * 0.006 + prisonerCount() * 0.004)) * (game.morale < 30 ? 0.85 : 1); }
 
 // "3 Spearmen", "1 Bowman", "2 Orc grunts".
 export function troopName(type, n) {
@@ -127,12 +201,33 @@ export function troopName(type, n) {
 }
 
 // ---------------------------------------------------------------- realms
+function warKey(a, b) { return KINGDOMS.indexOf(a) < KINGDOMS.indexOf(b) ? a + '|' + b : b + '|' + a; }
+export function atWar(a, b) { const w = game.wars && game.wars[warKey(a, b)]; return !!(w && w.on); }
+export function enemiesOf(k) { return KINGDOMS.filter(o => o !== k && atWar(k, o)); }
+export function anyWar() { return Object.keys(game.wars).filter(k => game.wars[k].on).map(k => k.split('|')); }
+export function realmName(k) { return FACTIONS[k].short.replace(/^the /, 'the '); }
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+export function warsText() {
+  const w = anyWar();
+  if (!w.length) return 'All the kingdoms are at peace.';
+  return w.map(([a, b]) => cap(FACTIONS[a].short) + ' and ' + FACTIONS[b].short + ' are at war.').join(' ');
+}
+// What people a faction's volunteers are.
+export function raceOfSite(s) { return s.race || (FACTIONS[s.faction] && FACTIONS[s.faction].race) || 'human'; }
+export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
+
 export function hostile(a, b) {
   if (a === b) return false;
   if (a === 'horde' || b === 'horde') return true;
-  if (a === 'player' || b === 'player') { const other = a === 'player' ? b : a; return (game.relations[other] || 0) <= -20; }
+  if (a === 'player' || b === 'player') {
+    const other = a === 'player' ? b : a;
+    if ((game.relations[other] || 0) <= -20) return true;
+    // Sworn to one kingdom while it is at war with the other: its enemies are yours.
+    const boss = employer();
+    return !!(boss && boss !== other && KINGDOMS.includes(other) && atWar(boss, other));
+  }
   if (a === 'free' || b === 'free') return false;
-  return game.atWar;            // the two kingdoms
+  return atWar(a, b);
 }
 export function changeRelation(f, d) {
   if (!(f in game.relations) || !d) return;
@@ -158,8 +253,8 @@ export function price(siteId, good) {
   else if (s.wants && s.wants.includes(good)) m = 1.55;
   return g.base * m * (1 + (st.glut[good] || 0));
 }
-export function buyPrice(siteId, good) { return Math.max(1, Math.round(price(siteId, good) * 1.07)); }
-export function sellPrice(siteId, good) { return Math.max(1, Math.round(price(siteId, good) * 0.93)); }
+export function buyPrice(siteId, good) { return Math.max(1, Math.round(price(siteId, good) * (1.08 - skill('trade') * 0.02))); }
+export function sellPrice(siteId, good) { return Math.max(1, Math.round(price(siteId, good) * (0.92 + skill('trade') * 0.02))); }
 // Buying makes things dearer and selling makes them cheaper, so one trade route can't be milked forever.
 export function nudgePrice(siteId, good, dir) {
   const st = game.sites[siteId];
@@ -177,9 +272,38 @@ export function dailyTick() {
     if (eat) { game.goods[g] -= eat; need -= eat; if (!game.goods[g]) delete game.goods[g]; }
   }
   if (need > 0) { game.morale = clamp(game.morale - 12, 0, 100); msgs.push(['Your men have no food! Morale falls.', '#ff9a8a']); }
-  else game.morale = clamp(game.morale + (72 - game.morale) * 0.12, 0, 100);
-  // Healing.
-  for (const t in game.troops) { const st = game.troops[t]; if (st.wounded) st.wounded = Math.max(0, st.wounded - Math.max(1, Math.ceil(st.wounded * 0.3))); }
+  else game.morale = clamp(game.morale + (72 + skill('leadership') * 2 - game.morale) * 0.12, 0, 100);
+  // Healing. Every man patched up is practice for Gunther's Medicine.
+  for (const t in game.troops) {
+    const st = game.troops[t];
+    if (!st.wounded) continue;
+    const healed = Math.min(st.wounded, Math.max(1, Math.ceil(st.wounded * (0.3 + skill('medicine') * 0.03))));
+    st.wounded -= healed;
+    trainSkill('medicine', healed * 2);
+  }
+  // Prisoners eat, and a few slip their ropes.
+  for (const t in game.prisoners) {
+    if (Math.random() < 0.06) { game.prisoners[t]--; msgs.push(['A prisoner escaped in the night.', '#ffd27a']); }
+    if (game.prisoners[t] <= 0) delete game.prisoners[t];
+  }
+  // Pay from your employer, and rent from your village.
+  const pay = contractPay() + fiefRent();
+  if (pay) game.gold += pay;
+  if (game.contract && game.contract.kind === 'vassal' && game.contract.fief && game.sites[game.contract.fief].raided && game.day % 3 === 0) msgs.push([site(game.contract.fief).name + ' lies raided and pays no rent.', '#ff9a8a']);
+  if (game.contract && (game.relations[game.contract.faction] || 0) < -5) {
+    msgs.push([FACTIONS[game.contract.faction].name + ' has dismissed you from its service.', '#ff9a8a']);
+    chronicle(FACTIONS[game.contract.faction].short + ' cast Gunther out of its service.');
+    game.contract = null;
+  }
+  // Lords who were beaten or captured come back with fresh troops.
+  for (const id in game.lords) {
+    const st = game.lords[id];
+    if (st.status === 'routed' && game.day >= st.back) st.status = 'free';
+    if (st.status.startsWith('held-') && game.day >= st.back) {
+      st.status = 'free';
+      chronicle(lord(id).name + ' was ransomed and returned home.');
+    }
+  }
   game.health = Math.min(game.maxHealth, game.health + game.maxHealth * 0.15);
   // Wages, once a week.
   if (game.day % 7 === 0) {
@@ -203,12 +327,20 @@ export function dailyTick() {
     if (st.burned > 0 && !game.hordeBroken) { st.burned--; if (st.burned === 0) { st.garrison = campGarrison(s); msgs.push(['The orcs have rebuilt ' + s.name + '.', '#ff9a8a']); } }
     if (st.garrison && st.burned === 0 && s.kind === 'camp' && game.day % 4 === 0) st.garrison.grunt = Math.min(st.garrison.grunt + 2, 10 + Math.floor(game.day / 6));
   }
-  // War and peace between the two kingdoms.
-  game.warTimer--;
-  if (game.warTimer <= 0) {
-    game.atWar = !game.atWar;
-    game.warTimer = game.atWar ? randInt(14, 24) : randInt(10, 18);
-    msgs.push([game.atWar ? 'War! The Vale and the March are fighting each other.' : 'The Vale and the March have made peace.', '#ffd27a']);
+  // War and peace between each pair of kingdoms. A kingdom with most of its lords beaten or
+  // captured sues for peace sooner, and no kingdom picks a second war while it is fighting one.
+  const beaten = k => { const ls = LORDS.filter(l => l.faction === k); return ls.filter(l => game.lords[l.id].status !== 'free').length >= Math.ceil(ls.length * 0.6); };
+  for (const key in game.wars) {
+    const w = game.wars[key], [a, b] = key.split('|');
+    w.timer--;
+    if (w.on && (beaten(a) || beaten(b))) w.timer--;
+    if (w.timer > 0) continue;
+    if (!w.on && (enemiesOf(a).length || enemiesOf(b).length)) { w.timer = randInt(4, 8); continue; }
+    w.on = !w.on;
+    w.timer = w.on ? randInt(12, 22) : randInt(14, 32);
+    const A = cap(FACTIONS[a].short), B = FACTIONS[b].short;
+    msgs.push([w.on ? 'War! ' + A + ' and ' + B + ' are fighting.' : A + ' and ' + B + ' have made peace.', '#ffd27a']);
+    chronicle(w.on ? 'War broke out between ' + FACTIONS[a].short + ' and ' + B + '.' : cap(FACTIONS[a].short) + ' and ' + B + ' made peace.');
   }
   // Quests that ran out of time.
   for (const q of game.quests) {
