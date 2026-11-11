@@ -8,7 +8,8 @@ import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
   buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName,
-  skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit
+  skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
+  enemiesOf, anyWar, warsText, recruitType
 } from './state.js';
 import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace } from './world.js';
 import { battleScene } from './battle.js';
@@ -62,12 +63,12 @@ export function openTitle() {
   const saved = hasSave();
   showPanel(
     '<h1>GUNTHER</h1>' +
-    '<p>The Gorrak Horde has landed on the isle of Aldmoor. The Vale and the March squabble while orc raiders burn their villages. Raise a warband, earn your coin, and break the Horde at Skullrock.</p>' +
+    '<p>The Gorrak Horde has landed on the isle of Aldmoor. Men of the Vale and the March, the elves of the Elthir Wood and the dwarves of the Dunmar Holds squabble while orc raiders burn their villages. Raise a warband, earn your coin, and break the Horde at Skullrock.</p>' +
     (saved ? '<button data-act="continue">Continue</button>' : '') +
     '<button data-act="new"' + (saved ? ' class="secondary"' : '') + '>New game</button>' +
     '<button data-act="help" class="secondary">How to play</button>',
     {
-      continue: () => { loadSave(); setScene(mapScene); },
+      continue: () => { loadSave(); populate(); setScene(mapScene); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
       help: () => openHelp(openTitle)
     });
@@ -81,8 +82,9 @@ function openHelp(back) {
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. G switches who you are ordering (All, Foot or Bows), and 1, 2 and 3 tell them to Charge, Hold or Follow you. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
     '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
+    '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
     '<p><b>Trade.</b> Each place makes some goods cheaply and pays well for others. Buy low, carry it across the island, sell high.</p>' +
-    '<p><b>Realms.</b> Help a kingdom and its people warm to you. Attack its lords or caravans and it will turn on you. The two kingdoms go to war with each other from time to time. The island carries on without you: check the Chronicle on the Party screen.</p>' +
+    '<p><b>Realms.</b> Help a kingdom and its people warm to you. Attack its lords or caravans and it will turn on you. The four kingdoms make war and peace with each other on their own, but none fights two wars at once. The island carries on without you: check the Chronicle on the Party screen.</p>' +
     '<p><b>Goal.</b> Grow strong enough to storm Skullrock and defeat Warlord Gorrak. Burning the orc camps first stops their raiders for a while.</p>' +
     '</div><button data-act="back">Back</button>', { back });
 }
@@ -179,7 +181,7 @@ function openRecruit(s, msg) {
   else if (!st.recruits) why = st.raided ? 'The orcs took the young men. Come back when the village recovers.' : 'Nobody else wants to join right now. Come back in a few days.';
   else if (room <= 0) why = 'Your warband is at its limit. Win renown to lead more men.';
   showPanel('<h2>Recruit</h2>' + statusLine() +
-    '<p>' + plural(st.recruits, 'volunteer') + ' will join for ' + cost + ' gold each. Recruits start weak but can be trained into spearmen or bowmen.</p>' +
+    '<p>' + plural(st.recruits, 'volunteer') + ' will join for ' + cost + ' gold each. ' + recruitBlurb(s) + '</p>' +
     (why ? '<p class="warn">' + why + '</p>' : '') + (msg ? '<p class="msg">' + msg + '</p>' : '') +
     '<button data-act="one"' + (why || can < 1 ? ' disabled' : '') + '>Hire 1 (' + cost + ' gold)</button>' +
     '<button data-act="all"' + (why || can < 2 ? ' disabled' : '') + '>Hire ' + Math.max(can, 0) + ' (' + Math.max(can, 0) * cost + ' gold)</button>' +
@@ -187,18 +189,23 @@ function openRecruit(s, msg) {
     one: () => hire(s, 1), all: () => hire(s, can), back: () => openSettlement(s)
   });
 }
+function recruitBlurb(s) {
+  const t = TROOPS[recruitType(s)];
+  const type = recruitType(s), ups = t.upgrades.map(u => troopName(u.to, 2).toLowerCase());
+  return 'Volunteers here are ' + troopName(type, 2).toLowerCase() + '. They start weak but can be trained into ' + ups.join(' or ') + '.';
+}
 function hire(s, n) {
   const cost = recruitCost(s);
   n = Math.min(n, game.sites[s.id].recruits, partyLimit() - troopCount(), Math.floor(game.gold / cost));
   if (n <= 0) return openRecruit(s);
-  game.gold -= n * cost; game.sites[s.id].recruits -= n; addTroops('recruit', n);
-  openRecruit(s, plural(n, 'recruit') + ' joined your warband.');
+  game.gold -= n * cost; game.sites[s.id].recruits -= n; addTroops(recruitType(s), n);
+  openRecruit(s, n + ' ' + troopName(recruitType(s), n).toLowerCase() + ' joined your warband.');
 }
 
 // Sellswords in the tavern: a band of trained troops for hire, refreshed each week.
 function mercs(s) {
   const st = game.sites[s.id], week = Math.floor(game.day / 7);
-  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(['spearman', 'bowman', 'spearman', 'knight', 'ranger']), n: randInt(2, 5) }; }
+  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(['spearman', 'bowman', 'spearman', 'knight', 'ranger', 'elfarcher', 'elfblade', 'dwarfaxe', 'dwarfxbow']), n: randInt(2, 5) }; }
   return st.mercs;
 }
 
@@ -240,7 +247,8 @@ function rumour() {
   r.push('"They say ' + t.name + ' pays well for ' + GOODS[g].name.toLowerCase() + '."');
   const m = pick(towns.filter(x => x.makes)), g2 = pick(m.makes);
   r.push('"' + GOODS[g2].name + ' is cheap in ' + m.name + ', if you can carry it."');
-  r.push(game.atWar ? '"The Vale and the March are at each other\'s throats again. Good time to be a sellsword."' : '"Peace between the Vale and the March, for now."');
+  const w = anyWar();
+  r.push(w.length ? '"' + FACTIONS[w[0][0]].short.replace(/^the /, 'The ') + ' and ' + FACTIONS[w[0][1]].short + ' are at each other\'s throats again. Good time to be a sellsword."' : '"All the kingdoms are at peace, for now."');
   const raided = SETTLEMENTS.filter(x => game.sites[x.id].raided);
   if (raided.length) r.push('"Orcs hit ' + raided[0].name + ' not long ago. Burned the barns."');
   if (!game.hordeBroken) r.push('"Warlord Gorrak sits in Skullrock, up in the northern hills. Takes an army to shift him."');
@@ -376,11 +384,12 @@ function openLordTalk(p) {
   if (recent.length) lines.push('"' + pick(recent).text + '"');
   const orcs = game.parties.filter(o => o.faction === 'horde').sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0];
   if (orcs) lines.push('"My scouts saw ' + orcs.name + ' near ' + nearestPlace(orcs.x, orcs.y) + '."');
-  if (game.atWar) lines.push(l.traits.includes('cruel') ? '"This war will be won by burning their fields, not by talk."' : '"This war with ' + (l.faction === 'vale' ? 'the March' : 'the Vale') + ' bleeds us both while the orcs grow fat."');
+  const foes = enemiesOf(l.faction);
+  if (foes.length) lines.push(l.traits.includes('cruel') ? '"This war will be won by burning their fields, not by talk."' : '"This war with ' + FACTIONS[foes[0]].short + ' bleeds us both while the orcs grow fat."');
   if (st.opinion >= 20 && !game.contract) lines.push('"If you want honest work, the hall in ' + site(LORDSHOME[l.faction]).name + ' hires good swords."');
   showPanel('<h2>' + l.name + '</h2>' + lines.map(x => '<p>' + x + '</p>').join('') + '<button data-act="back">Back</button>', { back: () => openEncounter(p, false) });
 }
-const LORDSHOME = { vale: 'brightwater', march: 'redcliff' };
+const LORDSHOME = { vale: 'brightwater', march: 'redcliff', elves: 'elthir', dwarves: 'dunmar' };
 
 function openConfirmAttack(p) {
   const f = FACTIONS[p.faction];
@@ -494,9 +503,9 @@ function afterBattle(foe, res) {
     let near = null, nd = Infinity;
     for (const s of SETTLEMENTS) if (KINGDOMS.includes(s.faction)) { const d = dist(s.x, s.y, mapScene.pos.x, mapScene.pos.y); if (d < nd) { nd = d; near = s; } }
     if (near && nd < 1000) changeRelation(near.faction, 2);
-  } else if (foe.party && KINGDOMS.includes(foe.party.faction) && game.atWar) {
-    const other = KINGDOMS.find(k => k !== foe.party.faction);
-    changeRelation(other, game.contract && game.contract.faction === other ? 6 : 4);
+  } else if (foe.party && KINGDOMS.includes(foe.party.faction)) {
+    // Every kingdom at war with the beaten one is grateful; your employer most of all.
+    for (const other of enemiesOf(foe.party.faction)) changeRelation(other, game.contract && game.contract.faction === other ? 6 : 4);
   }
   if (foe.party && foe.party.kind === 'caravan') {
     const g = pick(Object.keys(GOODS)), n = randInt(3, 8);
@@ -579,7 +588,7 @@ export function openParty(msg, tab) {
   let body = '';
   if (partyTab === 'troops') {
     let rows = '';
-    const order = ['knight', 'ranger', 'spearman', 'bowman', 'recruit'];
+    const order = Object.keys(game.troops).filter(t => TROOPS[t]).sort((a, b) => TROOPS[b].power - TROOPS[a].power);
     for (const t of order) {
       const st = game.troops[t];
       if (!st) continue;
@@ -607,13 +616,13 @@ export function openParty(msg, tab) {
       '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>';
   } else {
     let realms = '';
-    for (const k of ['vale', 'march', 'free']) {
+    for (const k of KINGDOMS.concat('free')) {
       const v = game.relations[k];
       realms += '<tr><td><span class="dot" style="background:' + FACTIONS[k].colour + '"></span>' + FACTIONS[k].name + '</td><td class="' + (v <= -20 ? 'bad' : v >= 15 ? 'good' : '') + '">' + relationWord(v) + ' (' + v + ')</td></tr>';
     }
     realms += '<tr><td><span class="dot" style="background:' + FACTIONS.horde.colour + '"></span>' + FACTIONS.horde.name + '</td><td class="bad">' + (game.hordeBroken ? 'Broken' : 'At war with everyone') + '</td></tr>';
     const chron = game.chronicle.slice(-10).reverse().map(c => '<li><span class="small">Day ' + c.day + '</span> ' + esc(c.text) + '</li>').join('');
-    body = '<p>' + (game.atWar ? '<span class="bad">The Vale and the March are at war.</span>' : 'The Vale and the March are at peace.') + '</p><table>' + realms + '</table>' +
+    body = '<p>' + (anyWar().length ? '<span class="bad">' + warsText() + '</span>' : warsText()) + '</p><table>' + realms + '</table>' +
       '<h3>Lords and what they think of you</h3>' + lordsTable() +
       '<h3>Chronicle</h3>' + (chron ? '<ul class="left">' + chron + '</ul>' : '<p>Nothing of note has happened yet.</p>');
   }

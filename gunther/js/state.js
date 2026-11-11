@@ -3,7 +3,7 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES } from './data.js';
 
 const SAVE_KEY = 'gunther-save-v2';
 const OLD_SAVE_KEY = 'gunther-save-v1';
@@ -19,8 +19,7 @@ export function newGame(migrate) {
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
-    relations: { vale: 0, march: 0, free: 5 },
-    atWar: false, warTimer: 12,
+    relations: { vale: 0, march: 0, free: 5, elves: 0, dwarves: 0 },
     sites: {},
     parties: [],
     player: { x: 1640, y: 1500 },
@@ -75,9 +74,17 @@ function ensureFields() {
   if (!game.lordCaptives) game.lordCaptives = [];
   if (!game.chronicle) game.chronicle = [];
   if (game.contract === undefined) game.contract = null;
-  if (!game.lords) {
-    game.lords = {};
-    for (const l of LORDS) game.lords[l.id] = { status: 'free', back: 0, opinion: 0, memories: [] };
+  for (const k of KINGDOMS) if (!(k in game.relations)) game.relations[k] = 0;
+  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
+  // War and peace between each pair of kingdoms. Older saves only tracked the Vale and the March.
+  if (!game.wars) {
+    game.wars = {};
+    for (let i = 0; i < KINGDOMS.length; i++) for (let j = i + 1; j < KINGDOMS.length; j++) game.wars[KINGDOMS[i] + '|' + KINGDOMS[j]] = { on: false, timer: randInt(8, 30) };
+    if (game.atWar !== undefined) { game.wars['vale|march'] = { on: game.atWar, timer: game.warTimer || 10 }; delete game.atWar; delete game.warTimer; }
+  }
+  if (!game.lords) game.lords = {};
+  for (const l of LORDS) if (!game.lords[l.id]) {
+    game.lords[l.id] = { status: 'free', back: 0, opinion: 0, memories: [] };
   }
 }
 
@@ -194,6 +201,21 @@ export function troopName(type, n) {
 }
 
 // ---------------------------------------------------------------- realms
+function warKey(a, b) { return KINGDOMS.indexOf(a) < KINGDOMS.indexOf(b) ? a + '|' + b : b + '|' + a; }
+export function atWar(a, b) { const w = game.wars && game.wars[warKey(a, b)]; return !!(w && w.on); }
+export function enemiesOf(k) { return KINGDOMS.filter(o => o !== k && atWar(k, o)); }
+export function anyWar() { return Object.keys(game.wars).filter(k => game.wars[k].on).map(k => k.split('|')); }
+export function realmName(k) { return FACTIONS[k].short.replace(/^the /, 'the '); }
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+export function warsText() {
+  const w = anyWar();
+  if (!w.length) return 'All the kingdoms are at peace.';
+  return w.map(([a, b]) => cap(FACTIONS[a].short) + ' and ' + FACTIONS[b].short + ' are at war.').join(' ');
+}
+// What people a faction's volunteers are.
+export function raceOfSite(s) { return s.race || (FACTIONS[s.faction] && FACTIONS[s.faction].race) || 'human'; }
+export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
+
 export function hostile(a, b) {
   if (a === b) return false;
   if (a === 'horde' || b === 'horde') return true;
@@ -202,10 +224,10 @@ export function hostile(a, b) {
     if ((game.relations[other] || 0) <= -20) return true;
     // Sworn to one kingdom while it is at war with the other: its enemies are yours.
     const boss = employer();
-    return !!(boss && boss !== other && KINGDOMS.includes(other) && game.atWar);
+    return !!(boss && boss !== other && KINGDOMS.includes(other) && atWar(boss, other));
   }
   if (a === 'free' || b === 'free') return false;
-  return game.atWar;            // the two kingdoms
+  return atWar(a, b);
 }
 export function changeRelation(f, d) {
   if (!(f in game.relations) || !d) return;
@@ -305,15 +327,20 @@ export function dailyTick() {
     if (st.burned > 0 && !game.hordeBroken) { st.burned--; if (st.burned === 0) { st.garrison = campGarrison(s); msgs.push(['The orcs have rebuilt ' + s.name + '.', '#ff9a8a']); } }
     if (st.garrison && st.burned === 0 && s.kind === 'camp' && game.day % 4 === 0) st.garrison.grunt = Math.min(st.garrison.grunt + 2, 10 + Math.floor(game.day / 6));
   }
-  // War and peace between the two kingdoms.
-  game.warTimer--;
-  // A kingdom with most of its lords beaten or captured sues for peace sooner.
-  if (game.atWar && KINGDOMS.some(k => LORDS.filter(l => l.faction === k && game.lords[l.id].status !== 'free').length >= 2)) game.warTimer--;
-  if (game.warTimer <= 0) {
-    game.atWar = !game.atWar;
-    game.warTimer = game.atWar ? randInt(14, 24) : randInt(10, 18);
-    msgs.push([game.atWar ? 'War! The Vale and the March are fighting each other.' : 'The Vale and the March have made peace.', '#ffd27a']);
-    chronicle(game.atWar ? 'War broke out between the Vale and the March.' : 'The Vale and the March made peace.');
+  // War and peace between each pair of kingdoms. A kingdom with most of its lords beaten or
+  // captured sues for peace sooner, and no kingdom picks a second war while it is fighting one.
+  const beaten = k => { const ls = LORDS.filter(l => l.faction === k); return ls.filter(l => game.lords[l.id].status !== 'free').length >= Math.ceil(ls.length * 0.6); };
+  for (const key in game.wars) {
+    const w = game.wars[key], [a, b] = key.split('|');
+    w.timer--;
+    if (w.on && (beaten(a) || beaten(b))) w.timer--;
+    if (w.timer > 0) continue;
+    if (!w.on && (enemiesOf(a).length || enemiesOf(b).length)) { w.timer = randInt(4, 8); continue; }
+    w.on = !w.on;
+    w.timer = w.on ? randInt(12, 22) : randInt(14, 32);
+    const A = cap(FACTIONS[a].short), B = FACTIONS[b].short;
+    msgs.push([w.on ? 'War! ' + A + ' and ' + B + ' are fighting.' : A + ' and ' + B + ' have made peace.', '#ffd27a']);
+    chronicle(w.on ? 'War broke out between ' + FACTIONS[a].short + ' and ' + B + '.' : cap(FACTIONS[a].short) + ' and ' + B + ' made peace.');
   }
   // Quests that ran out of time.
   for (const q of game.quests) {

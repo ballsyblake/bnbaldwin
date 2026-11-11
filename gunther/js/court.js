@@ -183,7 +183,7 @@ export function convertPrisoner(t) {
 
 export function contractLine() {
   const c = game.contract;
-  if (!c) return 'You serve no one. Kingdom halls in Brightwater and Redcliff hire mercenaries.';
+  if (!c) return 'You serve no one. Kingdom halls in Brightwater, Redcliff, Elthir and Dunmar hire mercenaries.';
   if (c.kind === 'merc') return 'Mercenary of ' + FACTIONS[c.faction].name + ', paid ' + contractPay() + ' gold a day.';
   return 'Sworn vassal of ' + FACTIONS[c.faction].name + ', holding ' + site(c.fief).name + ' (' + fiefRent() + ' gold a day).';
 }

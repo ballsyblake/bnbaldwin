@@ -270,11 +270,11 @@ export const battleScene = {
           if (u.cd <= 0) {
             u.cd = def.cd * rand(0.9, 1.2); u.anim = 'attack'; u.at = 0;
             // Aim where the target will be, a little wobbly.
-            const speed2 = def.javelin ? 460 : 620;
+            const speed2 = def.javelin ? 460 : def.bolt ? 760 : 620;
             const lead = d / speed2;
             const tx = T.x + (T.vx || 0) * lead, ty = T.y - 16 + (T.vy || 0) * lead;
             const a = Math.atan2(ty - (u.y - 26), tx - u.x) + rand(-0.07, 0.07);
-            this.shoot(u, a, def.dmg, def.javelin ? 'javelin' : 'arrow', u.side, speed2);
+            this.shoot(u, a, def.dmg, def.javelin ? 'javelin' : def.bolt ? 'bolt' : 'arrow', u.side, speed2);
           }
         } else if (d <= def.range + (def.scale ? 14 : 0)) {
           u.anim = 'idle';
@@ -416,6 +416,7 @@ export const battleScene = {
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
     for (const s of this.shots) {
       if (s.kind === 'javelin') drawJavelin(s.x, s.y, s.a);
+      else if (s.kind === 'bolt') drawBolt(s.x, s.y, s.a);
       else drawArrow(s.x, s.y, s.a);
     }
     for (const e of this.effects) {
@@ -471,6 +472,17 @@ function drawJavelin(x, y, angle) {
   ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(8, 0); ctx.stroke();
   ctx.fillStyle = '#9aa2ac';
   ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(6, -3); ctx.lineTo(6, 3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+// A crossbow bolt: short, thick and fast.
+function drawBolt(x, y, angle) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(angle);
+  ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(4, 0); ctx.stroke();
+  ctx.fillStyle = '#6a7078';
+  ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(3, -3); ctx.lineTo(3, 3); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 

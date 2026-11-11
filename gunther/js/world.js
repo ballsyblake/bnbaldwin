@@ -4,7 +4,7 @@
 
 import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, hint, setHud, setScene, panelOpen, bar, onKeyPress, getScene } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
-import { WORLD_W, WORLD_H, DAY_SECONDS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS } from './data.js';
+import { WORLD_W, WORLD_H, DAY_SECONDS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
 import { openSettlement, openEncounter, openParty, autoResolve } from './menus.js';
@@ -44,21 +44,30 @@ function spawnLordHost(l) {
   const down = LORDS.filter(o => o.faction === l.faction && lordState(o.id).status !== 'free').length;
   const m = 1 + down * 0.25 + (l.ruler ? 0.3 : 0);
   const n = x => Math.round(x * m);
-  const troops = { recruit: n(randInt(2, 4)), spearman: n(randInt(3, 5) + d / 8), bowman: n(randInt(2, 4) + d / 10) };
-  if (d > 5) troops.knight = n(1 + d / 9);
-  if (d > 9) troops.ranger = n(d / 12);
-  for (const t in troops) if (!troops[t]) delete troops[t];
+  // Each people fields its own troops: [raw recruits], [foot, bows], [elite foot, elite bows].
+  const [t0, t1, t2] = RACES[raceOf(l.faction)].army;
+  const troops = {};
+  const add = (t, k) => { if (k > 0) troops[t] = (troops[t] || 0) + k; };
+  add(t0[0], n(randInt(2, 4)));
+  add(t1[0], n(randInt(3, 5) + d / 8)); add(t1[1], n(randInt(2, 4) + d / 10));
+  if (d > 5) add(t2[0], n(1 + d / 9));
+  if (d > 9) add(t2[1], n(d / 12));
   return makeParty(l.faction, 'lord', l.name, troops, home.x + rand(-80, 80), home.y + rand(60, 120), { home: home.id, lord: l.id, gold: randInt(60, 140) });
 }
 
 function spawnCaravan() {
-  const faction = pick(['vale', 'march', 'free']);
+  const faction = pick(KINGDOMS.concat('free'));
   const towns = SETTLEMENTS.filter(s => s.kind === 'town');
   const from = pick(towns.filter(t => !hostile(t.faction, faction) && (t.faction === faction || faction === 'free' || t.faction === 'free')).concat(towns.filter(t => t.faction === faction)));
   const to = pick(towns.filter(t => t !== from && !hostile(t.faction, faction)));
   if (!from || !to) return null;
   return makeParty(faction, 'caravan', (faction === 'free' ? 'Fairmeet' : FACTIONS[faction].short.replace('the ', '')) + ' caravan',
-    { spearman: randInt(2, 4), bowman: randInt(1, 3) }, from.x + rand(-60, 60), from.y + 110, { home: from.id, dest: to.id, gold: randInt(120, 220) });
+    caravanGuard(faction), from.x + rand(-60, 60), from.y + 110, { home: from.id, dest: to.id, gold: randInt(120, 220) });
+}
+
+function caravanGuard(faction) {
+  const [, [foot, bows]] = RACES[raceOf(faction)].army;
+  return { [foot]: randInt(2, 4), [bows]: randInt(1, 3) };
 }
 
 // Keeps the island busy: tops up warbands, patrols and caravans each day.
@@ -136,7 +145,7 @@ function think(p) {
   }
   if (p.mode === 'raid') {
     const v = site(p.raid);
-    if (p.lord && !(game.atWar && hostile(p.faction, v.faction))) { p.mode = 'idle'; p.raid = null; return; }   // peace broke out
+    if (p.lord && !hostile(p.faction, v.faction)) { p.mode = 'idle'; p.raid = null; return; }   // peace broke out
     if (dist(p.x, p.y, v.x, v.y) < 50) {
       game.sites[v.id].raided = 10; game.sites[v.id].recruits = 0;
       const who = p.lord ? lord(p.lord).name : p.name;
@@ -154,7 +163,7 @@ function think(p) {
   }
   if (p.lord) {
     // A cruel lord at war goes burning the enemy's villages.
-    if (game.atWar && hasTrait(p.lord, 'cruel') && Math.random() < 0.5) {
+    if (hasTrait(p.lord, 'cruel') && Math.random() < 0.5) {
       const targets = SETTLEMENTS.filter(s => s.kind === 'village' && hostile(p.faction, s.faction) && s.faction !== 'horde' && !game.sites[s.id].raided);
       if (targets.length) { const v = targets.sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0]; p.mode = 'raid'; p.raid = v.id; p.tx = v.x; p.ty = v.y; return; }
     }
