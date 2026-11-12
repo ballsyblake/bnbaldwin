@@ -257,3 +257,20 @@ export function drawBanner(x, y, colour) {
   ctx.fillStyle = colour; ctx.fillRect(x + 2, y, 14, 12);
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 2, y + 8, 14, 4);
 }
+
+// A still portrait of a unit as an image URL, for HTML menus such as the party roster.
+const portraits = {};
+export function portrait(sprite, kind, team) {
+  const key = sprite + '|' + kind + '|' + team;
+  if (portraits[key]) return portraits[key];
+  const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+  const g = c.getContext('2d');
+  let sheet;
+  if (sprite === 'soldier') sheet = spriteFor(kind, team);
+  else if (sprite === 'gunther') sheet = img.gunther;
+  else if (sprite === 'archer') sheet = spriteFor('archer', team);
+  else if (sprite === 'shaman') sheet = spriteFor('shaman', '');
+  else sheet = img[sprite];
+  if (sheet) g.drawImage(sheet, 0, 0, 32, 32, 0, 0, 32, 32);
+  return (portraits[key] = c.toDataURL());
+}

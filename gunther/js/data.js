@@ -8,7 +8,7 @@ export const DAY_SECONDS = 10;          // seconds of travel that make one in-ga
 // ---------------------------------------------------------------- realms
 // 'player' is Gunther's own warband. 'free' is the neutral market town.
 export const FACTIONS = {
-  player: { name: "Gunther's warband", colour: '#e8b83a', short: 'You' },
+  player: { name: "Gunther's warband", colour: '#f2c14e', short: 'You' },
   vale: { name: 'Kingdom of the Vale', colour: '#4f86d9', short: 'the Vale', ruler: 'Queen Isolde' },
   march: { name: 'The Ember March', colour: '#d0563c', short: 'the March', ruler: 'Lord Brannoc' },
   free: { name: 'Free city of Fairmeet', colour: '#9aa3b2', short: 'Fairmeet' },

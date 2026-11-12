@@ -2,10 +2,10 @@
 // simple orders: Charge, Hold or Follow. Each soldier is a small "agent" that picks a target,
 // walks to it and attacks, which is enough to give the feel of two lines crashing together.
 
-import { ctx, view, keys, pointer, clamp, dist, rand, text, shadow, bar, hint, setHud, onKeyPress, getScene, noise, seeded, onResize } from './core.js';
+import { ctx, view, keys, pointer, clamp, dist, rand, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
 import { img, drawUnit } from './sprites.js';
 import { TROOPS, FACTIONS } from './data.js';
-import { game, playerFit, skill, trainSkill } from './state.js';
+import { game, playerFit, skill, trainSkill, strength } from './state.js';
 
 const PX = 3;
 
@@ -105,15 +105,78 @@ export const battleScene = {
     this.routing = false;
     this.hud();
   },
-  bounds() { return { x0: 40, y0: 96, x1: view.W - 40, y1: view.H - (view.portrait ? 70 : 54) }; },
+  bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 150 : 76) }; },
+  // Battle HUD: a top bar with both sides and the odds, group cards bottom left, orders bottom right.
   hud() {
+    const ORD = { charge: 'Charge', hold: 'Hold', follow: 'Follow', fallback: 'Fall back' };
+    if (this.hero.dead && !this.over) {
+      setHud(this.topBar() + '<div class="box abs finish"><button class="primary" data-act="finish">Let your men finish it</button></div>', { finish: () => this.autoFinish() });
+      this.refreshHud(true);
+      return;
+    }
     const cur = this.group === 'all' ? (this.orders.foot === this.orders.bows ? this.orders.foot : '') : this.orders[this.group];
-    const b = o => '<button data-act="order" data-arg="' + o + '"' + (cur === o ? ' class="on"' : '') + '>' + { charge: 'Charge', hold: 'Hold', follow: 'Follow' }[o] + '</button>';
-    const g = '<button data-act="group">' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</button>';
-    let html = g + b('charge') + b('hold') + b('follow');
-    if (this.hero.dead && !this.over) html = '<button data-act="finish">Let your men finish it</button>';
-    setHud(html, { order: o => this.setOrder(o), group: () => this.nextGroup(), finish: () => this.autoFinish() });
+    const groups = ['all', 'foot', 'bows'].map((g, i) =>
+      '<button data-act="group" data-arg="' + g + '" class="' + (this.group === g ? 'sel' : '') + '"><span class="gh"><span data-k="gn-' + g + '"></span><span>[' + (i + 1) + ']</span></span>' +
+      { all: 'All', foot: 'Foot', bows: 'Bows' }[g] + '<small>' + (g === 'all' ? (this.orders.foot === this.orders.bows ? ORD[this.orders.foot] : 'Mixed') : ORD[this.orders[g]]) + '</small></button>').join('');
+    const orders = ['charge', 'hold', 'follow', 'fallback'].map((o, i) =>
+      '<button data-act="order" data-arg="' + o + '" class="' + (cur === o ? 'sel' : '') + '">' + ORD[o] + '<small>F' + (i + 1) + '</small></button>').join('');
+    setHud(this.topBar() +
+      '<div class="box abs groups">' + groups + '</div>' +
+      '<div class="box abs orders"><span class="lbl">Order for: <b>' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</b></span><div>' + orders + '</div></div>',
+      { order: o => this.setOrder(o), group: g => this.setGroup(g) });
+    this.refreshHud(true);
   },
+  topBar() {
+    const foe = this.opts.enemy, fc = this.enemyFaction === 'horde' ? 'var(--danger)' : FACTIONS[this.enemyFaction].colour;
+    return '<div class="box abs btop">' +
+      '<div class="side"><div class="meterhead"><b class="px name gold">Gunther</b><span data-k="hp"></span></div><div class="meter"><i data-k="hpbar"></i></div>' +
+        '<div class="meterhead"><span class="lbl">Men standing</span><b class="px" data-k="mine"></b></div><div class="meter"><i data-k="minebar" style="background:var(--gold)"></i></div></div>' +
+      '<div class="odds"><span class="lbl">Odds</span><b class="px" data-k="odds"></b><span data-k="oddsw"></span></div>' +
+      '<div class="side right"><div class="meterhead"><b class="px name" style="color:' + fc + '">' + esc(foe.name) + '</b><span data-k="ehp"></span></div><div class="meter"><i data-k="ebar"></i></div>' +
+        '<div class="meterhead"><span class="lbl">Men standing</span><b class="px" data-k="theirs"></b></div><div class="meter"><i data-k="theirbar" style="background:' + fc + '"></i></div></div>' +
+    '</div>';
+  },
+  refreshHud(force) {
+    this.hudT = (this.hudT || 0) - 1;
+    if (!force && this.hudT > 0) return;
+    this.hudT = 8;
+    const count = (side, filter) => {
+      const m = {};
+      for (const u of this.alive(side)) if (!u.isHero && !u.fleeing && (!filter || filter(u))) m[u.type] = (m[u.type] || 0) + 1;
+      for (const t of this.reserve[side]) if (!filter || filter({ def: TROOPS[t] })) m[t] = (m[t] || 0) + 1;
+      return m;
+    };
+    const n = m => { let k = 0; for (const t in m) k += m[t]; return k; };
+    const mine = count(0), theirs = count(1);
+    const nm = n(mine), nt = n(theirs);
+    const hp = game.health / game.maxHealth;
+    uiSet('hp', this.hero.dead ? '<span class="dangerc">Down</span>' : 'You &middot; HP ' + Math.round(hp * 100) + '%');
+    uiBar('hpbar', this.hero.dead ? 0 : hp, hp > 0.3 ? 'var(--good)' : 'var(--danger)');
+    uiSet('mine', nm + ' / ' + this.start[0]);
+    uiBar('minebar', nm / Math.max(1, this.start[0]));
+    uiSet('theirs', nt + ' / ' + this.start[1]);
+    uiBar('theirbar', nt / Math.max(1, this.start[1]));
+    // The enemy's fighting strength left, against what they started with.
+    if (!this.startPower) this.startPower = Math.max(1, strength(this.opts.enemy.troops));
+    const ep = strength(theirs) / this.startPower;
+    uiSet('ehp', 'Enemy &middot; Strength ' + Math.round(clamp(ep, 0, 1) * 100) + '%');
+    uiBar('ebar', ep, 'var(--good)');
+    // Odds compare fighting strength, Gunther included.
+    const a = strength(mine) + (this.hero.dead ? 0 : 5), b = strength(theirs);
+    let odds, word, cls;
+    if (b <= 0) { odds = '-'; word = 'Won'; cls = 'goodc'; }
+    else {
+      const r = b / Math.max(0.1, a);
+      const fmt = v => String(Math.round(v * 10) / 10);
+      odds = r >= 1 ? '1 : ' + fmt(r) : fmt(1 / r) + ' : 1';
+      if (r > 1.3) { word = 'Outnumbered'; cls = 'dangerc'; } else if (r < 0.77) { word = 'Advantage'; cls = 'goodc'; } else { word = 'Even fight'; cls = 'mutedc'; }
+    }
+    uiSet('odds', odds);
+    uiSet('oddsw', '<span class="' + cls + '">' + word + '</span>');
+    const foot = n(count(0, u => !(u.def && u.def.ranged))), bows = n(count(0, u => u.def && u.def.ranged));
+    uiSet('gn-all', nm + ' men'); uiSet('gn-foot', foot + ' men'); uiSet('gn-bows', bows + ' men');
+  },
+  setGroup(g) { this.group = g; this.hud(); },
   nextGroup() {
     this.group = { all: 'foot', foot: 'bows', bows: 'all' }[this.group];
     this.hud();
@@ -121,7 +184,12 @@ export const battleScene = {
   setOrder(o) {
     const groups = this.group === 'all' ? ['foot', 'bows'] : [this.group];
     for (const g of groups) this.orders[g] = o;
-    for (const u of this.units) if (u.side === 0 && !u.isHero && groups.includes(groupOf(u))) { u.holdX = u.x; u.holdY = u.y; }
+    const b = this.bounds();
+    for (const u of this.units) if (u.side === 0 && !u.isHero && groups.includes(groupOf(u))) {
+      // Fall back: pull back to your own edge of the field and hold there.
+      if (o === 'fallback') { if (view.portrait) { u.holdX = u.x; u.holdY = b.y1 - 20 - Math.random() * 40; } else { u.holdX = b.x0 + 20 + Math.random() * 50; u.holdY = u.y; } }
+      else { u.holdX = u.x; u.holdY = u.y; }
+    }
     this.hud();
   },
   // Places a soldier on the field at its side's starting edge.
@@ -251,6 +319,7 @@ export const battleScene = {
         const order = u.side === 0 ? this.orders[groupOf(u)] : 'charge';
         if (order === 'hold') reach = def.ranged ? def.range : 90;
         if (order === 'follow') reach = def.ranged ? def.range : 110;
+        if (order === 'fallback') reach = dist(u.x, u.y, u.holdX, u.holdY) > 20 ? 30 : (def.ranged ? def.range : 60);
         u.target = this.nearestFoe(u, reach);
       }
       const T = u.target;
@@ -410,7 +479,7 @@ export const battleScene = {
         }
         if (u.flash > 0 && !u.dead) { ctx.globalAlpha = 0.5; shadow(u.x, u.y - 18, 10, '#fff'); }
         ctx.globalAlpha = 1;
-        if (!u.dead && u.hp < u.max) bar(u.x - 12 * scale / 2, u.y - 34 * scale + 2, 24 * scale / 2, 3, u.hp / u.max, u.side === 0 ? '#50f08b' : '#f05a50');
+        if (!u.dead && u.hp < u.max) bar(u.x - 12 * scale / 2, u.y - 34 * scale + 2, 24 * scale / 2, 3, u.hp / u.max, u.side === 0 ? '#3ddc84' : '#e0533d');
       } });
     }
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
@@ -425,24 +494,20 @@ export const battleScene = {
     }
     // Hero's health, top left, and the head count for both sides.
     const H = this.hero;
-    const mine = this.alive(0).filter(u => !u.isHero).length + this.reserve[0].length;
-    const theirs = this.alive(1).filter(u => !u.fleeing).length + this.reserve[1].length;
-    text('Gunther', 12, 24, 15, '#ffe08a');
-    bar(80, 14, 120, 8, game.health / game.maxHealth, game.health > game.maxHealth * 0.3 ? '#50f08b' : '#f05a50');
-    text('Your men ' + mine, 12, 46, 15, '#ffe08a');
-    text(this.opts.enemy.name + ' ' + theirs, W - 12, 24, 15, '#ffb0a0', 'right');
-    text('Foot: ' + this.orders.foot + '   Bows: ' + this.orders.bows, 12, 66, 13, '#d8dce6');
+    if (!this.over) this.refreshHud();
     if (pointer.touch && pointer.down && !this.over && !H.dead) {
       ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff';
       ctx.beginPath(); ctx.arc(pointer.startX, pointer.startY, 40, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 18, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
-    if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, 100, 20, '#ff9a8a', 'center');
-    if (this.banner && this.banner.t < 2.5) text(this.banner.msg, W / 2, Hh / 2 - 40, 30, '#ffe08a', 'center');
-    if (this.time < 5 && !this.over) {
-      if (pointer.touch) hint('Drag to move. Gunther shoots by himself. Buttons give orders.', 'Drag to move. Buttons give orders.');
-      else hint('WASD move, hold click to shoot. G: Foot/Bows. 1/2/3: orders.', 'WASD, click to shoot, G group, 1/2/3 orders.');
+    const top = this.bounds().y0, bot = this.bounds().y1;
+    if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, top + 24, 20, '#e0533d', 'center');
+    if (this.banner && this.banner.t < 2.5) text(this.banner.msg, W / 2, Hh / 2 - 40, 34, '#f2c14e', 'center');
+    if (this.time < 6 && !this.over) {
+      const msg = pointer.touch ? (view.portrait ? 'Drag to move. Buttons pick a group and give orders.' : 'Drag to move. Gunther shoots by himself. Buttons give orders.')
+        : 'WASD move, hold click to shoot. 1 2 3 pick a group, F1 to F4 give orders.';
+      text(msg, W / 2, bot + 2, 14, '#f4ead2', 'center');
     }
   }
 };
@@ -509,9 +574,11 @@ function drawCampfire(x, y, t) {
 onKeyPress(k => {
   if (getScene() !== battleScene || battleScene.over) return;
   if (k === 'g' || k === 'tab') battleScene.nextGroup();
-  if (k === '1') battleScene.setOrder('charge');
-  if (k === '2') battleScene.setOrder('hold');
-  if (k === '3') battleScene.setOrder('follow');
+  if (k === '1') battleScene.setGroup('all');
+  if (k === '2') battleScene.setGroup('foot');
+  if (k === '3') battleScene.setGroup('bows');
+  const o = { f1: 'charge', f2: 'hold', f3: 'follow', f4: 'fallback' }[k];
+  if (o) battleScene.setOrder(o);
 });
 
 // Rotating the phone mid-battle: rebuild the ground and keep everyone on the field.

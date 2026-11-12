@@ -2,7 +2,8 @@
 // the party screen, meeting other parties, and what happens after a battle.
 // Menus are plain HTML laid over the canvas (see showPanel in core.js).
 
-import { showPanel, hidePanel, setScene, rand, randInt, pick, dist, esc, clamp } from './core.js';
+import { showPanel, hidePanel, panelOpen, onKeyPress, overlay, setScene, rand, randInt, pick, dist, esc, clamp } from './core.js';
+import { portrait } from './sprites.js';
 import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS } from './data.js';
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
@@ -11,7 +12,7 @@ import {
   skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
   enemiesOf, anyWar, warsText, recruitType
 } from './state.js';
-import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace } from './world.js';
+import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { battleScene } from './battle.js';
 import { openHall, openRansom, openCapturedLord, lordBlurb, lordGreeting, skillsTable, prisonersSection, convertPrisoner, contractLine, lordsTable } from './court.js';
 
@@ -62,24 +63,26 @@ export function autoResolve(a, b, heroPower, boostA) {
 export function openTitle() {
   const saved = hasSave();
   showPanel(
-    '<h1>GUNTHER</h1>' +
-    '<p>The Gorrak Horde has landed on the isle of Aldmoor. Men of the Vale and the March, the elves of the Elthir Wood and the dwarves of the Dunmar Holds squabble while orc raiders burn their villages. Raise a warband, earn your coin, and break the Horde at Skullrock.</p>' +
-    (saved ? '<button data-act="continue">Continue</button>' : '') +
-    '<button data-act="new"' + (saved ? ' class="secondary"' : '') + '>New game</button>' +
-    '<button data-act="help" class="secondary">How to play</button>',
+    '<div class="eyebrow">A warband tale</div>' +
+    '<h1>Gunther</h1>' +
+    '<p>The Gorrak Horde has landed on Aldmoor while its four kingdoms quarrel. Raise a band of sellswords, earn a lord\'s favour, and break the Horde at Skullrock.</p>' +
+    (saved ? '<button data-act="continue" class="primary">Continue <span class="hk">Day ' + game.day + '</span></button>' : '') +
+    '<button data-act="new"' + (saved ? '' : ' class="primary"') + '>New campaign</button>' +
+    '<button data-act="help">How to play</button>' +
+    '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.4 prototype</span></div>',
     {
       continue: () => { loadSave(); populate(); setScene(mapScene); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
       help: () => openHelp(openTitle)
-    });
+    }, 'title');
 }
 
 function openHelp(back) {
   showPanel(
     '<h2>How to play</h2><div class="left">' +
-    '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. The small map in the corner can be clicked too.</p>' +
+    '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. Space pauses, the speed buttons bottom left fast-forward, M opens the full map, P the party, J skills and quests, C camps, and E enters the place you are standing beside.</p>' +
     '<p><b>Your warband.</b> Hire recruits in villages and towns. Feed them (grain or fish) and pay their wages each week, or morale drops and men desert. Winning battles gives your men experience: train them up from the Party screen.</p>' +
-    '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. G switches who you are ordering (All, Foot or Bows), and 1, 2 and 3 tell them to Charge, Hold or Follow you. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
+    '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
     '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
     '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
@@ -580,33 +583,57 @@ function upgradeable() {
   return n;
 }
 
+// The roster: a card for Gunther and one per troop type, with details for the picked card.
+let rosterSel = 'gunther';
+function healthColour(f) { return f > 0.6 ? 'var(--good)' : f > 0.3 ? 'var(--gold)' : 'var(--danger)'; }
+const ROLE = t => { const d = TROOPS[t]; return d.ranged ? (d.bolt ? 'Crossbow' : 'Archer') : d.block >= 0.6 ? 'Heavy foot' : d.kind === 'spear' ? 'Spearman' : 'Infantry'; };
+function rosterHtml() {
+  const order = Object.keys(game.troops).filter(t => TROOPS[t] && game.troops[t].n > 0).sort((a, b) => TROOPS[b].power - TROOPS[a].power);
+  if (rosterSel !== 'gunther' && !order.includes(rosterSel)) rosterSel = 'gunther';
+  const lv = renownLevel().lv;
+  const card = (key, role, lvl, pic, name, frac) => '<button class="card' + (rosterSel === key ? ' sel' : '') + '" data-act="pick" data-arg="' + key + '">' +
+    '<div class="ch"><span>' + role + '</span><span>' + lvl + '</span></div><img alt="" src="' + pic + '"><div class="cn">' + name + '</div>' +
+    '<div class="meter"><i style="width:' + Math.round(frac * 100) + '%;background:' + healthColour(frac) + '"></i></div></button>';
+  let cards = card('gunther', 'Captain', 'Lv ' + lv, portrait('gunther', '', ''), 'Gunther', game.health / game.maxHealth);
+  for (const t of order) {
+    const st = game.troops[t], d = TROOPS[t];
+    cards += card(t, ROLE(t), '&times;' + st.n, portrait(d.sprite, d.kind || '', FACTIONS.player.colour), troopName(t, st.n), (st.n - st.wounded) / st.n);
+  }
+  if (!order.length) cards += '<p>No troops yet. Hire volunteers in a village or town.</p>';
+  let det;
+  const stat = (a, b) => '<div><span>' + a + '</span><b>' + b + '</b></div>';
+  if (rosterSel === 'gunther') {
+    det = '<div class="kind">Captain &middot; Level ' + lv + '</div><h3>Gunther</h3><p>Leads from the front with a bow. Renown ' + game.renown + '.</p>' +
+      '<div class="sg">' + stat('Health', Math.ceil(game.health) + '/' + game.maxHealth) + stat('Bow', game.bowLevel) + stat('Armour', game.armourLevel) + stat('Archery', skill('archery')) +
+      stat('Leadership', skill('leadership')) + stat('Tactics', skill('tactics')) + '</div>' +
+      '<p class="lbl">Kit</p><p>Hunting bow (level ' + game.bowLevel + '), ' + (game.armourLevel ? 'armour (level ' + game.armourLevel + ')' : 'travelling clothes') + '. Upgrade both at a town smith.</p>';
+  } else {
+    const t = rosterSel, st = game.troops[t], d = TROOPS[t];
+    let ups = '';
+    for (const u of d.upgrades) {
+      const can = Math.min(st.n - st.wounded, Math.floor(st.xp / u.xp), Math.floor(game.gold / u.cost));
+      ups += '<button data-act="up" data-arg="' + t + '>' + u.to + '"' + (can < 1 ? ' disabled' : '') + '>Train as ' + TROOPS[u.to].name.toLowerCase() + ' <span class="hk">' + u.cost + 'g each' + (can > 0 ? ', ' + can + ' ready' : '') + '</span></button>';
+    }
+    const need = d.upgrades.length ? Math.min(...d.upgrades.map(u => u.xp)) : 0;
+    det = '<div class="kind">' + ROLE(t) + ' &middot; ' + st.n + ' in the warband</div><h3>' + d.name + '</h3>' +
+      (st.wounded ? '<p class="bad">' + st.wounded + ' wounded, they will not fight until they heal.</p>' : '') +
+      '<div class="sg">' + stat(d.ranged ? 'Ranged' : 'Melee', d.dmg) + stat('Health', d.hp) + stat('Defence', Math.round((d.block || 0) * 100) + '%') + stat('Speed', d.speed) +
+      stat('Range', d.ranged ? d.range : 'Close') + stat('Upkeep', d.wage + 'g/wk') + '</div>' +
+      (need ? '<p class="lbl">Experience</p><div class="meter"><i style="width:' + Math.min(100, Math.round(st.xp / need * 100)) + '%;background:var(--gold)"></i></div><p class="small">' + Math.min(st.xp, need) + ' / ' + need + ' xp to train one man</p>' : '<p class="small">Fully trained.</p>') +
+      ups + '<button data-act="dismiss" data-arg="' + t + '" class="secondary">Dismiss one</button>';
+  }
+  return '<div class="roster"><div class="cards">' + cards + '</div><div class="detail">' + det + '</div></div>';
+}
+
 // The party screen has tabs so it fits on a phone: troops, Gunther himself, and the wider world.
 let partyTab = 'troops';
 export function openParty(msg, tab) {
+  partyShownAt = performance.now();
   if (tab) partyTab = tab;
-  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Troops', gunther: 'Gunther', world: 'The island' }[t] + '</button>').join('');
+  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Roster', gunther: 'Skills and quests', world: 'The island' }[t] + '</button>').join('');
   let body = '';
   if (partyTab === 'troops') {
-    let rows = '';
-    const order = Object.keys(game.troops).filter(t => TROOPS[t]).sort((a, b) => TROOPS[b].power - TROOPS[a].power);
-    for (const t of order) {
-      const st = game.troops[t];
-      if (!st) continue;
-      const d = TROOPS[t];
-      let ups = '';
-      for (const u of d.upgrades) {
-        const can = Math.min(st.n - st.wounded, Math.floor(st.xp / u.xp), Math.floor(game.gold / u.cost));
-        ups += '<button class="mini" data-act="up" data-arg="' + t + '>' + u.to + '"' + (can < 1 ? ' disabled' : '') + ' title="Needs ' + u.xp + ' xp and ' + u.cost + ' gold per man">' + TROOPS[u.to].name + ' (' + u.cost + 'g)</button>';
-      }
-      const need = d.upgrades.length ? Math.min(...d.upgrades.map(u => u.xp)) : 0;
-      rows += '<tr><td>' + d.name + '</td><td>' + st.n + (st.wounded ? ' <span class="bad">(' + st.wounded + ' hurt)</span>' : '') + '</td><td>' +
-        (need ? Math.min(st.xp, 9999) + '/' + need : '-') + '</td><td>' + d.wage + '</td><td class="ups">' + ups + '</td></tr>';
-    }
-    const goods = Object.keys(game.goods).map(g => game.goods[g] + ' ' + GOODS[g].name.toLowerCase()).join(', ') || 'nothing';
-    body = '<p>Gold ' + game.gold + '. Wages ' + wages() + ' gold a week (next pay day in ' + plural(7 - game.day % 7, 'day') + '). Men ' + troopCount() + '/' + partyLimit() + '. Morale ' + Math.round(game.morale) + '.</p>' +
-      '<table><tr><th>Troops</th><th>Men</th><th>XP</th><th>Wage</th><th>Train</th></tr>' + (rows || '<tr><td colspan="5">No troops. Hire some in a village.</td></tr>') + '</table>' +
-      '<p>Carrying: ' + goods + ' (' + cargo() + '/' + cargoLimit() + '). Food lasts ' + plural(Math.floor(foodStock() / foodPerDay()), 'day') + '.</p>' +
-      '<h3>Prisoners</h3>' + prisonersSection();
+    body = rosterHtml() + '<h3>Prisoners</h3>' + prisonersSection();
   } else if (partyTab === 'gunther') {
     const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
     body = '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + '</p>' +
@@ -626,9 +653,17 @@ export function openParty(msg, tab) {
       '<h3>Lords and what they think of you</h3>' + lordsTable() +
       '<h3>Chronicle</h3>' + (chron ? '<ul class="left">' + chron + '</ul>' : '<p>Nothing of note has happened yet.</p>');
   }
-  showPanel('<h2>Gunther\'s warband</h2><div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
-    '<button data-act="close">Close</button><button data-act="help" class="secondary">How to play</button><button data-act="title" class="secondary">Save and quit to title</button>', {
+  const food = foodStock(), days = Math.floor(food / foodPerDay());
+  const head = '<div class="rhead"><h2>Gunther\'s Warband</h2><span class="small">' + troopCount() + ' / ' + partyLimit() + ' men</span>' +
+    '<span class="chip">Gold<b class="gold">' + game.gold.toLocaleString('en-AU') + '</b></span><span class="chip">Food<b>' + days + ' days</b></span>' +
+    '<span class="chip">Morale<b class="good">' + Math.round(game.morale) + '</b></span><span class="chip">Wages<b class="bad">-' + wages() + ' / wk</b></span></div>';
+  const where = 'Near ' + nearestPlace(game.player.x, game.player.y) + (game.contract ? ' &middot; ' + contractLine() : '') + (game.quests[0] ? ' &middot; Quest: ' + esc(game.quests[0].title) + ' (' + plural(Math.max(0, game.quests[0].deadline - game.day), 'day') + ' left)' : '');
+  showPanel(head + '<div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
+    '<div class="rfoot">' + where + '</div>' +
+    '<button data-act="close" class="primary">Back to the map <span class="hk">P</span></button><button data-act="help" class="secondary">How to play</button><button data-act="title" class="secondary">Save and quit to title</button>', {
     tab: t => openParty('', t),
+    pick: t => { rosterSel = t; openParty(); },
+    dismiss: t => { if (game.troops[t] && game.troops[t].n > 0) { removeTroops(t, 1); save(); openParty('One ' + troopName(t, 1).toLowerCase() + ' was paid off and sent home.'); } },
     up: arg => {
       const [from, to] = arg.split('>');
       const st = game.troops[from], u = TROOPS[from].upgrades.find(x => x.to === to);
@@ -636,6 +671,7 @@ export function openParty(msg, tab) {
       if (n < 1) return openParty();
       st.xp -= n * u.xp; game.gold -= n * u.cost;
       removeTroops(from, n); addTroops(to, n);
+      if (!game.troops[from] || game.troops[from].n <= 0) rosterSel = to;
       save();
       openParty(n + ' ' + troopName(from, n).toLowerCase() + ' trained as ' + troopName(to, n).toLowerCase() + '.');
     },
@@ -654,3 +690,7 @@ export const titleScene = {
 };
 
 export { guntherPower, partyById };
+
+// P closes the party screen again.
+let partyShownAt = 0;
+onKeyPress(k => { if (k === 'p' && panelOpen() && overlay.querySelector('.rhead') && performance.now() - partyShownAt > 100) hidePanel(); });
