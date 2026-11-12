@@ -4,6 +4,7 @@
 export const WORLD_W = 3600;
 export const WORLD_H = 2400;
 export const DAY_SECONDS = 10;          // seconds of travel that make one in-game day
+export const YEAR_DAYS = 40;            // days in a year (four seasons of 10 days); everyone ages one year per year
 
 // ---------------------------------------------------------------- realms
 // 'player' is Gunther's own warband. 'free' is the neutral market town.
@@ -24,10 +25,18 @@ export const KINGDOMS = ['vale', 'march', 'elves', 'dwarves'];
 //  Dwarves: slow, very tough, heavy shields and crossbows.  Orcs: raiders from over the sea.
 // recruit: what volunteers join as. army: what a lord of that people fields, from weakest to best
 // as [melee, ranged] pairs.
+// adult: age a child comes of age. old: age after which death by old age becomes likely.
+// titles: [for a man, for a woman] for a ruler and for a lord. names: first names for heirs and spouses.
 export const RACES = {
-  human: { name: 'Human', recruit: 'recruit', army: [['recruit', 'recruit'], ['spearman', 'bowman'], ['knight', 'ranger']] },
-  elf: { name: 'Elf', recruit: 'elfscout', army: [['elfscout', 'elfscout'], ['elfblade', 'elfarcher'], ['elfblade', 'sentinel']] },
-  dwarf: { name: 'Dwarf', recruit: 'dwarfminer', army: [['dwarfminer', 'dwarfminer'], ['dwarfaxe', 'dwarfxbow'], ['ironguard', 'dwarfxbow']] }
+  human: { name: 'Human', recruit: 'recruit', army: [['recruit', 'recruit'], ['spearman', 'bowman'], ['knight', 'ranger']],
+    adult: 16, old: 55, titles: { ruler: ['King', 'Queen'], lord: ['Sir', 'Lady'] },
+    names: { m: ['Edric', 'Osric', 'Alden', 'Rowan', 'Tobin', 'Hal', 'Bram', 'Cedric', 'Wystan', 'Godric'], f: ['Ada', 'Elowen', 'Maud', 'Isobel', 'Wren', 'Edith', 'Rosalind', 'Bryony', 'Agnes', 'Linnet'] } },
+  elf: { name: 'Elf', recruit: 'elfscout', army: [['elfscout', 'elfscout'], ['elfblade', 'elfarcher'], ['elfblade', 'sentinel']],
+    adult: 40, old: 240, titles: { ruler: ['King', 'Queen'], lord: ['Lord', 'Lady'] },
+    names: { m: ['Caelir', 'Thalion', 'Erevan', 'Aerin', 'Lorien', 'Sylvar'], f: ['Ilyth', 'Naeva', 'Siora', 'Elara', 'Liriel', 'Aeris'] } },
+  dwarf: { name: 'Dwarf', recruit: 'dwarfminer', army: [['dwarfminer', 'dwarfminer'], ['dwarfaxe', 'dwarfxbow'], ['ironguard', 'dwarfxbow']],
+    adult: 30, old: 130, titles: { ruler: ['High Thane', 'High Thane'], lord: ['Thane', 'Thane'] },
+    names: { m: ['Torvald', 'Brok', 'Durin', 'Hakon', 'Grim', 'Ulfar'], f: ['Helga', 'Sigrun', 'Brynja', 'Dagny', 'Thora', 'Ragna'] } }
 };
 export function raceOf(faction) { return (FACTIONS[faction] && FACTIONS[faction].race) || 'human'; }
 
@@ -79,20 +88,22 @@ export const GOODS = {
 };
 
 // ---------------------------------------------------------------- places
-// kind: town (market, tavern, smith, recruits), village (recruits, grain), camp (orc camp),
+// kind: town (market, tavern, smith, recruits, walls and a garrison), village (recruits, grain), camp (orc camp),
 // stronghold (the Horde's fortress). makes: cheap here. wants: pays well here.
+// bound: the town a village belongs to. Whoever takes the town takes its villages too.
+// faction is who holds a place at the start; towns can change hands in sieges.
 export const SETTLEMENTS = [
   { id: 'brightwater', name: 'Brightwater', kind: 'town', faction: 'vale', x: 760, y: 1300, art: 0, makes: ['ale'], wants: ['wool', 'spice', 'iron'] },
-  { id: 'millford', name: 'Millford', kind: 'village', faction: 'vale', x: 560, y: 900, makes: ['grain', 'wool'], wants: ['ale'] },
-  { id: 'oakhollow', name: 'Oakhollow', kind: 'village', faction: 'vale', x: 1060, y: 1760, makes: ['grain', 'fish'], wants: ['iron'] },
+  { id: 'millford', name: 'Millford', kind: 'village', faction: 'vale', bound: 'brightwater', x: 560, y: 900, makes: ['grain', 'wool'], wants: ['ale'] },
+  { id: 'oakhollow', name: 'Oakhollow', kind: 'village', faction: 'vale', bound: 'brightwater', x: 1060, y: 1760, makes: ['grain', 'fish'], wants: ['iron'] },
   { id: 'fairmeet', name: 'Fairmeet', kind: 'town', faction: 'free', x: 1780, y: 1460, art: 1, makes: ['spice'], wants: ['fish', 'ale', 'wool'] },
   { id: 'redcliff', name: 'Redcliff', kind: 'town', faction: 'march', x: 2760, y: 1480, art: 2, makes: ['iron'], wants: ['grain', 'wool', 'spice'] },
-  { id: 'ashby', name: 'Ashby', kind: 'village', faction: 'march', x: 2340, y: 1900, makes: ['wool', 'ale'], wants: ['iron'] },
-  { id: 'stonefold', name: 'Stonefold', kind: 'village', faction: 'march', x: 3060, y: 1080, makes: ['iron', 'fish'], wants: ['grain', 'ale'] },
+  { id: 'ashby', name: 'Ashby', kind: 'village', faction: 'march', bound: 'redcliff', x: 2340, y: 1900, makes: ['wool', 'ale'], wants: ['iron'] },
+  { id: 'stonefold', name: 'Stonefold', kind: 'village', faction: 'march', bound: 'redcliff', x: 3060, y: 1080, makes: ['iron', 'fish'], wants: ['grain', 'ale'] },
   { id: 'elthir', name: 'Elthir', kind: 'town', faction: 'elves', race: 'elf', x: 560, y: 1990, art: 1, makes: ['timber'], wants: ['tools', 'spice', 'fish'] },
-  { id: 'silverbrook', name: 'Silverbrook', kind: 'village', faction: 'elves', race: 'elf', x: 1230, y: 2060, makes: ['timber', 'wool'], wants: ['iron'] },
+  { id: 'silverbrook', name: 'Silverbrook', kind: 'village', faction: 'elves', race: 'elf', bound: 'elthir', x: 1230, y: 2060, makes: ['timber', 'wool'], wants: ['iron'] },
   { id: 'dunmar', name: 'Dunmar', kind: 'town', faction: 'dwarves', race: 'dwarf', x: 2980, y: 760, art: 2, makes: ['tools', 'iron'], wants: ['grain', 'ale', 'timber'] },
-  { id: 'irondeep', name: 'Irondeep', kind: 'village', faction: 'dwarves', race: 'dwarf', x: 3220, y: 920, makes: ['iron'], wants: ['grain', 'ale'] },
+  { id: 'irondeep', name: 'Irondeep', kind: 'village', faction: 'dwarves', race: 'dwarf', bound: 'dunmar', x: 3220, y: 920, makes: ['iron'], wants: ['grain', 'ale'] },
   { id: 'camp-west', name: 'Bonepit Camp', kind: 'camp', faction: 'horde', x: 1180, y: 640 },
   { id: 'camp-mid', name: 'Gutrot Camp', kind: 'camp', faction: 'horde', x: 2080, y: 760 },
   { id: 'camp-east', name: 'Fangmire Camp', kind: 'camp', faction: 'horde', x: 2640, y: 640 },
@@ -113,17 +124,18 @@ export const ORC_CHIEFS = ['Gruk', 'Morza', 'Uthak', 'Snagga', 'Bolg', 'Rakha', 
 //  bold: picks fights at worse odds.      cautious: only fights when well ahead.
 //  honourable: hunts orcs, respects mercy. cruel: burns enemy villages in wartime.
 //  greedy: preys on enemy caravans, likes gold.
+// sex and age matter for ageing and heirs: when a lord dies, a son or daughter of the house takes over.
 export const LORDS = [
-  { id: 'isolde', name: 'Queen Isolde', faction: 'vale', ruler: true, traits: ['honourable', 'cautious'], home: 'brightwater' },
-  { id: 'aldric', name: 'Sir Aldric Fenn', faction: 'vale', traits: ['bold', 'honourable'], home: 'oakhollow' },
-  { id: 'maren', name: 'Lady Maren Holt', faction: 'vale', traits: ['greedy', 'cautious'], home: 'millford' },
-  { id: 'brannoc', name: 'Lord Brannoc', faction: 'march', ruler: true, traits: ['cruel', 'bold'], home: 'redcliff' },
-  { id: 'corwen', name: 'Sir Corwen Ashe', faction: 'march', traits: ['honourable', 'cautious'], home: 'stonefold' },
-  { id: 'tamsin', name: 'Lady Tamsin Vey', faction: 'march', traits: ['greedy', 'bold'], home: 'ashby' },
-  { id: 'ilyra', name: 'Queen Ilyra', faction: 'elves', ruler: true, traits: ['honourable', 'cautious'], home: 'elthir' },
-  { id: 'faelan', name: 'Lord Faelan', faction: 'elves', traits: ['bold', 'cruel'], home: 'silverbrook' },
-  { id: 'borga', name: 'High Thane Borga', faction: 'dwarves', ruler: true, traits: ['greedy', 'bold'], home: 'dunmar' },
-  { id: 'halvar', name: 'Thane Halvar', faction: 'dwarves', traits: ['honourable', 'cautious'], home: 'irondeep' }
+  { id: 'isolde', name: 'Queen Isolde', faction: 'vale', ruler: true, traits: ['honourable', 'cautious'], sex: 'f', age: 52, home: 'brightwater' },
+  { id: 'aldric', name: 'Sir Aldric Fenn', faction: 'vale', traits: ['bold', 'honourable'], sex: 'm', age: 34, house: 'Fenn', home: 'oakhollow' },
+  { id: 'maren', name: 'Lady Maren Holt', faction: 'vale', traits: ['greedy', 'cautious'], sex: 'f', age: 41, house: 'Holt', home: 'millford' },
+  { id: 'brannoc', name: 'Lord Brannoc', faction: 'march', ruler: true, traits: ['cruel', 'bold'], sex: 'm', age: 61, home: 'redcliff' },
+  { id: 'corwen', name: 'Sir Corwen Ashe', faction: 'march', traits: ['honourable', 'cautious'], sex: 'm', age: 47, house: 'Ashe', home: 'stonefold' },
+  { id: 'tamsin', name: 'Lady Tamsin Vey', faction: 'march', traits: ['greedy', 'bold'], sex: 'f', age: 29, house: 'Vey', home: 'ashby' },
+  { id: 'ilyra', name: 'Queen Ilyra', faction: 'elves', ruler: true, traits: ['honourable', 'cautious'], sex: 'f', age: 190, home: 'elthir' },
+  { id: 'faelan', name: 'Lord Faelan', faction: 'elves', traits: ['bold', 'cruel'], sex: 'm', age: 95, home: 'silverbrook' },
+  { id: 'borga', name: 'High Thane Borga', faction: 'dwarves', ruler: true, traits: ['greedy', 'bold'], sex: 'f', age: 126, home: 'dunmar' },
+  { id: 'halvar', name: 'Thane Halvar', faction: 'dwarves', traits: ['honourable', 'cautious'], sex: 'm', age: 66, home: 'irondeep' }
 ];
 
 // ---------------------------------------------------------------- skills

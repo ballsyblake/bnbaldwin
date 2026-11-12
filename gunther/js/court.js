@@ -7,12 +7,13 @@ import {
   game, save, note, site, troopCount, partyLimit, addTroops, changeRelation, relationWord, lord, lordState, remember, hasTrait,
   chronicle, prisonerCount, prisonerLimit, ransomPrice, lordRansom, contractPay, fiefRent, skill, skillProgress, troopName
 } from './state.js';
+import { lordAge, canMarry, marry } from './dynasty.js';
 
 const TRAIT_WORDS = { bold: 'bold', cautious: 'cautious', honourable: 'honourable', cruel: 'cruel', greedy: 'greedy' };
 
 export function lordBlurb(id) {
   const l = lord(id), st = lordState(id);
-  return l.name + ', ' + (l.ruler ? 'ruler' : 'a lord') + ' of ' + FACTIONS[l.faction].short + '. Known to be ' + l.traits.map(t => TRAIT_WORDS[t]).join(' and ') + '.';
+  return l.name + ', ' + (l.ruler ? 'ruler' : 'a lord') + ' of ' + FACTIONS[l.faction].short + ', aged ' + lordAge(id) + '. Known to be ' + l.traits.map(t => TRAIT_WORDS[t]).join(' and ') + '.';
 }
 
 // What a lord says when you meet, based on how they feel about you and what they remember.
@@ -62,7 +63,7 @@ export function openHall(s, back) {
       '<button data-act="quit" class="secondary">End your contract</button>';
     handlers.vassal = () => {
       game.contract = { faction: k, kind: 'vassal', since: game.day, fief: fief.id };
-      chronicle(ruler.name + ' made Gunther a vassal and granted him ' + fief.name + '.');
+      chronicle(ruler.name + ' made Gunther a vassal and granted the village of ' + fief.name + '.');
       for (const l of lords) remember(l.id, 'Gunther swore fealty to our crown', 8);
       game.renown += 10;
       save(); openHall(s, back);
@@ -74,11 +75,27 @@ export function openHall(s, back) {
     handlers.renounce = () => {
       game.contract = null;
       changeRelation(k, -20);
-      for (const l of lords) remember(l.id, 'Gunther broke his oath to our crown', -15);
-      chronicle('Gunther renounced his oath to ' + ruler.name + '.');
+      for (const l of lords) remember(l.id, 'Gunther broke an oath to our crown', -15);
+      chronicle('Gunther renounced the oath to ' + ruler.name + '.');
       save(); openHall(s, back);
     };
   }
+  // A lord who thinks well of Gunther may offer a match with their house.
+  if (canMarry()) {
+    const match = lords.filter(l => lordState(l.id).opinion >= 20 && lordState(l.id).status === 'free').sort((a, b) => lordState(b.id).opinion - lordState(a.id).opinion)[0];
+    const gift = 150, ok = match && game.renown >= 25 && game.gold >= gift;
+    body += '<h3>A match</h3><p>' + (match ? match.name + ' would consider joining your family to theirs.' : 'None of the lords here thinks well enough of you (opinion 20) to offer a match.') +
+      (match && game.renown < 25 ? ' They want a captain of more renown (25).' : '') + '</p>' +
+      (match ? '<button data-act="marry" data-arg="' + match.id + '"' + (ok ? '' : ' disabled') + '>Ask for a match with ' + match.name.split(' ').pop() + '\'s house (gift of ' + gift + ' gold)</button>' : '');
+    handlers.marry = id => {
+      game.gold -= gift;
+      const sp = marry(id);
+      remember(id, 'Gunther married into our family', 15);
+      changeRelation(k, 8);
+      note(game.hero.name + ' married ' + sp.name + '.', '#ffe08a');
+      save(); openHall(s, back);
+    };
+  } else if (game.spouse) body += '<p class="small">You are married to ' + game.spouse.name + '.</p>';
   body += '<h3>Lords of ' + f.short + '</h3><table>' + lords.map(l => lordRow(l.id)).join('') + '</table>';
   body += '<button data-act="back" class="secondary">Back</button>';
   showPanel(body, handlers, true);
@@ -88,7 +105,7 @@ function lordRow(id) {
   const l = lord(id), st = lordState(id);
   const where = st.status === 'free' ? 'In the field' : st.status === 'routed' ? 'Recovering' : st.status === 'held-player' ? 'Your prisoner' : 'Held by ' + FACTIONS[st.status.slice(5)].short;
   const op = st.opinion;
-  return '<tr><td>' + l.name + '<br><span class="small">' + l.traits.join(', ') + '</span></td><td>' + where + '</td><td class="' + (op <= -20 ? 'bad' : op >= 20 ? 'good' : '') + '">' + (op > 0 ? '+' : '') + op + '</td></tr>';
+  return '<tr><td>' + l.name + '<br><span class="small">' + l.traits.join(', ') + ', age ' + lordAge(id) + '</span></td><td>' + where + '</td><td class="' + (op <= -20 ? 'bad' : op >= 20 ? 'good' : '') + '">' + (op > 0 ? '+' : '') + op + '</td></tr>';
 }
 
 // ---------------------------------------------------------------- ransom broker (in town taverns)

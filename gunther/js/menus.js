@@ -4,7 +4,7 @@
 
 import { showPanel, hidePanel, panelOpen, onKeyPress, overlay, setScene, rand, randInt, pick, dist, esc, clamp } from './core.js';
 import { portrait } from './sprites.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RACES } from './data.js';
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
@@ -14,6 +14,7 @@ import {
 } from './state.js';
 import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { battleScene } from './battle.js';
+import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
 import { openHall, openRansom, openCapturedLord, lordBlurb, lordGreeting, skillsTable, prisonersSection, convertPrisoner, contractLine, lordsTable } from './court.js';
 
 // ---------------------------------------------------------------- helpers
@@ -69,7 +70,7 @@ export function openTitle() {
     (saved ? '<button data-act="continue" class="primary">Continue <span class="hk">Day ' + game.day + '</span></button>' : '') +
     '<button data-act="new"' + (saved ? '' : ' class="primary"') + '>New campaign</button>' +
     '<button data-act="help">How to play</button>' +
-    '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.4 prototype</span></div>',
+    '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.5 prototype</span></div>',
     {
       continue: () => { loadSave(); populate(); setScene(mapScene); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
@@ -85,6 +86,7 @@ function openHelp(back) {
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
     '<p><b>Fighting.</b> Q swaps between bow and sword. Bow: hold click to draw and release to shoot; a full draw hits hardest and flies straightest, but moving or holding too long makes it shaky. Sword: move the mouse left, right or up to pick the side you swing from (the gold marker), hold click to wind up and release to strike. Each enemy shows its guard as a grey bar; strike a side it is not guarding, or hit it while it is winding up. Right click cancels a swing, which lets you feint. Red arrows show where a blow is coming from: hold right click with your marker on that side to block, and block just before it lands to parry and stun them. On a phone, tap left, right or above Gunther to swing and hold the Block button. Bladework improves as you fight.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
+    '<p><b>Family.</b> Years pass (one every 40 days) and everyone ages. Lords die of old age or in battle, and their son or daughter takes over, remembering half of what their parent felt about you. Marry into a lord\'s house through their kingdom\'s hall and you may have children. When your captain dies, of old age or struck down in battle, a grown child (or a cousin) takes over with the gear, some gold and renown, and a little of the skill. Death in battle can be turned off on the Party screen.</p>' +
     '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
     '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
     '<p><b>Trade.</b> Each place makes some goods cheaply and pays well for others. Buy low, carry it across the island, sell high.</p>' +
@@ -458,7 +460,14 @@ function afterBattle(foe, res) {
   for (const t in res.wounded) { const st = game.troops[t]; if (st) st.wounded = Math.min(st.n, st.wounded + res.wounded[t]); }
   const nk = count(res.killed), nw = count(res.wounded);
   if (nk || nw) lines.push('Your losses: ' + plural(nk, 'man') + ' killed, ' + nw + ' wounded.');
-  if (res.heroDown) { game.health = Math.max(game.health, game.maxHealth * 0.1); lines.push('Gunther was knocked senseless but will recover.'); }
+  if (res.heroDown) {
+    game.health = Math.max(game.health, game.maxHealth * 0.1);
+    // Falling in battle can be the end of a captain. The heir takes over back on the map.
+    if (Math.random() < deathChance(!res.won)) {
+      game.pendingDeath = 'fell in battle near ' + nearestPlace(mapScene.pos.x, mapScene.pos.y);
+      lines.push('<span class="bad">' + esc(game.hero.name) + ' was struck down and did not get up.</span>');
+    } else lines.push(esc(game.hero.name) + ' was knocked senseless but will recover.');
+  }
   const slain = count(res.enemyKilled);
   const orcs = foe.site || (foe.party && foe.party.faction === 'horde');
   if (orcs) game.stats.orcsSlain += slain;
@@ -577,6 +586,25 @@ function defeat(lines) {
     '<button data-act="map">Carry on</button>', { map: () => { setScene(mapScene); mapScene.grace = 2; } });
 }
 
+// ---------------------------------------------------------------- death and the heir
+export function openSuccession(cause) {
+  const dead = game.hero, heirs = heirChoices();
+  const nth = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+  const opts = heirs.map((h, i) => '<button data-act="pick" data-arg="' + i + '">' + esc(h.first) + ' Gunther' +
+    '<span class="hk">' + (h.cousin ? 'cousin, ' : (h.sex === 'm' ? 'son, ' : 'daughter, ')) + 'age ' + h.age + ', knack for ' + esc(SKILLS[h.talent].name) + '</span></button>').join('');
+  showPanel('<h2>' + esc(dead.name) + ' is dead</h2>' +
+    '<p>' + esc(dead.name) + ' ' + esc(cause) + ', aged ' + heroAge() + ', after ' + plural(game.day - (dead.since || 1), 'day') + ' in command. ' + (dead.gen > 1 ? 'The ' + nth(dead.gen) + ' captain of the line.' : 'The first captain of the line.') + '</p>' +
+    '<p>' + (heirs[0].cousin ? 'No child of yours is old enough to lead. A cousin will carry the banner.' : 'Choose who leads the warband now.') + '</p>' + opts, {
+    pick: i => {
+      const lines = succeed(heirs[+i], cause);
+      game.pendingDeath = null;
+      save();
+      showPanel('<h2>' + esc(game.hero.name) + ' takes command</h2>' + lines.map(l => '<p>' + l + '</p>').join('') +
+        '<button data-act="ok">Carry on</button>', { ok: () => { hidePanel(); mapScene.hud(); } });
+    }
+  });
+}
+
 // ---------------------------------------------------------------- party screen
 function upgradeable() {
   let n = 0;
@@ -598,7 +626,7 @@ function rosterHtml() {
   const card = (key, role, lvl, pic, name, frac) => '<button class="card' + (rosterSel === key ? ' sel' : '') + '" data-act="pick" data-arg="' + key + '">' +
     '<div class="ch"><span>' + role + '</span><span>' + lvl + '</span></div><img alt="" src="' + pic + '"><div class="cn">' + name + '</div>' +
     '<div class="meter"><i style="width:' + Math.round(frac * 100) + '%;background:' + healthColour(frac) + '"></i></div></button>';
-  let cards = card('gunther', 'Captain', 'Lv ' + lv, portrait('gunther', '', ''), 'Gunther', game.health / game.maxHealth);
+  let cards = card('gunther', 'Captain', 'Lv ' + lv, portrait('gunther', '', ''), esc(game.hero.first), game.health / game.maxHealth);
   for (const t of order) {
     const st = game.troops[t], d = TROOPS[t];
     cards += card(t, ROLE(t), '&times;' + st.n, portrait(d.sprite, d.kind || '', FACTIONS.player.colour), troopName(t, st.n), (st.n - st.wounded) / st.n);
@@ -607,7 +635,7 @@ function rosterHtml() {
   let det;
   const stat = (a, b) => '<div><span>' + a + '</span><b>' + b + '</b></div>';
   if (rosterSel === 'gunther') {
-    det = '<div class="kind">Captain &middot; Level ' + lv + '</div><h3>Gunther</h3><p>Leads from the front with a bow. Renown ' + game.renown + '.</p>' +
+    det = '<div class="kind">Captain &middot; Level ' + lv + ' &middot; Age ' + heroAge() + '</div><h3>' + esc(game.hero.name) + '</h3><p>Leads from the front with bow and sword. Renown ' + game.renown + '.</p>' +
       '<div class="sg">' + stat('Health', Math.ceil(game.health) + '/' + game.maxHealth) + stat('Bow', game.bowLevel) + stat('Armour', game.armourLevel) + stat('Archery', skill('archery')) +
       stat('Bladework', skill('blade')) + stat('Sword', game.swordLevel) + stat('Leadership', skill('leadership')) + '</div>' +
       '<p class="lbl">Kit</p><p>Hunting bow (level ' + game.bowLevel + '), arming sword and shield (level ' + game.swordLevel + '), armour (level ' + game.armourLevel + '). Upgrade them at a town smith.</p>';
@@ -634,14 +662,14 @@ let partyTab = 'troops';
 export function openParty(msg, tab) {
   partyShownAt = performance.now();
   if (tab) partyTab = tab;
-  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Roster', gunther: 'Skills and quests', world: 'The island' }[t] + '</button>').join('');
+  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Roster', gunther: 'Captain and family', world: 'The island' }[t] + '</button>').join('');
   let body = '';
   if (partyTab === 'troops') {
     body = rosterHtml() + '<h3>Prisoners</h3>' + prisonersSection();
   } else if (partyTab === 'gunther') {
     const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
     body = '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + '</p>' +
-      '<p>' + contractLine() + '</p>' +
+      '<p>' + contractLine() + '</p>' + familySection() +
       '<h3>Skills</h3>' + skillsTable() +
       (quests ? '<h3>Quests</h3><ul class="left">' + quests + '</ul>' : '') +
       '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>';
@@ -680,10 +708,26 @@ export function openParty(msg, tab) {
       openParty(n + ' ' + troopName(from, n).toLowerCase() + ' trained as ' + troopName(to, n).toLowerCase() + '.');
     },
     convert: t => { const m = convertPrisoner(t); save(); openParty(m); },
+    mortal: () => { game.battleDeath = !game.battleDeath; save(); openParty(game.battleDeath ? 'Captains can now die when struck down in battle.' : 'Captains struck down in battle will always recover. Old age still comes for everyone.'); },
     close: () => hidePanel(),
     help: () => openHelp(() => openParty()),
     title: () => { save(); setScene(titleScene); }
   }, true);
+}
+
+// Gunther's family: spouse, children, the heir, and the captains who came before.
+function familySection() {
+  const h = game.hero, sp = game.spouse;
+  let html = '<h3>Family</h3><p>' + esc(h.name) + ', aged ' + heroAge() + (h.gen > 1 ? ', captain since day ' + h.since + ' (' + (['', 'first', 'second', 'third', 'fourth', 'fifth'][h.gen] || h.gen + 'th') + ' of the line)' : '') + '. ' +
+    (sp ? 'Married to ' + esc(sp.name) + ', kin of ' + esc(lord(sp.from).name) + '.' : 'Unmarried. A lord who thinks well of you may offer a match: ask in their kingdom\'s hall.') + '</p>';
+  if (game.children.length) html += '<ul class="left">' + game.children.map(c => '<li>' + esc(c.first) + ', ' + (c.sex === 'm' ? 'son' : 'daughter') + ', age ' + ageOf(c.born) +
+    (ageOf(c.born) >= RACES.human.adult ? ' <span class="good">(of age)</span>' : '') + ' &middot; knack for ' + SKILLS[c.talent].name + '</li>').join('') + '</ul>';
+  const heir = adultHeirs()[0];
+  html += '<p class="small">Heir: ' + (heir ? esc(heir.first) + ' Gunther.' : 'none of age. If you die, a cousin takes over, and more of your men will leave.') +
+    ' Chance of dying when struck down in a lost battle: ' + Math.round(deathChance(true) * 100) + '%.</p>' +
+    '<button class="mini secondary" data-act="mortal">Death in battle: ' + (game.battleDeath ? 'on' : 'off') + '</button>';
+  if (game.dynasty.length) html += '<p class="small">Before you: ' + game.dynasty.map(d => esc(d.name) + ' (' + d.cause.replace(/ near .*/, '') + ' at ' + d.age + ', day ' + d.to + ')').join('; ') + '.</p>';
+  return html;
 }
 
 // The title screen is the map in the background with the title menu on top.

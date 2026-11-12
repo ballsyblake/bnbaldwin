@@ -3,7 +3,8 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
+import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
 
 const SAVE_KEY = 'gunther-save-v2';
 const OLD_SAVE_KEY = 'gunther-save-v1';
@@ -29,10 +30,8 @@ export function newGame(migrate) {
     seenIntro: false,
     nextId: 1
   });
+  for (const s of SETTLEMENTS) game.sites[s.id] = newSite(s);
   ensureFields();
-  for (const s of SETTLEMENTS) {
-    game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
-  }
   // Carry over gold and gear from the old one-camp version of the game.
   if (migrate) try {
     const old = JSON.parse(localStorage.getItem(OLD_SAVE_KEY));
@@ -46,6 +45,8 @@ export function newGame(migrate) {
     }
   } catch (e) { /* ignore */ }
 }
+
+function newSite(s) { return { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) }; }
 
 export function campGarrison(s) {
   if (s.kind === 'camp') return { grunt: 10, brute: 3, shaman: 2 };
@@ -78,7 +79,7 @@ function ensureFields() {
   if (!game.chronicle) game.chronicle = [];
   if (game.contract === undefined) game.contract = null;
   for (const k of KINGDOMS) if (!(k in game.relations)) game.relations[k] = 0;
-  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
+  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = newSite(s);
   // War and peace between each pair of kingdoms. Older saves only tracked the Vale and the March.
   if (!game.wars) {
     game.wars = {};
@@ -86,9 +87,17 @@ function ensureFields() {
     if (game.atWar !== undefined) { game.wars['vale|march'] = { on: game.atWar, timer: game.warTimer || 10 }; delete game.atWar; delete game.warTimer; }
   }
   if (!game.lords) game.lords = {};
-  for (const l of LORDS) if (!game.lords[l.id]) {
-    game.lords[l.id] = { status: 'free', back: 0, opinion: 0, memories: [] };
+  for (const l of LORDS) {
+    if (!game.lords[l.id]) game.lords[l.id] = newLordState(l);
+    if (game.lords[l.id].born === undefined) game.lords[l.id].born = 1 - (l.age || 40) * YEAR_DAYS;
   }
+  // Ageing, death and heirs.
+  if (!game.hero) game.hero = newHero();
+  if (game.spouse === undefined) game.spouse = null;
+  if (!game.children) game.children = [];
+  if (!game.dynasty) game.dynasty = [];
+  if (game.battleDeath === undefined) game.battleDeath = true;
+  applyLords();
 }
 
 // ---------------------------------------------------------------- chronicle
@@ -345,6 +354,8 @@ export function dailyTick() {
     msgs.push([w.on ? 'War! ' + A + ' and ' + B + ' are fighting.' : A + ' and ' + B + ' have made peace.', '#ffd27a']);
     chronicle(w.on ? 'War broke out between ' + FACTIONS[a].short + ' and ' + B + '.' : cap(FACTIONS[a].short) + ' and ' + B + ' made peace.');
   }
+  // Birthdays, old age and heirs. Gunther dying is handled by the map, which shows the succession.
+  if (dynastyTick() === 'hero' && !game.pendingDeath) game.pendingDeath = 'died of old age';
   // Quests that ran out of time.
   for (const q of game.quests) {
     if (!q.done && game.day > q.deadline) { q.failed = true; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }

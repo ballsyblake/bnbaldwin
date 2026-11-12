@@ -4,10 +4,11 @@
 
 import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
-import { WORLD_W, WORLD_H, DAY_SECONDS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
+import { year, lordDies } from './dynasty.js';
+import { WORLD_W, WORLD_H, DAY_SECONDS, YEAR_DAYS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
-import { openSettlement, openEncounter, openParty, autoResolve } from './menus.js';
+import { openSettlement, openEncounter, openParty, autoResolve, openSuccession } from './menus.js';
 
 const SIGHT = 360;
 
@@ -204,7 +205,8 @@ function aiClash(a, b) {
   if (lose.lord) {
     // A beaten lord either escapes or is taken prisoner by a rival kingdom.
     const st = lordState(lose.lord);
-    if (KINGDOMS.includes(win.faction) && Math.random() < 0.5) {
+    if (Math.random() < 0.05) lordDies(lose.lord, 'fell in battle near ' + near);
+    else if (KINGDOMS.includes(win.faction) && Math.random() < 0.5) {
       st.status = 'held-' + win.faction; st.back = game.day + randInt(8, 14);
       chronicle((win.lord ? lord(win.lord).name : win.name) + ' defeated and captured ' + lord(lose.lord).name + ' near ' + near + '.');
     } else {
@@ -347,6 +349,8 @@ export const mapScene = {
     this.time += dt;
     for (const m of log) m.age += dt;
     if (panelOpen()) return;
+    // Gunther died (of old age, in the night): the heir takes over before anything else.
+    if (game.pendingDeath) { openSuccession(game.pendingDeath); return; }
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer = 0.15; this.refreshHud(); }
     const P = this.pos;
@@ -661,9 +665,9 @@ function partyColour(p) {
 const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
 const WEATHER = ['Clear skies', 'Clear skies', 'Overcast', 'Light rain', 'Windy', 'Morning fog'];
 function seasonText() {
-  const season = SEASONS[Math.floor((game.day - 1) / 30) % 4];
+  const season = SEASONS[Math.floor((game.day - 1) / (YEAR_DAYS / 4)) % 4] + ', year ' + year();
   let w = WEATHER[Math.floor(seeded(game.day * 7919 + 13)() * WEATHER.length)];
-  if (season === 'Winter' && w === 'Light rain') w = 'Light snow';
+  if (season.startsWith('Winter') && w === 'Light rain') w = 'Light snow';
   return season + ' &middot; ' + w;
 }
 // Renown turned into a level, so the HUD can show progress towards the next one.
