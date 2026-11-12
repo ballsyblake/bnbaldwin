@@ -2,7 +2,7 @@
 // simple orders: Charge, Hold or Follow. Each soldier is a small "agent" that picks a target,
 // walks to it and attacks, which is enough to give the feel of two lines crashing together.
 
-import { ctx, view, keys, pointer, clamp, dist, rand, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
+import { ctx, view, keys, pointer, clamp, dist, rand, pick, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
 import { img, drawUnit } from './sprites.js';
 import { TROOPS, FACTIONS } from './data.js';
 import { game, playerFit, skill, trainSkill, strength } from './state.js';
@@ -78,7 +78,8 @@ export const battleScene = {
     this.opts = opts;
     this.enemyFaction = opts.enemy.faction;
     if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H) buildGround(opts.kind);
-    this.units = []; this.shots = []; this.effects = [];
+    this.units = []; this.shots = []; this.effects = []; this.floats = [];
+    this.drawT = 0; this.wasDown = false; this.blockHeld = false; pointer.tap = null;
     this.time = 0; this.over = false;
     // Orders are given to two groups: foot soldiers and bowmen. 'group' is who the next order goes to.
     this.orders = { foot: 'charge', bows: 'charge' }; this.group = 'all';
@@ -105,7 +106,7 @@ export const battleScene = {
     this.routing = false;
     this.hud();
   },
-  bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 150 : 76) }; },
+  bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 210 : 76) }; },
   // Battle HUD: a top bar with both sides and the odds, group cards bottom left, orders bottom right.
   hud() {
     const ORD = { charge: 'Charge', hold: 'Hold', follow: 'Follow', fallback: 'Fall back' };
@@ -119,11 +120,20 @@ export const battleScene = {
       '<button data-act="group" data-arg="' + g + '" class="' + (this.group === g ? 'sel' : '') + '"><span class="gh"><span data-k="gn-' + g + '"></span><span>[' + (i + 1) + ']</span></span>' +
       { all: 'All', foot: 'Foot', bows: 'Bows' }[g] + '<small>' + (g === 'all' ? (this.orders.foot === this.orders.bows ? ORD[this.orders.foot] : 'Mixed') : ORD[this.orders[g]]) + '</small></button>').join('');
     const orders = ['charge', 'hold', 'follow', 'fallback'].map((o, i) =>
-      '<button data-act="order" data-arg="' + o + '" class="' + (cur === o ? 'sel' : '') + '">' + ORD[o] + '<small>F' + (i + 1) + '</small></button>').join('');
-    setHud(this.topBar() +
+      '<button data-act="order" data-arg="' + o + '" class="' + (cur === o ? 'sel' : '') + '">' + ORD[o] + (pointer.touch ? '' : '<small>F' + (i + 1) + '</small>') + '</button>').join('');
+    const sw = game.weapon === 'sword', touch = pointer.touch;
+    const hero = '<div class="box abs herobox"><button data-act="weapon">' + (sw ? 'Sword' : 'Bow') + '<small>' + (touch ? 'tap to swap' : 'Q to swap') + '</small></button>' +
+      (sw ? '<button data-act="block">Block<small>' + (touch ? 'hold' : 'hold right click') + '</small></button>' : '') + '</div>';
+    setHud(this.topBar() + hero +
       '<div class="box abs groups">' + groups + '</div>' +
       '<div class="box abs orders"><span class="lbl">Order for: <b>' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</b></span><div>' + orders + '</div></div>',
-      { order: o => this.setOrder(o), group: g => this.setGroup(g) });
+      { order: o => this.setOrder(o), group: g => this.setGroup(g), weapon: () => this.swapWeapon(), block: () => {} });
+    // The Block button works while held, so it listens for press and release itself.
+    const bb = document.querySelector('#ui [data-act="block"]');
+    if (bb) {
+      const on = e => { e.preventDefault(); this.blockHeld = true; }, off = () => { this.blockHeld = false; };
+      bb.addEventListener('pointerdown', on); bb.addEventListener('pointerup', off); bb.addEventListener('pointerleave', off); bb.addEventListener('pointercancel', off);
+    }
     this.refreshHud(true);
   },
   topBar() {
@@ -177,6 +187,14 @@ export const battleScene = {
     uiSet('gn-all', nm + ' men'); uiSet('gn-foot', foot + ' men'); uiSet('gn-bows', bows + ' men');
   },
   setGroup(g) { this.group = g; this.hud(); },
+  swapWeapon() {
+    if (this.over || this.hero.dead) return;
+    game.weapon = game.weapon === 'sword' ? 'bow' : 'sword';
+    this.hero.swing = null; this.hero.drawing = false; this.drawT = 0; this.blockHeld = false;
+    this.hud();
+  },
+  // Floating words over the field: Blocked, Parry!, Interrupted.
+  float(x, y, msg, colour) { this.floats.push({ x, y, msg, colour, t: 0 }); },
   nextGroup() {
     this.group = { all: 'foot', foot: 'bows', bows: 'all' }[this.group];
     this.hud();
@@ -260,6 +278,22 @@ export const battleScene = {
     const b = this.bounds();
     const H = this.hero;
     // ---- Gunther
+    H.stagger = Math.max(0, (H.stagger || 0) - dt);
+    // Desktop: the way the mouse last moved sets Gunther's stance, the side he swings from or guards.
+    if (!pointer.touch) {
+      this.sx = (this.sx || 0) * 0.8 + pointer.mvx; this.sy = (this.sy || 0) * 0.8 + pointer.mvy;
+      if (!(H.swing && !H.swing.released) && Math.hypot(this.sx, this.sy) > 9) {
+        H.stance = Math.abs(this.sx) > Math.abs(this.sy) * 1.1 ? (this.sx < 0 ? 'left' : 'right') : 'over';
+      }
+    }
+    pointer.mvx = 0; pointer.mvy = 0;
+    if (!H.stance) H.stance = 'over';
+    const sword = game.weapon === 'sword';
+    const wasBlocking = H.blocking;
+    H.blocking = !H.dead && !this.over && sword && (pointer.rdown || this.blockHeld) && !(H.swing && H.swing.released);
+    if (H.blocking && !wasBlocking) H.blockStart = this.time;
+    // A short tap on a phone (no drag) is a sword stroke towards that spot.
+    this.tap = pointer.tap || null; pointer.tap = null;
     if (!H.dead && !this.over) {
       let mx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
       let my = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
@@ -268,24 +302,18 @@ export const battleScene = {
         if (Math.hypot(jx, jy) > 12) { mx = jx; my = jy; }
       }
       const len = Math.hypot(mx, my);
+      const slow = (H.blocking ? 0.5 : 1) * (H.swing && !H.swing.released ? 0.7 : 1) * (H.stagger > 0 ? 0.4 : 1);
       H.anim = len > 0 ? 'walk' : 'idle';
-      if (len > 0) { H.x += mx / len * 190 * dt; H.y += my / len * 190 * dt; }
-      let wantFire = false;
+      if (len > 0) { H.x += mx / len * 190 * slow * dt; H.y += my / len * 190 * slow * dt; }
       if (pointer.touch) {
-        const o = this.nearestFoe(H, 520);
-        if (o) { this.aim = Math.atan2(o.y - 16 - (H.y - 26), o.x - H.x); wantFire = true; }
-      } else {
-        this.aim = Math.atan2(pointer.y - (H.y - 26), pointer.x - H.x);
-        wantFire = pointer.down || keys[' '];
-      }
+        const o = this.nearestFoe(H, sword ? 160 : 520);
+        if (this.tap) this.aim = Math.atan2(this.tap.y - (H.y - 26), this.tap.x - H.x);
+        else if (o) this.aim = Math.atan2(o.y - 16 - (H.y - 26), o.x - H.x);
+      } else this.aim = Math.atan2(pointer.y - (H.y - 26), pointer.x - H.x);
       H.flip = Math.cos(this.aim) < 0;
-      this.fireTimer -= dt;
-      if (wantFire && this.fireTimer <= 0) {
-        this.fireTimer = Math.max(0.5 * Math.pow(0.8, game.bowLevel - 1) * (1 - skill('archery') * 0.02), 0.13);
-        H.shootT = 0;
-        this.shoot(H, this.aim, (14 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04), 'arrow', 0, 760);
-      }
+      if (sword) this.updateSword(dt); else this.updateBow(dt);
     }
+    this.wasDown = pointer.down;
     H.shootT = (H.shootT || 9) + dt;
     pointer.clicked = false;
 
@@ -304,6 +332,8 @@ export const battleScene = {
       if (u.isHero || u.fled) continue;
       u.cd -= dt; u.at += dt;
       const def = u.def;
+      if (u.stun > 0) { u.stun -= dt; u.anim = 'idle'; continue; }
+      if (u.side === 1 && !def.ranged) this.guardAI(u, dt);
       const speed = def.speed * (u.fleeing ? 1.25 : 1);
       if (u.fleeing) {
         const ex = view.portrait ? u.x : (u.side === 1 ? view.W + 40 : -40);
@@ -323,11 +353,15 @@ export const battleScene = {
         u.target = this.nearestFoe(u, reach);
       }
       const T = u.target;
-      if (u.anim === 'attack' && u.at < (def.ranged ? 0.35 : 0.32)) {
+      const wind = u.windT || 0.16;
+      if (u.anim === 'attack' && u.at < (def.ranged ? 0.35 : wind + 0.16)) {
         // Mid-swing: the blow lands part way through.
-        if (!def.ranged && !u.struck && u.at > 0.16 && T && !T.dead && dist(u.x, u.y, T.x, T.y) < def.range + 14) {
+        if (!def.ranged && !u.struck && u.at > wind && T && !T.dead && dist(u.x, u.y, T.x, T.y) < def.range + 14) {
           u.struck = true;
-          this.hurt(T, def.dmg * rand(0.8, 1.2) * (1 - (T.def && T.def.block || 0) * 0.3), 'melee');
+          const dmg = def.dmg * rand(0.8, 1.2);
+          if (T.isHero) this.strikeHero(u, dmg);
+          else if (Math.random() < (T.def.guard || 0) * 0.3) { if (Math.random() < 0.3) this.effects.push({ x: (u.x + T.x) / 2, y: (u.y + T.y) / 2 - 26, t: 0, kind: 'block' }); }
+          else this.hurt(T, dmg * (1 - (T.def && T.def.block || 0) * 0.15), 'melee');
         }
         continue;
       }
@@ -347,7 +381,15 @@ export const battleScene = {
           }
         } else if (d <= def.range + (def.scale ? 14 : 0)) {
           u.anim = 'idle';
-          if (u.cd <= 0) { u.cd = def.cd * rand(0.9, 1.2); u.anim = 'attack'; u.at = 0; u.struck = false; }
+          if (u.cd <= 0) {
+            u.cd = def.cd * rand(0.9, 1.2); u.anim = 'attack'; u.at = 0; u.struck = false; u.windT = 0.16;
+            // Against Gunther the blow is telegraphed: a slower wind-up from one side he can read and block.
+            if (T.isHero) {
+              const g = def.guard || 0;
+              u.windT = clamp(0.62 - g * 0.3, 0.4, 0.62);
+              u.atkDir = H.blocking && Math.random() < g ? pick(DIRS.filter(d => d !== H.stance)) : pick(DIRS);
+            }
+          }
         } else this.walk(u, T.x, T.y, speed, dt);
       } else if (u.side === 0 && this.orders[groupOf(u)] === 'follow' && !H.dead) {
         const k = this.units.indexOf(u);
@@ -396,6 +438,8 @@ export const battleScene = {
     this.shots = this.shots.filter(s => !s.gone);
     for (const e of this.effects) e.t += dt;
     this.effects = this.effects.filter(e => e.t < 0.4);
+    for (const f of this.floats) f.t += dt;
+    this.floats = this.floats.filter(f => f.t < 0.9);
     if (this.banner) this.banner.t += dt;
     // Remove bodies after a while so the field doesn't fill up.
     this.units = this.units.filter(u => u.isHero || !(u.dead && u.deadT > 6) && !u.fled);
@@ -408,6 +452,137 @@ export const battleScene = {
       if (foes === 0 && this.alive(1).length === 0) this.finish(true);
       else if (foes === 0 && this.time > 2) this.finish(true);
       else if (friends === 0) this.finish(false);
+    }
+  },
+  // ---- Sword: hold to wind up (stronger), release to strike from the stance side.
+  updateSword(dt) {
+    const H = this.hero, s = H.swing;
+    const minWind = 0.26 - skill('blade') * 0.01;
+    if (s) {
+      s.t += dt;
+      if (!s.released) {
+        s.charge = Math.min(1, s.t / 0.65);
+        if (pointer.rdown && !pointer.touch) { H.swing = null; return; }          // right click cancels: a feint
+        if (!pointer.down || s.t > 1.5) { s.released = true; s.rt = 0; }
+      } else {
+        s.rt += dt;
+        if (!s.hit && s.rt >= 0.08 && s.t >= minWind + 0.08) { s.hit = true; this.resolveSwing(s); }
+        if (s.hit && s.rt > 0.3) H.swing = null;
+      }
+      return;
+    }
+    if (H.stagger > 0 || H.blocking) return;
+    if (pointer.touch) {
+      if (!this.tap) return;
+      const dx = this.tap.x - H.x, dy = this.tap.y - (H.y - 26);
+      const dir = Math.abs(dx) < 34 || dy < -Math.abs(dx) ? 'over' : dx < 0 ? 'left' : 'right';
+      H.stance = dir;
+      H.swing = { dir, t: 0, charge: 0.45, released: true, rt: 0 };
+    } else if (pointer.down) H.swing = { dir: H.stance, t: 0, charge: 0, released: false };
+  },
+  resolveSwing(s) {
+    const H = this.hero;
+    const near = this.units.filter(u => u.side === 1 && !u.dead && !u.fled).map(u => ({ u, d: dist(H.x, H.y, u.x, u.y) }))
+      .filter(o => o.d < 58 + (o.u.def.scale ? 26 : 0) && angleGap(Math.atan2(o.u.y - H.y, o.u.x - H.x), this.aim) < 1.4)
+      .sort((a, b) => a.d - b.d).slice(0, s.dir === 'over' ? 1 : 2);
+    for (const { u } of near) {
+      const busy = u.anim === 'attack' && !u.struck && !u.def.ranged;     // a man mid-swing cannot guard
+      if (u.guarding && u.guard === s.dir && !busy) {
+        this.effects.push({ x: (H.x + u.x) / 2, y: (H.y + u.y) / 2 - 30, t: 0, kind: 'block' });
+        this.float(u.x, u.y - 70, 'Blocked', '#c9bb9c');
+        H.stagger = 0.45;
+        trainSkill('blade', 0.5);
+        return;
+      }
+      const dmg = (11 + 2.5 * (game.swordLevel - 1)) * (1 + skill('blade') * 0.05) * (0.55 + 0.8 * s.charge) * (s.dir === 'over' ? 1.2 : 1) * rand(0.9, 1.1);
+      this.hurt(u, dmg, 'hero');
+      this.effects.push({ x: u.x, y: u.y - 30, t: 0, kind: 'hit' });
+      trainSkill('blade', 1);
+      if (busy && !u.dead) { u.anim = 'idle'; u.struck = true; u.cd = Math.max(u.cd, 0.5); this.float(u.x, u.y - 70, 'Interrupted', '#f2c14e'); }
+      if (s.charge > 0.8 && !u.def.scale && !u.dead) {
+        const d = Math.max(1, dist(H.x, H.y, u.x, u.y));
+        u.x += (u.x - H.x) / d * 12; u.y += (u.y - H.y) / d * 12; u.stun = Math.max(u.stun || 0, 0.4);
+      }
+    }
+  },
+  // ---- Bow: on a computer, hold to draw and release to loose. A full draw hits harder and flies true;
+  // moving, or holding the draw too long, makes it shaky. On a phone Gunther shoots by himself.
+  updateBow(dt) {
+    const H = this.hero;
+    if (pointer.touch) {
+      this.fireTimer -= dt;
+      if (this.nearestFoe(H, 520) && this.fireTimer <= 0) {
+        this.fireTimer = Math.max(0.5 * Math.pow(0.8, game.bowLevel - 1) * (1 - skill('archery') * 0.02), 0.13);
+        H.shootT = 0;
+        this.shoot(H, this.aim, (14 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04), 'arrow', 0, 760);
+      }
+      return;
+    }
+    const full = this.drawTime();
+    if (pointer.down || keys[' ']) { this.drawT += dt; H.drawing = true; return; }
+    if (!H.drawing) return;
+    H.drawing = false;
+    if (this.drawT > 0.1) {
+      const p = Math.min(1, this.drawT / full);
+      const shaky = Math.min(0.14, Math.max(0, this.drawT - full - 1.6) * 0.06);
+      const spread = (1 - p) * 0.18 + (H.anim === 'walk' ? 0.07 : 0) + shaky;
+      H.shootT = 0;
+      this.shoot(H, this.aim + rand(-spread, spread), (17 + 2.5 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04) * (0.3 + 0.7 * p), 'arrow', 0, 480 + 340 * p);
+    }
+    this.drawT = 0;
+  },
+  drawTime() { return 0.8 * Math.pow(0.9, game.bowLevel - 1) * (1 - skill('archery') * 0.03); },
+  // How an enemy guards against Gunther's sword: skilled troops read his swing and turn their
+  // guard to meet it after a short reaction time; poor ones guess.
+  guardAI(u, dt) {
+    const H = this.hero, g = u.def.guard || 0;
+    if (!u.guard) u.guard = pick(DIRS);
+    if (H.swing && H.swing !== u.readSwing && dist(u.x, u.y, H.x, H.y) < 120) {
+      u.readSwing = H.swing; u.react = 0.42 - g * 0.32 + rand(0, 0.08); u.willRead = Math.random() < g * 0.95 + 0.03;
+    }
+    if (u.react > 0) { u.react -= dt; if (u.react <= 0) u.guard = u.willRead ? u.readSwing.dir : pick(DIRS); }
+    else if (!H.swing) { u.drift = (u.drift || rand(1, 2.5)) - dt; if (u.drift <= 0) { u.drift = rand(1, 2.5); if (Math.random() < 0.5) u.guard = pick(DIRS); } }
+    u.guarding = g >= 0.1 || (u.react <= 0 && u.willRead);
+  },
+  strikeHero(u, dmg) {
+    const H = this.hero;
+    if (H.blocking && (pointer.touch || H.stance === u.atkDir)) {
+      if (this.time - H.blockStart < 0.22 + skill('blade') * 0.012) {
+        u.stun = 0.9;
+        this.effects.push({ x: (u.x + H.x) / 2, y: (u.y + H.y) / 2 - 30, t: 0, kind: 'parry' });
+        this.float(H.x, H.y - 76, 'Parry!', '#f2c14e');
+        trainSkill('blade', 2);
+      } else {
+        this.effects.push({ x: (u.x + H.x) / 2, y: (u.y + H.y) / 2 - 30, t: 0, kind: 'block' });
+        trainSkill('blade', 0.5);
+      }
+      return;
+    }
+    this.hurt(H, dmg, 'melee');
+  },
+  // Guard and attack markers: Gunther's stance in gold, each nearby enemy's guard in grey,
+  // and red arrows on the side an enemy blow is coming from.
+  drawCombatMarks() {
+    const H = this.hero;
+    if (H.dead || this.over) return;
+    if (game.weapon !== 'sword') {
+      if (H.drawing) {
+        const p = Math.min(1, this.drawT / this.drawTime());
+        ctx.strokeStyle = 'rgba(13,11,9,0.7)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(H.x, H.y - 28, 30, -Math.PI * 0.75, -Math.PI * 0.25); ctx.stroke();
+        ctx.strokeStyle = p >= 1 ? '#3ddc84' : '#f2c14e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(H.x, H.y - 28, 30, -Math.PI * 0.75, -Math.PI * 0.75 + Math.PI * 0.5 * p); ctx.stroke();
+      }
+      return;
+    }
+    for (const u of this.units) {
+      if (u.side !== 1 || u.dead || u.fled || u.def.ranged || dist(u.x, u.y, H.x, H.y) > 160) continue;
+      const big = u.def.scale ? 1.5 : 1;
+      dirMark(u.x, u.y, u.guard || 'over', 'guard', u.guarding ? '#c9bb9c' : 'rgba(201,187,156,0.35)', big);
+      if (u.anim === 'attack' && !u.struck && u.target === H && u.atkDir) dirMark(H.x, H.y, u.atkDir, 'threat', '#e0533d', 1);
+    }
+    dirMark(H.x, H.y, H.stance, H.blocking ? 'guard' : 'stance', H.blocking ? '#f2c14e' : 'rgba(242,193,78,0.75)', 1);
+    if (H.swing && !H.swing.released) {
+      ctx.strokeStyle = 'rgba(13,11,9,0.7)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(H.x, H.y - 28, 30, Math.PI * 0.25, Math.PI * 0.75); ctx.stroke();
+      ctx.strokeStyle = H.swing.charge >= 1 ? '#3ddc84' : '#f2c14e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(H.x, H.y - 28, 30, Math.PI * 0.75, Math.PI * 0.75 - Math.PI * 0.5 * H.swing.charge, true); ctx.stroke();
     }
   },
   walk(u, tx, ty, speed, dt) {
@@ -470,12 +645,17 @@ export const battleScene = {
         if (u.dead) ctx.globalAlpha = clamp((6 - u.deadT) / 1.5, 0, 1);
         if (!u.dead) shadow(u.x, u.y + 4, 12 * scale / 2, u.isHero ? 'rgba(232,184,58,0.55)' : hexA(teamColour[u.side], 0.45));
         if (u.isHero) {
-          const shooting = !u.dead && u.shootT < 0.25;
-          drawUnit('gunther', '', '', u.x, u.y, 2, u.dead ? 'dead' : shooting ? 'attack' : u.anim, u.dead ? u.deadT : shooting ? u.shootT : u.t, u.flip);
+          const sw = game.weapon === 'sword';
+          let anim = u.anim, at = u.t;
+          if (sw && u.swing) { anim = 'attack'; at = u.swing.released && u.swing.rt > 0.05 ? 0.25 : 0; }
+          else if (!sw && u.drawing) { anim = 'attack'; at = 0; }
+          else if (!sw && u.shootT < 0.2) { anim = 'attack'; at = 0.25; }
+          drawUnit('soldier', sw ? 'gunthersword' : 'gunther', '#f2c14e', u.x, u.y, 2, u.dead ? 'dead' : anim, u.dead ? u.deadT : at, u.flip);
         } else {
           const def = u.def;
           const anim = u.dead ? 'dead' : u.anim;
-          drawUnit(def.sprite, def.kind || '', teamColour[u.side], u.x, u.y, scale, anim, u.dead ? u.deadT : (anim === 'attack' || anim === 'cast' ? u.at : u.t), u.flip);
+          const at = anim === 'attack' ? (u.at < (u.windT || 0.16) ? 0 : 0.25) : u.t;
+          drawUnit(def.sprite, def.kind || '', teamColour[u.side], u.x, u.y, scale, anim, u.dead ? u.deadT : at, u.flip);
         }
         if (u.flash > 0 && !u.dead) { ctx.globalAlpha = 0.5; shadow(u.x, u.y - 18, 10, '#fff'); }
         ctx.globalAlpha = 1;
@@ -489,9 +669,22 @@ export const battleScene = {
       else drawArrow(s.x, s.y, s.a);
     }
     for (const e of this.effects) {
-      ctx.globalAlpha = 1 - e.t / 0.4; ctx.fillStyle = '#ffb04a';
-      ctx.beginPath(); ctx.arc(e.x, e.y, 8 + e.t * 50, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1 - e.t / 0.4;
+      if (e.kind === 'block' || e.kind === 'parry') {
+        // Sparks off steel: white for a block, a gold ring for a parry.
+        ctx.strokeStyle = e.kind === 'parry' ? '#f2c14e' : '#f4ead2'; ctx.lineWidth = 3;
+        const r = 6 + e.t * 60;
+        for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + 0.3; ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * r * 0.4, e.y + Math.sin(a) * r * 0.4); ctx.lineTo(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r); ctx.stroke(); }
+        if (e.kind === 'parry') { ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke(); }
+      } else {
+        ctx.fillStyle = '#ffb04a';
+        ctx.beginPath(); ctx.arc(e.x, e.y, 8 + e.t * 50, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
+    this.drawCombatMarks();
+    for (const f of this.floats) { ctx.globalAlpha = clamp(1.4 - f.t * 1.6, 0, 1); text(f.msg, f.x, f.y - f.t * 26, 15, f.colour, 'center'); }
+    ctx.globalAlpha = 1;
     // Hero's health, top left, and the head count for both sides.
     const H = this.hero;
     if (!this.over) this.refreshHud();
@@ -505,9 +698,9 @@ export const battleScene = {
     if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, top + 24, 20, '#e0533d', 'center');
     if (this.banner && this.banner.t < 2.5) text(this.banner.msg, W / 2, Hh / 2 - 40, 34, '#f2c14e', 'center');
     if (this.time < 6 && !this.over) {
-      const msg = pointer.touch ? (view.portrait ? 'Drag to move. Buttons pick a group and give orders.' : 'Drag to move. Gunther shoots by himself. Buttons give orders.')
-        : 'WASD move, hold click to shoot. 1 2 3 pick a group, F1 to F4 give orders.';
-      text(msg, W / 2, bot + 2, 14, '#f4ead2', 'center');
+      const msg = pointer.touch ? (game.weapon === 'sword' ? 'Drag to move. Tap left, right or above Gunther to swing. Hold Block.' : view.portrait ? 'Drag to move. Buttons pick a group and give orders.' : 'Drag to move. Gunther shoots by himself. Buttons give orders.')
+        : (game.weapon === 'sword' ? 'Move the mouse to pick a side, hold click to wind up. Right click blocks. Q: bow.' : 'WASD move, hold click to draw, release to shoot. Q: sword. 1 2 3 groups, F1 to F4 orders.');
+      text(msg, W / 2, bot - (view.portrait ? 12 : -2), 14, '#f4ead2', 'center');
     }
   }
 };
@@ -551,6 +744,26 @@ function drawBolt(x, y, angle) {
   ctx.restore();
 }
 
+const DIRS = ['left', 'over', 'right'];
+function angleGap(a, b) { let d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; }
+// A small marker on one side of a fighter. 'guard' is a bar (a raised guard), 'stance' a chevron
+// pointing out (where Gunther will swing from), 'threat' a bigger chevron pointing in (an incoming blow).
+function dirMark(x, y, dir, style, colour, big) {
+  const cy = y - 28 * big, threat = style === 'threat';
+  const side = (threat ? 46 : 34) * big, top = (threat ? 64 : 54) * big;
+  ctx.fillStyle = colour; ctx.strokeStyle = 'rgba(13,11,9,0.9)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (style === 'guard') {
+    if (dir === 'over') ctx.rect(x - 14, cy - top, 28, 6); else ctx.rect(x + (dir === 'left' ? -side - 3 : side - 3), cy - 14, 6, 28);
+  } else {
+    const s = threat ? 12 : 8, o = threat ? -1 : 1;     // threats point inwards, at Gunther
+    if (dir === 'over') { const by = cy - top; ctx.moveTo(x - s, by + s * 0.7 * o); ctx.lineTo(x + s, by + s * 0.7 * o); ctx.lineTo(x, by - s * 0.7 * o); }
+    else { const sx = dir === 'left' ? -1 : 1, bx = x + sx * side; ctx.moveTo(bx - sx * s * 0.7 * o, cy - s); ctx.lineTo(bx - sx * s * 0.7 * o, cy + s); ctx.lineTo(bx + sx * s * 0.7 * o, cy); }
+    ctx.closePath();
+  }
+  ctx.fill(); ctx.stroke();
+}
+
 // Foot soldiers and bowmen take orders separately.
 function groupOf(u) { return u.def && u.def.ranged ? 'bows' : 'foot'; }
 
@@ -574,6 +787,7 @@ function drawCampfire(x, y, t) {
 onKeyPress(k => {
   if (getScene() !== battleScene || battleScene.over) return;
   if (k === 'g' || k === 'tab') battleScene.nextGroup();
+  if (k === 'q') battleScene.swapWeapon();
   if (k === '1') battleScene.setGroup('all');
   if (k === '2') battleScene.setGroup('foot');
   if (k === '3') battleScene.setGroup('bows');

@@ -83,6 +83,7 @@ function openHelp(back) {
     '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. Space pauses, the speed buttons bottom left fast-forward, M opens the full map, P the party, J skills and quests, C camps, and E enters the place you are standing beside.</p>' +
     '<p><b>Your warband.</b> Hire recruits in villages and towns. Feed them (grain or fish) and pay their wages each week, or morale drops and men desert. Winning battles gives your men experience: train them up from the Party screen.</p>' +
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
+    '<p><b>Fighting.</b> Q swaps between bow and sword. Bow: hold click to draw and release to shoot; a full draw hits hardest and flies straightest, but moving or holding too long makes it shaky. Sword: move the mouse left, right or up to pick the side you swing from (the gold marker), hold click to wind up and release to strike. Each enemy shows its guard as a grey bar; strike a side it is not guarding, or hit it while it is winding up. Right click cancels a swing, which lets you feint. Red arrows show where a blow is coming from: hold right click with your marker on that side to block, and block just before it lands to parry and stun them. On a phone, tap left, right or above Gunther to swing and hold the Block button. Bladework improves as you fight.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
     '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
     '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
@@ -311,13 +312,16 @@ function completeQuest(q) {
 function openSmith(s, msg) {
   const bowCost = 40 * game.bowLevel, armourCost = 50 * game.armourLevel;
   const bowMax = game.bowLevel >= 8;
+  const swordCost = 45 * game.swordLevel, swordMax = game.swordLevel >= 8;
   showPanel('<h2>Smith</h2>' + statusLine() + (msg ? '<p class="msg">' + msg + '</p>' : '') +
-    '<p>Bow level ' + game.bowLevel + ', armour level ' + game.armourLevel + '.</p>' +
+    '<p>Bow level ' + game.bowLevel + ', sword level ' + game.swordLevel + ', armour level ' + game.armourLevel + '.</p>' +
     '<button data-act="armour"' + (game.gold < armourCost ? ' disabled' : '') + '>Better armour: +25 health, less damage (' + armourCost + ' gold)</button>' +
-    (bowMax ? '<button disabled>Your bow is the finest on the island</button>' : '<button data-act="bow"' + (game.gold < bowCost ? ' disabled' : '') + '>Better bow: faster, harder hitting (' + bowCost + ' gold)</button>') +
+    (bowMax ? '<button disabled>Your bow is the finest on the island</button>' : '<button data-act="bow"' + (game.gold < bowCost ? ' disabled' : '') + '>Better bow: faster draw, harder hitting (' + bowCost + ' gold)</button>') +
+    (swordMax ? '<button disabled>Your sword is the finest on the island</button>' : '<button data-act="sword"' + (game.gold < swordCost ? ' disabled' : '') + '>Better sword: harder blows (' + swordCost + ' gold)</button>') +
     '<button data-act="back" class="secondary">Back</button>', {
     armour: () => { game.gold -= armourCost; game.armourLevel++; game.maxHealth += 25; game.health = game.maxHealth; openSmith(s, 'The smith fits new plates. You feel sturdier.'); },
     bow: () => { game.gold -= bowCost; game.bowLevel++; openSmith(s, 'The bowyer hands you a stronger bow.'); },
+    sword: () => { game.gold -= swordCost; game.swordLevel++; openSmith(s, 'The smith hands you a better-balanced blade.'); },
     back: () => openSettlement(s)
   });
 }
@@ -605,8 +609,8 @@ function rosterHtml() {
   if (rosterSel === 'gunther') {
     det = '<div class="kind">Captain &middot; Level ' + lv + '</div><h3>Gunther</h3><p>Leads from the front with a bow. Renown ' + game.renown + '.</p>' +
       '<div class="sg">' + stat('Health', Math.ceil(game.health) + '/' + game.maxHealth) + stat('Bow', game.bowLevel) + stat('Armour', game.armourLevel) + stat('Archery', skill('archery')) +
-      stat('Leadership', skill('leadership')) + stat('Tactics', skill('tactics')) + '</div>' +
-      '<p class="lbl">Kit</p><p>Hunting bow (level ' + game.bowLevel + '), ' + (game.armourLevel ? 'armour (level ' + game.armourLevel + ')' : 'travelling clothes') + '. Upgrade both at a town smith.</p>';
+      stat('Bladework', skill('blade')) + stat('Sword', game.swordLevel) + stat('Leadership', skill('leadership')) + '</div>' +
+      '<p class="lbl">Kit</p><p>Hunting bow (level ' + game.bowLevel + '), arming sword and shield (level ' + game.swordLevel + '), armour (level ' + game.armourLevel + '). Upgrade them at a town smith.</p>';
   } else {
     const t = rosterSel, st = game.troops[t], d = TROOPS[t];
     let ups = '';

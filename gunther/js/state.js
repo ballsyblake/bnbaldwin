@@ -15,7 +15,7 @@ export function newGame(migrate) {
   Object.assign(game, {
     version: 2,
     day: 1, dayTime: 0,
-    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1,
+    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
@@ -69,7 +69,10 @@ export function loadSave() {
 
 // Fills in anything a save from an older build doesn't have yet.
 function ensureFields() {
-  if (!game.skills) { game.skills = {}; for (const k in SKILLS) game.skills[k] = 0; }
+  if (!game.skills) game.skills = {};
+  for (const k in SKILLS) if (game.skills[k] === undefined) game.skills[k] = 0;
+  if (!game.swordLevel) game.swordLevel = 1;
+  if (!game.weapon) game.weapon = 'bow';
   if (!game.prisoners) game.prisoners = {};
   if (!game.lordCaptives) game.lordCaptives = [];
   if (!game.chronicle) game.chronicle = [];
@@ -169,7 +172,7 @@ export function removeTroops(type, n, wounded) {
   st.wounded = Math.min(st.wounded + (wounded || 0), st.n);
   if (st.n === 0) delete game.troops[type];
 }
-export function guntherPower() { return 5 + game.bowLevel * 1.5 + game.armourLevel; }
+export function guntherPower() { return 5 + Math.max(game.bowLevel * 1.5, (game.swordLevel || 1) * 1.5) + game.armourLevel; }
 export function strength(troops) {
   let s = 0;
   for (const t in troops) s += TROOPS[t].power * troops[t];
