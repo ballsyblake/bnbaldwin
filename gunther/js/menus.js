@@ -12,7 +12,8 @@ import {
   skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
   enemiesOf, anyWar, warsText, recruitType
 } from './state.js';
-import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
+import { storyButton, storyAt, storyBeaten, journalHtml, openPrologue } from './story.js';
+import { mapScene, populate, spawnWarband, spawnParty, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { battleScene } from './battle.js';
 import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
 import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
@@ -128,6 +129,7 @@ function openHelp(back) {
   showPanel(
     '<h2>How to play</h2><div class="left">' +
     '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. Space pauses, the speed buttons bottom left fast-forward, M opens the full map, P the party, J skills and quests, C camps, and E enters the place you are standing beside.</p>' +
+    '<p><b>Story and quests.</b> From day 2 you are offered Gunther\'s own story, The Wall Tithe: nine chapters about where the villages\' tithe silver really goes, with choices that change what comes later. A gold ! marks where the story wants you next. Town taverns also offer work: hunting orc raiders or outlaws, burning a camp, feeding a village, carrying a letter, or bringing in orc captives. Your story and quests are on the Quests screen (J).</p>' +
     '<p><b>Your warband.</b> Hire recruits in villages and towns. Feed them (grain or fish) and pay their wages each week, or morale drops and men desert. Winning battles gives your men experience: train them up from the Party screen.</p>' +
     '<p><b>Screen space.</b> The small &minus; button in the corner of a panel shrinks it (the stats to one line, the minimap away, the button bars to compact rows); + brings it back. The game remembers your choice.</p>' +
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
@@ -170,8 +172,12 @@ export function openSettlement(s, msg) {
   }
   const quest = game.quests.find(q => q.kind === 'supply' && q.to === s.id);
   let html = head + msg;
+  const sb = storyButton(s);
+  if (sb) html += '<button data-act="story"' + (sb.why ? ' disabled' : '') + '>' + esc(sb.label) + (sb.why ? ' (' + esc(sb.why) + ')' : '') + ' <span class="small">Story</span></button>';
   html += '<button data-act="market">Market</button>';
   html += '<button data-act="recruit">Recruit volunteers (' + st.recruits + ' willing)</button>';
+  const letter = game.quests.find(q => q.kind === 'letter' && q.to === s.id);
+  if (letter) html += '<button data-act="letter">Hand over the sealed letter</button>';
   if (quest) html += '<button data-act="deliver"' + ((game.goods[quest.good] || 0) < quest.amount ? ' disabled' : '') + '>Deliver ' + quest.amount + ' ' + GOODS[quest.good].name + ' for the quest</button>';
   if (s.kind === 'town') html += '<button data-act="tavern">Tavern</button><button data-act="smith">Smith</button>';
   if (s.kind === 'town' && KINGDOMS.includes(s.faction)) html += '<button data-act="hall">Hall of ' + FACTIONS[s.faction].short + '</button>';
@@ -193,6 +199,8 @@ export function openSettlement(s, msg) {
       no: () => openSettlement(s)
     }),
     hall: () => openHall(s, () => openSettlement(s)),
+    story: () => storyAt(s, () => openSettlement(s)),
+    letter: () => { completeQuest(letter); openSettlement(s, 'The letter is delivered. +' + letter.reward + ' gold.'); },
     market: () => openMarket(s),
     recruit: () => openRecruit(s),
     tavern: () => openTavern(s),
@@ -285,6 +293,7 @@ function openTavern(s, msg) {
   const room = partyLimit() - troopCount();
   const hireN = Math.min(m.n, room, Math.floor(game.gold / mCost));
   const myQuest = game.quests.find(q => q.giver === s.id);
+  const captQ = game.quests.find(q => q.kind === 'captives' && q.giver === s.id);
   const questBtn = myQuest ? '<button disabled>Quest in progress: ' + esc(myQuest.title) + '</button>' :
     game.quests.length >= 3 ? '<button disabled>You have enough quests already</button>' : '<button data-act="quest">Ask about work</button>';
   showPanel('<h2>' + s.name + ' tavern</h2>' + statusLine() + (msg ? '<p class="msg">' + msg + '</p>' : '') +
@@ -292,6 +301,7 @@ function openTavern(s, msg) {
     '<button data-act="rest"' + (game.gold < restCost ? ' disabled' : '') + '>Rest a night: heal Gunther, men recover (' + restCost + ' gold)</button>' +
     (m.n ? '<button data-act="mercs"' + (hireN < 1 ? ' disabled' : '') + '>Hire sellswords: ' + m.n + ' ' + troopName(m.type, m.n) + ' at ' + mCost + ' gold each' + (hireN < 1 ? (troopCount() >= partyLimit() ? ' (warband full)' : ' (not enough gold)') : hireN < m.n ? ' (you can take ' + hireN + ')' : '') + '</button>' : '<button disabled>No sellswords here this week</button>') +
     questBtn +
+    (captQ ? '<button data-act="captives"' + (orcCaptives() < captQ.amount ? ' disabled' : '') + '>Hand over ' + captQ.amount + ' orc captives (' + orcCaptives() + ' held)</button>' : '') +
     '<button data-act="ransom"' + (prisonerCount() ? '' : ' disabled') + '>Ransom broker' + (prisonerCount() ? ' (' + prisonerCount() + ' prisoners to sell)' : ' (no prisoners)') + '</button>' +
     '<button data-act="back" class="secondary">Back</button>', {
     ransom: () => openRansom(s, () => openTavern(s)),
@@ -306,6 +316,7 @@ function openTavern(s, msg) {
       openTavern(s, hireN + ' ' + troopName(m.type, hireN).toLowerCase() + ' signed on.');
     },
     quest: () => offerQuest(s),
+    captives: () => { takeOrcCaptives(captQ.amount); completeQuest(captQ); openTavern(s, 'The marshal\'s men lead the captives away. +' + captQ.reward + ' gold.'); },
     back: () => openSettlement(s)
   });
 }
@@ -330,36 +341,97 @@ function rumour() {
 }
 
 // ---------------------------------------------------------------- quests
+// Work from a tavern keeper or a worried official. Each town offers one job at a time, and what
+// it is depends on what the island needs: orcs to hunt, outlaws to catch, camps to burn, hungry
+// villages, letters to carry, captives to question.
+function orcCaptives() { let n = 0; for (const t in game.prisoners) if (TROOPS[t].orc) n += game.prisoners[t]; return n; }
+function takeOrcCaptives(n) {
+  for (const t of Object.keys(game.prisoners)) {
+    if (!TROOPS[t].orc || n <= 0) continue;
+    const k = Math.min(n, game.prisoners[t]); game.prisoners[t] -= k; n -= k;
+    if (!game.prisoners[t]) delete game.prisoners[t];
+  }
+}
+const OUTLAW_TAGS = ['the Red', 'Half-Ear', 'the Hound', 'Blackhand', 'the Tanner', 'Crowfoot', 'the Deserter', 'Ninefingers'];
+
 function offerQuest(s) {
   const kingdom = s.faction;
-  const villages = SETTLEMENTS.filter(v => v.kind === 'village' && (v.faction === kingdom || kingdom === 'free'));
-  const v = pick(villages);
-  let q;
-  if (Math.random() < 0.55 && !game.hordeBroken) {
-    const camps = SETTLEMENTS.filter(c => c.kind === 'camp' && !game.sites[c.id].burned);
+  const villages = SETTLEMENTS.filter(v => v.kind === 'village' && (v.faction === kingdom || kingdom === 'free' || kingdom === 'player'));
+  const v = pick(villages.length ? villages : SETTLEMENTS.filter(x => x.kind === 'village'));
+  const camps = SETTLEMENTS.filter(c => c.kind === 'camp' && !game.sites[c.id].burned);
+  const towns = SETTLEMENTS.filter(t => t.kind === 'town' && t !== s && !hostile(t.faction, 'player'));
+  const kinds = ['supply', 'bounty', 'letter'];
+  if (!game.hordeBroken) kinds.push('hunt', 'hunt');
+  if (!game.hordeBroken && camps.length) kinds.push('burn');
+  if (!game.hordeBroken) kinds.push('captives');
+  const kind = pick(kinds);
+  const d = game.day;
+  let q, offer, days;
+  const accept = (extra) => { game.quests.push(q); if (extra) extra(); save(); openTavern(s, 'Quest accepted. It is on the Quests screen (J).'); };
+
+  if (kind === 'hunt') {
     const camp = camps.length ? pick(camps) : SETTLEMENTS.find(c => c.kind === 'stronghold');
     const chief = pick(ORC_CHIEFS);
-    q = { kind: 'hunt', giver: s.id, chief, near: v.id, camp: camp.id, title: 'Hunt ' + chief + "'s raiders near " + v.name, reward: 90 + game.day * 6, deadline: game.day + 14 };
-    showPanel('<h2>Work</h2><p>"An orc chief called ' + chief + ' has been raiding around ' + v.name + '. Bring me word that his band is broken and you will have ' + q.reward + ' gold."</p>' +
-      '<p>Time limit: 14 days.</p><button data-act="yes">Accept</button><button data-act="no" class="secondary">Not now</button>', {
-      yes: () => {
-        const p = spawnWarband(camp, 4, { quest: true, anchor: { x: v.x, y: v.y } });
-        p.name = chief + "'s raiders"; p.x = v.x + rand(-200, 200); p.y = v.y + rand(-200, 200);
-        const spot = nearestLandSafe(p.x, p.y); p.x = spot.x; p.y = spot.y; p.tx = p.x; p.ty = p.y;
-        q.party = p.id; game.quests.push(q); save();
-        openTavern(s, 'Quest accepted. ' + chief + "'s band is marked with ! on the map.");
-      },
-      no: () => openTavern(s)
-    });
-  } else {
+    days = 14;
+    q = { kind, giver: s.id, chief, near: v.id, camp: camp.id, title: 'Hunt ' + chief + "'s raiders near " + v.name, reward: 90 + d * 6 };
+    offer = pick([
+      '"An orc chief called ' + chief + ' has been raiding around ' + v.name + '. Bring me word that his band is broken and you will have ' + q.reward + ' gold."',
+      '"' + v.name + ' lost two barns and a shepherd to ' + chief + '\'s raiders last week. The headman has scraped together ' + q.reward + ' gold for whoever ends it."'
+    ]);
+    q.spawn = () => {
+      const p = spawnWarband(camp, 4, { quest: true, anchor: { x: v.x, y: v.y } });
+      p.name = chief + "'s raiders"; p.x = v.x + rand(-200, 200); p.y = v.y + rand(-200, 200);
+      const spot = nearestLandSafe(p.x, p.y); p.x = spot.x; p.y = spot.y; p.tx = p.x; p.ty = p.y;
+      q.party = p.id;
+    };
+  } else if (kind === 'bounty') {
+    const boss = pick(RACES.human.names.m) + ' ' + pick(OUTLAW_TAGS);
+    days = 12;
+    q = { kind, giver: s.id, near: v.id, title: 'Bring in ' + boss, reward: 120 + d * 7 };
+    offer = pick([
+      '"Deserters from the last war have turned outlaw on the roads near ' + v.name + '. Their leader, ' + boss + ', has a price on his head: ' + q.reward + ' gold."',
+      '"' + boss + ' and his cutthroats robbed a wedding party outside ' + v.name + '. They took the bride\'s ring and the groom\'s teeth. ' + q.reward + ' gold for the lot of them."'
+    ]);
+    q.spawn = () => {
+      const troops = { recruit: 3 + Math.floor(d / 6), spearman: 2 + Math.floor(d / 9), bowman: 2 + Math.floor(d / 12) };
+      if (d > 15) troops.knight = Math.floor(d / 15);
+      const spot = nearestLandSafe(v.x + rand(-220, 220), v.y + rand(-220, 220));
+      const p = spawnParty('outlaws', 'outlaws', boss + "'s outlaws", troops, spot.x, spot.y, { quest: true, anchor: { x: v.x, y: v.y }, gold: randInt(60, 140), desc: 'Deserters and cutthroats with a price on their heads.' });
+      q.party = p.id;
+    };
+  } else if (kind === 'burn') {
+    const camp = pick(camps);
+    days = 16;
+    q = { kind, giver: s.id, camp: camp.id, title: 'Burn ' + camp.name, reward: 200 + d * 8 };
+    offer = '"Every raider that hits our villages comes out of ' + camp.name + '. The council will pay ' + q.reward + ' gold to see it burn. Take plenty of men: they keep a garrison."';
+  } else if (kind === 'supply') {
     const good = pick(['grain', 'fish']), amount = randInt(6, 12);
-    q = { kind: 'supply', giver: s.id, to: v.id, good, amount, title: 'Bring ' + amount + ' ' + GOODS[good].name + ' to ' + v.name, reward: Math.round(GOODS[good].base * amount * 1.6 + 30), deadline: game.day + 10 };
-    showPanel('<h2>Work</h2><p>"' + v.name + ' is short of food. Take them ' + amount + ' ' + GOODS[good].name.toLowerCase() + ' and I will pay you ' + q.reward + ' gold."</p>' +
-      '<p>Time limit: 10 days.</p><button data-act="yes">Accept</button><button data-act="no" class="secondary">Not now</button>', {
-      yes: () => { game.quests.push(q); save(); openTavern(s, 'Quest accepted.'); },
-      no: () => openTavern(s)
-    });
+    days = 10;
+    q = { kind, giver: s.id, to: v.id, good, amount, title: 'Bring ' + amount + ' ' + GOODS[good].name + ' to ' + v.name, reward: Math.round(GOODS[good].base * amount * 1.6 + 30) };
+    offer = pick([
+      '"' + v.name + ' is short of food. Take them ' + amount + ' ' + GOODS[good].name.toLowerCase() + ' and I will pay you ' + q.reward + ' gold."',
+      '"The orcs burned ' + v.name + '\'s stores, and the children there are going hungry. ' + amount + ' ' + GOODS[good].name.toLowerCase() + ' would see them through. The guild pays ' + q.reward + ' gold."'
+    ]);
+  } else if (kind === 'letter') {
+    const to = pick(towns.length ? towns : SETTLEMENTS.filter(t => t.kind === 'town' && t !== s));
+    days = Math.max(5, Math.ceil(dist(s.x, s.y, to.x, to.y) / 260) + 3);
+    q = { kind, giver: s.id, to: to.id, title: 'Carry a sealed letter to ' + to.name, reward: 40 + Math.round(dist(s.x, s.y, to.x, to.y) / 20) };
+    offer = pick([
+      '"A letter for the guildmaster in ' + to.name + '. Do not open it, and do not let it get wet. ' + q.reward + ' gold when it arrives."',
+      '"My daughter married a ' + to.name + ' man. Take her this letter, and the little purse inside is yours: ' + q.reward + ' gold."'
+    ]);
+  } else {
+    const n = randInt(3, 5);
+    days = 15;
+    q = { kind, giver: s.id, amount: n, title: 'Bring ' + n + ' orc captives to ' + s.name, reward: 60 + n * 30 };
+    offer = '"The marshal wants live orcs to question. Where they camp, how many, who feeds them. Bring ' + n + ' captives here and I will pay ' + q.reward + ' gold. Dead ones are no use to anybody."';
   }
+  q.deadline = d + days;
+  const spawn = q.spawn; delete q.spawn;
+  showPanel('<h2>Work</h2><p>' + offer + '</p><p>Time limit: ' + plural(days, 'day') + '.</p><button data-act="yes">Accept</button><button data-act="no" class="secondary">Not now</button>', {
+    yes: () => accept(spawn),
+    no: () => openTavern(s)
+  });
 }
 function nearestLandSafe(x, y) {
   return terrainAt(x, y) >= T.GRASS ? { x, y } : { x: mapScene.pos.x, y: mapScene.pos.y };
@@ -417,7 +489,7 @@ function openCamp(s, msg) {
 export function openEncounter(p, forced) {
   const f = FACTIONS[p.faction];
   const isHostile = enemies(p, { faction: 'player' });
-  const desc = { warband: 'Orc raiders looking for easy prey.', lord: p.lord ? lordBlurb(p.lord) : '', caravan: 'Merchants hauling goods to ' + (p.dest ? site(p.dest).name : 'market') + '.' }[p.kind] || '';
+  const desc = { story: p.desc, outlaws: p.desc, warband: 'Orc raiders looking for easy prey.', lord: p.lord ? lordBlurb(p.lord) : '', caravan: 'Merchants hauling goods to ' + (p.dest ? site(p.dest).name : 'market') + '.' }[p.kind] || '';
   let html = '<h2>' + esc(p.name) + (p.lord ? '\'s host' : '') + '</h2><p>' + (p.lord ? '' : f.name + '. ') + desc + '</p>' + (p.lord ? '<p>' + lordGreeting(p.lord) + '</p>' : '') +
     '<p>' + troopList(p.troops) + '.</p><p>' + compare(strength(p.troops)) + '</p>' + armourNote(p.troops);
   if (p.lord && grudge(p.lord) && !hostile(p.faction, 'player')) html += '<p class="warn">This is a personal grudge. Fighting back will not anger ' + f.short + '.</p>';
@@ -597,6 +669,7 @@ function afterBattle(foe, res) {
     foe.party.gone = true;
     const q = game.quests.find(q => q.party === foe.party.id);
     if (q) completeQuest(q), lines.push('Quest complete! +' + q.reward + ' gold.');
+    if (foe.party.story) storyBeaten(foe.party);
     if (foe.party.lord) { capturedLord = foe.party.lord; chronicle('Gunther defeated ' + lord(capturedLord).name + ' near ' + nearestPlace(foe.party.x, foe.party.y) + '.'); }
   } else if (foe.site && !foe.siege) chronicle('Gunther stormed ' + foe.site.name + '.');
   let title = 'Victory';
@@ -617,6 +690,8 @@ function afterBattle(foe, res) {
     } else {
       st.burned = 25;
       game.stats.campsBurned++;
+      const bq = game.quests.find(q => q.kind === 'burn' && q.camp === foe.site.id);
+      if (bq) completeQuest(bq), lines.push('Quest complete! +' + bq.reward + ' gold.');
       lines.push(foe.site.name + ' burns. No raiders will come from it for a while.');
     }
   }
@@ -812,9 +887,10 @@ export function openParty(msg, tab) {
   } else if (partyTab === 'gunther') {
     const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
     body = '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + '</p>' +
+      journalHtml() +
+      '<h3>Quests</h3>' + (quests ? '<ul class="left">' + quests + '</ul>' : '<p class="small">No work taken. Ask in any town tavern.</p>') +
       '<p>' + contractLine() + '</p>' + familySection() +
       '<h3>Skills</h3>' + skillsTable() +
-      (quests ? '<h3>Quests</h3><ul class="left">' + quests + '</ul>' : '') +
       '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>';
   } else {
     let realms = '';
@@ -851,6 +927,7 @@ export function openParty(msg, tab) {
       openParty(n + ' ' + troopName(from, n).toLowerCase() + ' trained as ' + troopName(to, n).toLowerCase() + '.');
     },
     convert: t => { const m = convertPrisoner(t); save(); openParty(m); },
+    story: () => openPrologue(() => openParty('', 'gunther')),
     mortal: () => { game.battleDeath = !game.battleDeath; save(); openParty(game.battleDeath ? 'Captains can now die when struck down in battle.' : 'Captains struck down in battle will always recover. Old age still comes for everyone.'); },
     close: () => hidePanel(),
     help: () => openHelp(() => openParty()),

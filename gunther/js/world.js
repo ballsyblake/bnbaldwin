@@ -6,6 +6,7 @@ import { uiMin, ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shad
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
 import { year, lordDies } from './dynasty.js';
 import { siegeTarget, isHeld, besiegers } from './sieges.js';
+import { storyTick, storyPlaces } from './story.js';
 import { WORLD_W, WORLD_H, DAY_SECONDS, YEAR_DAYS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
@@ -16,6 +17,7 @@ const SIGHT = 360;
 // ---------------------------------------------------------------- parties
 export function partyById(id) { return game.parties.find(p => p.id === id); }
 
+export function spawnParty(faction, kind, name, troops, x, y, extra) { return makeParty(faction, kind, name, troops, x, y, extra); }
 function makeParty(faction, kind, name, troops, x, y, extra) {
   const pos = nearestLand(x, y);
   const p = Object.assign({ id: game.nextId++, faction, kind, name, troops, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, gold: 0, think: 0, mode: 'idle', flip: false, time: Math.random() * 3 }, extra || {});
@@ -118,6 +120,8 @@ function think(p) {
   const bold = p.lord && hasTrait(p.lord, 'bold'), cautious = p.lord && hasTrait(p.lord, 'cautious');
   const attackOdds = p.kind === 'warband' ? 0.9 : bold ? 0.95 : cautious ? 1.5 : 1.2;
   const fleeOdds = bold ? 1.4 : 1.15;
+  // A party sent to hunt Gunther down does nothing else.
+  if (p.hunt) { p.mode = 'chase'; p.chase = 'player'; p.tx = player.x; p.ty = player.y; return; }
   let threat = null, prey = null, threatD = Infinity, preyD = Infinity;
   for (const o of game.parties.concat([player])) {
     if (o === p || !enemies(p, o)) continue;
@@ -377,6 +381,8 @@ export const mapScene = {
     if (panelOpen()) return;
     // Gunther died (of old age, in the night): the heir takes over before anything else.
     if (game.pendingDeath) { openSuccession(game.pendingDeath); return; }
+    storyTick();
+    if (panelOpen()) return;
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer = 0.15; this.refreshHud(); }
     const P = this.pos;
@@ -472,7 +478,7 @@ export const mapScene = {
       if (a.gone) continue;
       for (let j = i + 1; j < game.parties.length; j++) {
         const b = game.parties[j];
-        if (b.gone || !hostile(a.faction, b.faction)) continue;   // grudges against Gunther don't count here
+        if (b.gone || !hostile(a.faction, b.faction) || a.story || b.story) continue;   // story foes wait for Gunther   // grudges against Gunther don't count here
         if (dist(a.x, a.y, b.x, b.y) < 24) aiClash(a, b);
       }
     }
@@ -547,6 +553,11 @@ export const mapScene = {
       text(label, s.x - cam.x, s.y - cam.y + (s.kind === 'town' ? 54 : 40), 16, s.kind === 'camp' || s.kind === 'stronghold' ? '#ffb0a0' : '#fff', 'center');
     }
 
+    // Where the story wants Gunther to go.
+    for (const id of storyPlaces()) {
+      const s = SETTLEMENTS.find(x => x.id === id);
+      if (onScreen(s.x, s.y, 140)) text('!', s.x - cam.x + 34, s.y - cam.y - (s.kind === 'town' ? 70 : 44) + Math.sin(this.time * 4) * 3, 30, '#ffd34a', 'center');
+    }
     // Where Gunther is going.
     if (this.target && !this.target.party) {
       const tx = (this.target.site ? this.target.site.x : this.target.x) - cam.x;
@@ -579,6 +590,7 @@ export const mapScene = {
       ctx.fillStyle = siteColour(s); ctx.fillRect(x - (big ? 4 : 3), y - (big ? 4 : 3), big ? 8 : 6, big ? 8 : 6);
       text(s.name, x, y - 9, big ? 12 : 10, '#f4ead2', 'center');
     }
+    for (const id of storyPlaces()) { const s = SETTLEMENTS.find(x => x.id === id); text('!', r.x + s.x * sx + 10, r.y + s.y * sy + 4, 18, '#ffd34a', 'center'); }
     for (const p of game.parties) {
       if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
       ctx.fillStyle = partyColour(p); ctx.fillRect(r.x + p.x * sx - 2, r.y + p.y * sy - 2, 4, 4);
@@ -654,6 +666,7 @@ export const mapScene = {
         ctx.fillStyle = siteColour(s);
         ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
       }
+      for (const id of storyPlaces()) { const s = SETTLEMENTS.find(x => x.id === id); ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 2; ctx.strokeRect(mm.x + s.x * sx - 5, mm.y + s.y * sy - 5, 10, 10); }
       for (const p of game.parties) {
         if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
         ctx.fillStyle = partyColour(p);

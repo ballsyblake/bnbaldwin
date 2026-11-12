@@ -5,6 +5,7 @@
 import { clamp, randInt, rand, pick } from './core.js';
 import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
 import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
+import { newStory } from './story.js';
 import { applyOwners, townGarrison, siegeTick, holdingsRent, garrisonWages, heldSites, peopleOf, originalFaction } from './sieges.js';
 
 const SAVE_KEY = 'gunther-save-v2';
@@ -98,6 +99,8 @@ function ensureFields() {
   if (!game.children) game.children = [];
   if (!game.dynasty) game.dynasty = [];
   if (game.battleDeath === undefined) game.battleDeath = true;
+  // The story. A save that is already well under way is offered it straight away.
+  if (!game.story) game.story = newStory();
   applyLords();
   // Town ownership and sieges. Older saves kept the vassal's village on the contract.
   for (const s of SETTLEMENTS) if (s.kind === 'town' && !game.sites[s.id].garrison) game.sites[s.id].garrison = townGarrison(game.sites[s.id].owner || originalFaction(s));
@@ -231,7 +234,9 @@ export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
 
 export function hostile(a, b) {
   if (a === b) return false;
-  if (a === 'horde' || b === 'horde') return true;
+  if (a === 'horde' || b === 'horde' || a === 'outlaws' || b === 'outlaws') return true;
+  // The Ashen Compact works in secret: only Gunther crosses swords with it.
+  if (a === 'compact' || b === 'compact') return a === 'player' || b === 'player';
   if (a === 'player' || b === 'player') {
     const other = a === 'player' ? b : a;
     if ((game.relations[other] || 0) <= -20) return true;
@@ -361,7 +366,7 @@ export function dailyTick() {
   if (dynastyTick() === 'hero' && !game.pendingDeath) game.pendingDeath = 'died of old age';
   // Quests that ran out of time.
   for (const q of game.quests) {
-    if (!q.done && game.day > q.deadline) { q.failed = true; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }
+    if (!q.done && game.day > q.deadline) { q.failed = true; for (const p of game.parties) if (p.id === q.party) p.quest = false; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }
   }
   game.quests = game.quests.filter(q => !q.failed);
   msgs.forEach(m => note(m[0], m[1]));

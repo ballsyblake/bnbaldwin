@@ -1,0 +1,148 @@
+{
+  "title": "The Wall Tithe",
+  "about": "Gunther's own story. Every village on Aldmoor pays the Wall Tithe to keep the orcs at bay. Gunther learns where the silver really goes.",
+  "startDay": 2,
+  "prologue": {
+    "title": "The Wall Tithe",
+    "text": [
+      "Every spring the tithe-wardens come to the villages of Aldmoor. A tenth of the grain, a tenth of the silver, and one son or daughter in ten for the levy. The Wall Tithe, they call it: the price of keeping the orcs in the north.",
+      "Three springs ago, on tithe day in Ashby, a quarry girl called Wren climbed onto the well and sang the Freeholder's Lament. It is an old song, and it has been banned for longer than anyone can remember. The wardens hanged her from the mill beam before sundown.",
+      "You were there. She found your face in the crowd, and her last words were for you: \"The tithe never reaches the wall, Gunther. Ask where it goes.\"",
+      "You left Ashby that night with a bow and nothing else. Now you have a warband, and men who follow you. Perhaps it is time to ask."
+    ],
+    "accept": "Ask where the tithe goes",
+    "decline": "Not now, I am just a sellsword"
+  },
+  "chapters": [
+    {
+      "id": "ledger",
+      "title": "Where the tithe goes",
+      "goal": "Ask about the Wall Tithe in Fairmeet. The free city keeps no tithe-wardens, so people talk there.",
+      "step": { "type": "visit", "place": "fairmeet", "button": "Ask about the Wall Tithe" },
+      "scene": [
+        "Most of the tavern goes quiet when you ask. One man does not: a thin clerk with a patch over one eye, who waves you to his corner and pays for your ale.",
+        "\"Hob Carrow. I kept the tithe ledgers for the March, until I added them up.\" He taps the patch. \"That is what adding up cost me. Your friend was right, captain. I have counted every cart. The silver goes north on the Gutrot road with no guard at all, and no orc ever touches it.\"",
+        "\"There are a few of us who know. Clerks, carters, quarry folk. We call ourselves the Unbound. But a ledger is only ink. Bring me something nobody can argue with.\"",
+        "\"The next cart left three days ago. Orcs meet it on the road below Gutrot Camp. Take what they are carrying.\""
+      ],
+      "reward": { "renown": 2 }
+    },
+    {
+      "id": "runners",
+      "title": "The tithe-runners",
+      "goal": "Find the orc tithe-runners near Gutrot Camp and take the chest they carry. They are marked with ! on the map.",
+      "step": { "type": "defeat", "near": "camp-mid", "spread": 260, "party": { "name": "Tithe-runners", "faction": "horde", "troops": { "grunt": 6, "brute": 1 }, "desc": "Orcs hauling an iron-bound chest south. They are not raiding anyone." } },
+      "scene": [
+        "The chest is heavy with silver, stamped with the treasury marks of the Vale and the Ember March. Under the coins is a letter in a careful hand, sealed in grey wax with the print of a burnt oak leaf.",
+        "\"To the Warlord, for the season. Raid where they grumble, spare where they pay. Burn Ashby again if it sings.\"",
+        "The orcs are not the enemy of the tithe. They are its servants. Someone pays Gorrak to frighten the villages, so the villages keep paying for protection. Someone who seals their letters with a burnt leaf.",
+        "There are four hundred silver marks in the chest."
+      ],
+      "choices": [
+        { "label": "Send the silver to Hob for the Unbound", "flag": "gave", "text": "Hob's carters take the chest by night. \"Every mark goes back to a village it came from,\" he promises. Word of it spreads fast.", "reward": { "renown": 10, "relations": { "march": 3, "vale": 3 } } },
+        { "label": "Keep it. Your men need paying", "flag": "kept", "text": "Your men cheer when you share it out. Hob says nothing, but he writes something in his ledger.", "reward": { "gold": 400 } }
+      ]
+    },
+    {
+      "id": "name",
+      "title": "A borrowed name",
+      "goal": "Hob says the burnt leaf belongs to the Ashen Compact, a circle of highborn houses that meets in secret. To get inside it, you need a highborn name. Find Mother Quill, the forger in Brightwater. You will need to be known (renown 30) and to pay her 250 gold.",
+      "step": { "type": "visit", "place": "brightwater", "button": "Visit Mother Quill the forger", "needs": { "renown": 30, "gold": 250 } },
+      "scene": [
+        "Mother Quill works by one candle in a room full of old charters. She looks you over the way a horse trader looks at teeth.",
+        "\"House Varn,\" she decides. \"Marsh lords, very old and very poor. The last of them drowned at sea twenty years back, and nobody went to the funeral. You will be Varn's lost nephew, raised abroad. That accounts for the manners.\"",
+        "The writ she hands you is better than real. Hob reads it twice. \"Good. Now, the Compact only takes new blood one way: the Proving at the Highcrag. Each year the young heirs bring their retinues to the hills and fight until one is left standing. The winner gets a seat at the table. They have one rule, and it is not much of a rule: try not to kill each other.\""
+      ],
+      "reward": { "spend": 250 }
+    },
+    {
+      "id": "proving",
+      "title": "The Proving",
+      "goal": "Win the Proving at the Highcrag, in the hills west of Stonefold. Leofric Crane, son of the Compact's chancellor, is the favourite. His retinue is marked with ! on the map.",
+      "step": { "type": "defeat", "near": "stonefold", "dx": -280, "dy": 120, "spread": 120, "party": { "name": "Leofric Crane's retinue", "faction": "compact", "troops": { "knight": 2, "spearman": 6, "ranger": 2, "recruit": 4 }, "desc": "Highborn heirs and their sworn men, here for the Proving. Leofric Crane rides at the front in silvered mail." } },
+      "scene": [
+        "Leofric's men break and run. The heir himself fights on alone, until your blade knocks his sword into the heather. He sits down hard in the mud, and for a moment he looks very young.",
+        "Another heir comes whooping down the slope, covered in someone else's blood: Wick Ashe, a wiry youngest son from House Ashe whom nobody had taken seriously. He fought on your side for the whole of the last day, uninvited. \"Well, Varn,\" he says, grinning, \"you've won the Proving. Now what about him?\"",
+        "Leofric looks up at you. He does not beg."
+      ],
+      "choices": [
+        { "label": "Spare him", "flag": "spared", "text": "You give Leofric his sword back, hilt first. The watching heirs murmur. \"Mercy from a marsh lord,\" one says, not kindly. Leofric says nothing, but he does not take his eyes off your face.", "reward": { "renown": 15 } },
+        { "label": "End him, as the old rules allow", "flag": "slew", "text": "It is quick. The heirs fall silent. By nightfall the story has run all the way to Redcliff, and the chancellor has had to hear from a stranger that his only son is dead.", "reward": { "renown": 25 } }
+      ],
+      "reward": { "troops": { "knight": 2 }, "say": "Wick Ashe and his sworn sword join your warband." }
+    },
+    {
+      "id": "table",
+      "title": "Among wolves",
+      "goal": "As victor of the Proving, you are summoned before the Ashen Compact. Go to Redcliff.",
+      "step": { "type": "visit", "place": "redcliff", "button": "Answer the Compact's summons" },
+      "scene": [
+        { "unless": "slew", "text": "Chancellor Aurek Crane is a soft-voiced man with ink on his fingers. \"You beat my son and gave him back his life,\" he says. \"I have not decided whether that was kindness or an insult. Sit.\"" },
+        { "if": "slew", "text": "Chancellor Aurek Crane is a soft-voiced man with ink on his fingers, and his eyes are red at the rims. \"The Proving is the Proving,\" he says. \"Leofric knew the rules. Sit.\" He does not look at you again for the rest of the night." },
+        "Around the table sit eleven highborn of the Vale and the March, the men and women who truly rule both crowns. The queen and Lord Brannoc know nothing of it. They speak of the tithe the way farmers speak of rain.",
+        "\"Fear is the cheapest wall there is,\" the chancellor explains. \"Gorrak takes a fifth of the silver and burns a few barns, and the villages pay us for the privilege of not being burned. Without him, they would start asking what they need lords for.\"",
+        "He slides a grey-wax seal across the table to you. \"This season, House Varn will carry the tithe north. Swear it.\""
+      ],
+      "choices": [
+        { "label": "Swear, and mean it for now", "flag": "sworn", "text": "You swear. The seal is cold in your palm. On the road north the tithe silver passes through your hands, and the Compact pays you a carrier's cut.", "reward": { "gold": 300 } },
+        { "label": "Swear, and copy the tithe rolls tonight", "flag": "copied", "text": "You swear. That night, while the Compact sleeps off its wine, you copy the names of every house on the tithe rolls by candlelight. Hob will want them.", "reward": { "renown": 5 } }
+      ]
+    },
+    {
+      "id": "rouse",
+      "title": "Rouse the bondfolk",
+      "goal": "Hob wants the villages to know the truth before the Compact can silence it. Read Gorrak's letter aloud in the squares of three villages. Each one will send you men.",
+      "step": { "type": "visits", "count": 3, "places": ["ashby", "millford", "oakhollow", "stonefold", "silverbrook", "irondeep"], "button": "Read Gorrak's letter in the square", "each": "The square fills. You read the letter, and you show them the grey seal. An old woman starts to sing the Freeholder's Lament, and the whole village takes it up. Their best young people come to join you.", "eachReward": { "recruits": 3, "renown": 3 } },
+      "scene": [
+        "Three villages have now heard the truth, and word runs ahead of you down every road. Tithe-wardens are pelted with mud in Millford. In Ashby someone has cut down the mill beam where Wren died.",
+        "Hob sends a message by a carter's boy: \"Well done. Now be careful. They will know it was you.\""
+      ]
+    },
+    {
+      "id": "unmasked",
+      "title": "Unmasked",
+      "goal": "The Compact knows who you are. Its swords are coming for you. Survive them.",
+      "step": [
+        { "if": "spared", "type": "defeat", "at": "player", "spread": 220, "party": { "name": "Leofric Crane's riders", "faction": "compact", "troops": { "knight": 3, "spearman": 6, "ranger": 3, "bowman": 4 }, "desc": "Leofric Crane, whose life you spared at the Highcrag, leads them. He looks sick about it." } },
+        { "type": "defeat", "at": "player", "spread": 220, "party": { "name": "The Chancellor's huntsmen", "faction": "compact", "troops": { "knight": 3, "spearman": 6, "ranger": 3, "bowman": 4 }, "desc": "Aurek Crane's household guard, sworn to avenge his son." } }
+      ],
+      "scene": [
+        "Mother Quill sold you. A forger who sells papers will sell anything, and the Compact paid well for the name of the man behind House Varn.",
+        { "if": "spared", "text": "When it is over, Leofric is on his knees in the mud for the second time. \"They told me you were a quarry rat,\" he says. \"I said that a quarry rat would not have spared me. I was wrong about what quarry rats are, wasn't I?\" You let him go again. This time he rides south, away from Redcliff." },
+        { "unless": "spared", "text": "Among the dead is a huntsman with a satchel full of letters. One is addressed to the chancellor." },
+        "The worst news comes on the last page. Hob Carrow was taken in Fairmeet two nights ago. He hid his ledger before they came for him, under the board where he always sat in the tavern. Everything is in it: the names, the sums and the seals of the whole Compact, written in red ink. The Red Ledger.",
+        "Fairmeet's Guildmoot is the one place where envoys of every realm sit together. If the ledger is read aloud there, no lord on Aldmoor can pretend not to have heard it."
+      ],
+      "reward": { "renown": 15 }
+    },
+    {
+      "id": "moot",
+      "title": "The Red Ledger",
+      "goal": "Recover Hob's ledger in Fairmeet and read it before the Guildmoot.",
+      "step": { "type": "visit", "place": "fairmeet", "button": "Read the Red Ledger to the Guildmoot", "needs": { "renown": 60 } },
+      "scene": [
+        "The ledger is where Hob said it would be. You read it standing, page by page, while the envoys of four crowns and the free city listen. You read the sums, the seals, the villages, and the dates of every burning that was paid for in advance.",
+        { "if": "copied", "text": "Then you lay your copy of the tithe rolls beside it, and the two match name for name. Nobody in the hall can call it a forgery." },
+        { "if": "gave", "text": "A carter stands up at the back of the hall. \"The silver from Gutrot came back to my village,\" he says. \"Every mark of it. He could have kept it.\"" },
+        "The Vale's envoy is first on her feet, white with fury. By evening riders are carrying the ledger to Brightwater, Redcliff, Elthir and Dunmar.",
+        "Aurek Crane does not wait to be arrested. He has gathered the Compact's households and every sellsword money can buy, and he is marching out of Redcliff. If he breaks you, he can still burn the ledger and the people who heard it.",
+        "Hob Carrow's body was found in the river below Fairmeet. Hob never told them where the ledger was."
+      ],
+      "reward": { "relations": { "free": 10 } }
+    },
+    {
+      "id": "host",
+      "title": "The Ashen Host",
+      "goal": "Defeat Chancellor Aurek Crane and the Ashen Host near Redcliff. It is the strongest army on the island. Gather your men first.",
+      "step": { "type": "defeat", "near": "redcliff", "dx": -260, "dy": 120, "spread": 140, "party": { "name": "The Ashen Host", "faction": "compact", "troops": { "knight": 6, "spearman": 12, "ranger": 4, "bowman": 4, "brute": 4 }, "desc": "The households of the Ashen Compact and their hired orcs, under the burnt-leaf banner. Chancellor Aurek Crane rides in the middle of them." } },
+      "scene": [
+        "The burnt-leaf banner goes down in the mud. Aurek Crane is pulled from under his horse alive and is handed over to the Guildmoot to answer for what he did.",
+        "The crowns of Aldmoor abolish the Wall Tithe within the month. The tithe-wardens' houses stand empty, and in every village square the Freeholder's Lament is sung openly for the first time in a hundred years.",
+        "Gorrak's silver has stopped. Up in Skullrock the Warlord is still there, and still dangerous. Now, though, the island knows exactly what he is for.",
+        "In Ashby they put up a stone by the old mill. It has Wren's name on it, and under that a line of the song. Your name is not on it, and you prefer it that way."
+      ],
+      "reward": { "renown": 100, "gold": 1000, "relations": { "vale": 15, "march": 15, "elves": 10, "dwarves": 10, "free": 10 }, "chronicle": "Gunther broke the Ashen Compact. The Wall Tithe is no more." }
+    }
+  ],
+  "ending": "The story of the Wall Tithe is over. The island is yours to roam: take towns, raise a family, or march on Skullrock."
+}
