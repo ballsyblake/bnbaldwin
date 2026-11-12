@@ -1,11 +1,9 @@
-// Loads the picture files, and makes extra sprites in code:
-//  - soldiers (spearmen, swordsmen, recruits) painted pixel by pixel, in any team colour
-//  - recoloured copies of the archer and orc sheets (team cloaks, brown-cloaked orc skirmishers)
-// Painting sprites in code means they are original art and can be recoloured for free.
+// Loads the picture files (scenery only) and paints every character in code, pixel by pixel,
+// in any team colour. Painting them in code means they are original art and recolour for free.
 
 import { ctx, drawFrame, shadow } from './core.js';
 
-const ASSET_NAMES = ['gunther', 'orc-yellow', 'orc-red', 'trees', 'rocks', 'keep', 'houses', 'orc-tent'];
+const ASSET_NAMES = ['trees', 'rocks', 'keep', 'houses', 'orc-tent'];
 export const img = {};
 
 export function loadAssets() {
@@ -18,126 +16,143 @@ export function loadAssets() {
   })));
 }
 
-// ---------------------------------------------------------------- recolouring
+// ---------------------------------------------------------------- colour helpers
 function hex(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
 function shade(rgb, f) { return rgb.map(v => Math.max(0, Math.min(255, Math.round(v * f)))); }
 
-// Copies an image, swapping exact colours. `swaps` is a list of [fromRGB, toRGB].
-function recolour(image, swaps) {
-  const c = document.createElement('canvas');
-  c.width = image.width; c.height = image.height;
-  const g = c.getContext('2d');
-  g.drawImage(image, 0, 0);
-  const d = g.getImageData(0, 0, c.width, c.height);
-  for (let i = 0; i < d.data.length; i += 4) {
-    if (!d.data[i + 3]) continue;
-    for (const [from, to] of swaps) {
-      if (d.data[i] === from[0] && d.data[i + 1] === from[1] && d.data[i + 2] === from[2]) {
-        d.data[i] = to[0]; d.data[i + 1] = to[1]; d.data[i + 2] = to[2];
-        break;
-      }
-    }
-  }
-  g.putImageData(d, 0, 0);
-  return c;
-}
-
-// ---------------------------------------------------------------- painted soldiers
-// Each soldier sheet is one row of 32x32 frames: idle, walk A, walk B, wind-up, strike, dead.
-const SKIN = hex('#e0a878'), SKIN_D = hex('#b47a52'), HAIR = hex('#5a3a22');
-const METAL = hex('#b8c2cc'), METAL_D = hex('#6c7684'), WOOD = hex('#8a5a30');
-const LEGS = hex('#4a4a58'), BOOTS = hex('#3a2a20'), OUTLINE = hex('#22180f'), BELT = hex('#3b2a1c');
-
-// Body shapes for each people. oy pushes the upper body down (dwarves are short), wide makes the
-// torso broader, and each has its own skin and hair.
-const RACE_BODY = {
-  human: { oy: 0, wide: 0, skin: SKIN, skinD: SKIN_D, hair: HAIR },
-  elf: { oy: -1, wide: -1, skin: hex('#f2d2b4'), skinD: hex('#d4ab8a'), hair: hex('#e6d08a'), ears: true, longHair: true },
-  dwarf: { oy: 4, wide: 1, skin: hex('#e2a274'), skinD: hex('#b97a50'), hair: hex('#9a4a24'), beard: true }
+// ---------------------------------------------------------------- painted characters
+// Every character is painted here, pixel by pixel, in the chunky style of the art mockups:
+// a big square head, flat colours, a dark outline, and the team colour on a shield or cloak
+// on the back side plus the skirt, so both armies read at a glance.
+// Each sheet is one row of 32x32 frames: idle, walk A, walk B, wind-up, strike, dead.
+const C = h => hex(h);
+const OUTLINE = C('#0d0b09'), EYE = C('#1d1a16');
+const WOOD = C('#8a5a30'), WOOD_D = C('#5e3b1e'), METAL = C('#c3c9d1'), METAL_D = C('#7e8794'), STRING = C('#e8e0cc');
+const BOW = C('#7a3040'), BOOT = C('#2e221a'), BELT = C('#2a1d12'), BONE = C('#e8e0cc');
+const MATERIAL = {
+  mail: [C('#a7aeb8'), C('#7c8490')], plate: [C('#c3c9d1'), C('#8d96a2')], leather: [C('#6e4a2c'), C('#523520')],
+  cloth: [C('#a39074'), C('#7c6a52')], elf: [C('#5f7f5a'), C('#46613f')], hide: [C('#7a5634'), C('#5a3e24')], red: [C('#8e3a2a'), C('#68281c')]
+};
+const LEGS = { human: C('#45414e'), elf: C('#4a5a44'), dwarf: C('#4d3a2a'), orc: C('#3e3328') };
+// Body shapes: head position and size, torso, how far the upper body sits down (dwarves are short).
+const BODY = {
+  human: { hx: 12, hw: 9, tx: 11, tw: 11, oy: 0, skin: C('#e5b183'), skinD: C('#c48d62'), hair: C('#6a3e22') },
+  elf: { hx: 12, hw: 8, tx: 12, tw: 9, oy: -1, skin: C('#f2d3b3'), skinD: C('#d6b08c'), hair: C('#e8cf7e'), ears: true, longHair: true },
+  dwarf: { hx: 11, hw: 10, tx: 10, tw: 13, oy: 3, skin: C('#e2a274'), skinD: C('#bd7d52'), hair: C('#b0552a'), beard: true },
+  orc: { hx: 11, hw: 10, tx: 10, tw: 12, oy: 0, skin: C('#7da044'), skinD: C('#5b7a2e'), hair: C('#1f1a14'), tusks: true },
+  brute: { hx: 11, hw: 10, tx: 9, tw: 14, oy: 0, skin: C('#6e9440'), skinD: C('#4f6e2a'), hair: C('#1f1a14'), tusks: true }
 };
 
-function paintSoldier(look, team, pose) {
-  const T = hex(team), TD = shade(T, 0.68), TL = shade(T, 1.22);
-  const body = RACE_BODY[look.race || 'human'];
+function paintCharacter(look, team, pose) {
+  const R = BODY[look.body || 'human'];
+  const T = team ? hex(team) : C('#8e3a2a'), TD = shade(T, 0.68), TL = shade(T, 1.18);
+  const [M, MD] = MATERIAL[look.mat || 'cloth'];
   const px = new Array(32 * 32).fill(null);
-  let oy = 0;   // vertical shift for everything above the legs
+  let oy = 0;
   const rect = (x, y, w, h, c) => {
     y += oy;
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && j >= 0 && i < 32 && j < 32) px[j * 32 + i] = c;
   };
-  const line = (x0, y0, x1, y1, c) => {
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-    for (let k = 0; k <= n; k++) rect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 1, 1, c);
+  const line = (x0, y0, x1, y1, c, w) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1;
+    for (let k = 0; k <= n; k++) rect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), w || 1, 1, c);
   };
-  // Legs, with a stride for the walking frames. Dwarves have short ones.
-  const stride = pose === 'walkA' ? 2 : pose === 'walkB' ? -2 : 0;
-  if (body.oy >= 3) {
-    rect(11, 25, 4, 3, LEGS); rect(17, 25, 4, 3, LEGS);
-    rect(10 - stride, 28, 5, 2, BOOTS); rect(17 + stride, 28, 5, 2, BOOTS);
-  } else {
-    rect(12, 21, 3, 4, LEGS); rect(17, 21, 3, 4, LEGS);
-    rect(12 - stride, 25, 3, 3, LEGS); rect(17 + stride, 25, 3, 3, LEGS);
-    rect(11 - stride, 28, 4, 2, BOOTS); rect(17 + stride, 28, 4, 2, BOOTS);
+  const step = pose === 'walkA' ? 1 : pose === 'walkB' ? -1 : 0;
+  const short = R.oy >= 3;
+  // Legs and boots: one foot lifts on each walking frame.
+  const legTop = short ? 23 : 21, cx = R.tx + Math.floor(R.tw / 2);
+  const leg = (x, up) => { rect(x, legTop, 3, 27 - legTop - up, LEGS[look.legs || (look.body === 'brute' ? 'orc' : look.body) || 'human'] || LEGS.human); rect(x - 1, 27 - up, 4, 2, BOOT); };
+  leg(cx - 4, step === 1 ? 1 : 0); leg(cx + 1, step === -1 ? 1 : 0);
+  oy = R.oy + (step ? 1 : 0);   // the body bobs while walking
+  const tx = R.tx, tw = R.tw, hx = R.hx, hw = R.hw;
+  // Back side: a cloak or a shield in team colours, drawn first so the body overlaps it.
+  if (look.cloak) { rect(tx - 2, 12, 3, look.cloak === 'long' ? 13 : 9, TD); rect(tx - 1, 12, 2, look.cloak === 'long' ? 12 : 8, T); }
+  if (look.shield === 'round') { rect(tx - 3, 13, 6, 7, T); rect(tx - 4, 14, 8, 5, T); rect(tx - 3, 14, 1, 5, TD); rect(tx - 1, 15, 2, 3, METAL); }
+  if (look.shield === 'heater') { rect(tx - 3, 12, 6, 7, T); rect(tx - 2, 19, 4, 2, T); rect(tx - 1, 21, 2, 1, T); rect(tx - 3, 12, 1, 7, TD); rect(tx - 3, 12, 6, 1, TL); }
+  if (look.shield === 'tower') { rect(tx - 4, 11, 7, 12, METAL_D); rect(tx - 3, 12, 5, 10, T); rect(tx - 2, 14, 3, 5, TL); }
+  // Torso: armour or clothes, a shaded back edge, a belt and a skirt in team colours.
+  const tb = short ? 23 : 21;
+  rect(tx, 12, tw, tb - 12, M); rect(tx, 12, 2, tb - 12, MD);
+  rect(tx, 17, tw, 1, BELT);
+  rect(tx, 18, tw, tb - 18, look.skirt === false ? M : T); rect(tx, 18, 2, tb - 18, look.skirt === false ? MD : TD);
+  if (look.mat === 'mail') for (let y = 13; y < 17; y += 2) for (let x = tx + 3; x < tx + tw; x += 3) rect(x, y, 1, 1, MD);
+  if (look.mat === 'plate') { rect(tx + 3, 13, tw - 5, 1, C('#e4e9ee')); }
+  if (look.tabard) { rect(tx + Math.floor(tw / 2) - 1, 12, 3, 5, T); }
+  if (look.body === 'brute') { rect(tx, 12, tw, 2, MATERIAL.red[0]); rect(tx + tw - 4, 11, 4, 3, METAL_D); }
+  // Head: big and square, eyes looking forward.
+  rect(hx, 3, hw, 9, R.skin); rect(hx, 10, hw, 2, R.skinD);
+  rect(hx + hw - 5, 7, 1, 2, EYE); rect(hx + hw - 2, 7, 1, 2, EYE);
+  if (R.tusks) { rect(hx + hw - 6, 10, 1, 2, BONE); rect(hx + hw - 2, 10, 1, 2, BONE); rect(hx + hw - 6, 6, 6, 1, R.skinD); }
+  if (R.ears) { rect(hx - 1, 6, 1, 2, R.skin); rect(hx - 2, 5, 1, 2, R.skin); }
+  const h = look.helm;
+  if (!h || h === 'circlet' || h === 'band') {
+    rect(hx, 2, hw, 3, R.hair); rect(hx, 5, 2, 3, R.hair);
+    if (R.longHair) rect(hx, 5, 2, 9, R.hair);
+    if (R.tusks) { rect(hx + 3, 0, 3, 3, R.hair); }
   }
-  oy = body.oy;
-  const w0 = 11 - body.wide, ww = 10 + body.wide * 2;
-  // Shield on the far arm, drawn first so the body overlaps it.
-  if (look.shield === 'round') { rect(7, 13, 6, 8, WOOD); rect(7, 13, 6, 1, METAL_D); rect(7, 20, 6, 1, METAL_D); rect(6, 14, 1, 6, METAL_D); rect(9, 15, 2, 4, T); rect(9, 16, 2, 2, METAL); }
-  if (look.shield === 'kite') { rect(6, 11, 7, 9, METAL); rect(7, 20, 5, 2, METAL); rect(8, 22, 3, 1, METAL); rect(9, 11, 1, 11, T); rect(6, 14, 7, 2, T); rect(6, 11, 1, 9, METAL_D); }
-  if (look.shield === 'tower') { rect(5, 10, 8, 13, METAL_D); rect(6, 11, 6, 11, T); rect(8, 13, 2, 7, METAL); }
-  // Tunic in team colours, with a belt. Elves wear a long cloak behind.
-  if (look.cloak) { rect(w0 - 1, 11, 3, 13, TD); }
-  rect(w0, 12, ww, 10 - (body.oy >= 3 ? 1 : 0), T); rect(w0, 12, 2, 10, TD); rect(w0, 22 - (body.oy >= 3 ? 1 : 0), ww, 1, TD);
-  rect(w0, 18, ww, 1, BELT);
-  if (look.helm === 'full') { rect(13, 12, 6, 1, METAL); }
-  // Far arm.
-  rect(w0 - 1, 13, 2, 6, TD);
-  // Head.
-  rect(13, 5, 6, 6, body.skin); rect(13, 9, 6, 2, body.skinD); rect(17, 7, 1, 1, OUTLINE);
-  if (body.ears) { rect(12, 5, 1, 2, body.skin); rect(11, 4, 1, 2, body.skin); }
-  if (!look.helm || look.helm === 'circlet' || look.helm === 'hood') {
-    rect(12, 3, 7, 3, body.hair); rect(12, 6, 1, 3, body.hair);
-    if (body.longHair) rect(12, 6, 2, 7, body.hair);
-  }
-  if (look.helm === 'circlet') rect(12, 4, 7, 1, hex('#f0cf7a'));
-  if (look.helm === 'hood') { rect(12, 2, 7, 3, T); rect(11, 4, 2, 7, T); rect(12, 2, 2, 2, TD); }
-  if (look.helm === 'cap') { rect(12, 2, 8, 4, METAL); rect(11, 5, 10, 1, METAL_D); rect(13, 2, 2, 2, hex('#e4ecf4')); }
-  if (look.helm === 'full') { rect(12, 2, 8, 9, METAL); rect(16, 6, 4, 1, OUTLINE); rect(12, 2, 2, 9, METAL_D); rect(15, 1, 2, 2, T); }
-  if (body.beard) { rect(13, 9, 7, 4, body.hair); rect(14, 13, 5, 2, body.hair); rect(16, 8, 3, 1, body.hair); }
+  if (h === 'circlet') { rect(hx, 4, hw, 1, C('#f2c14e')); }
+  if (h === 'band') { rect(hx, 4, hw, 1, T); }
+  if (h === 'hood') { rect(hx - 1, 1, hw + 2, 4, look.hoodC === 'team' ? T : M); rect(hx - 1, 5, 3, 7, look.hoodC === 'team' ? T : M); rect(hx - 1, 1, 2, 3, look.hoodC === 'team' ? TD : MD); }
+  if (h === 'cap') { rect(hx - 1, 1, hw + 2, 4, METAL); rect(hx - 1, 5, hw + 2, 1, METAL_D); rect(hx + 1, 1, 3, 1, C('#e4e9ee')); }
+  if (h === 'full') { rect(hx - 1, 1, hw + 2, 11, METAL); rect(hx - 1, 1, 2, 11, METAL_D); rect(hx + hw - 6, 7, 6, 1, OUTLINE); rect(hx + 3, 0, 3, 1, T); }
+  if (h === 'horned') { rect(hx - 1, 1, hw + 2, 4, METAL_D); rect(hx - 3, 0, 2, 3, BONE); rect(hx + hw + 1, 0, 2, 3, BONE); rect(hx - 4, -1, 1, 2, BONE); rect(hx + hw + 3, -1, 1, 2, BONE); }
+  if (R.beard) { rect(hx + 1, 9, hw - 1, 4, R.hair); rect(hx + 2, 13, hw - 3, 3, R.hair); rect(hx + hw - 5, 8, 4, 1, R.hair); }
   // Near arm and weapon.
+  const ax = tx + tw;           // the arm hangs just past the torso
   const w = look.weapon;
-  if (w === 'bow' || w === 'crossbow') {
-    // Ranged weapons: held out in front, drawn back on the wind-up frame.
-    const drawn = pose === 'windup';
-    rect(19, 13, 4, 2, T); rect(23, 13, 2, 2, body.skin);
+  if (w === 'bow' || w === 'crossbow' || w === 'javelin' && pose !== 'windup' && pose !== 'strike') {
+    rect(ax, 13, 2, 4, MD); rect(ax + 1, 16, 2, 2, R.skin);
     if (w === 'bow') {
-      line(24, 6, 26, 10, WOOD); line(26, 10, 26, 18, WOOD); line(26, 18, 24, 22, WOOD);
-      const sx = drawn ? 19 : 24;
-      line(24, 6, sx, 14, hex('#e8e4d8')); line(sx, 14, 24, 22, hex('#e8e4d8'));
-      if (drawn) { rect(19, 14, 9, 1, WOOD); rect(28, 13, 2, 3, METAL); }
-    } else {
-      rect(16, 14, 12, 2, WOOD); rect(26, 10, 2, 9, METAL_D); rect(28, 14, 2, 1, METAL);
-      if (drawn) rect(20, 13, 6, 1, hex('#e8e4d8'));
-    }
+      const drawn = pose === 'windup';
+      line(ax + 3, 6, ax + 5, 10, BOW); line(ax + 5, 10, ax + 5, 20, BOW); line(ax + 5, 20, ax + 3, 24, BOW);
+      const sx = drawn ? ax - 1 : ax + 3;
+      line(ax + 3, 6, sx, 15, STRING); line(sx, 15, ax + 3, 24, STRING);
+      if (drawn) { rect(ax - 1, 15, 10, 1, WOOD); rect(ax + 9, 14, 1, 3, METAL); }
+    } else if (w === 'crossbow') {
+      rect(ax - 2, 15, 12, 2, WOOD_D); rect(ax + 7, 11, 2, 10, METAL_D);
+      if (pose === 'windup') rect(ax + 1, 14, 7, 1, STRING);
+    } else { rect(ax + 2, 3, 1, 22, WOOD); rect(ax + 1, 1, 3, 3, METAL); }
   } else if (pose === 'windup') {
-    rect(18, 10, 3, 3, T); rect(20, 8, 2, 3, body.skin);
-    if (w === 'sword') { rect(20, 1, 2, 8, METAL); rect(19, 9, 4, 1, WOOD); }
-    else if (w === 'axe' || w === 'pick') { line(14, 2, 21, 12, WOOD); if (w === 'axe') rect(11, 0, 4, 5, METAL); else rect(10, 1, 7, 1, METAL); }
-    else { line(14, 2, 22, 22, WOOD); rect(13, 0, 2, 3, w === 'fork' ? WOOD : METAL); if (w === 'fork') { rect(12, 0, 1, 2, WOOD); rect(15, 0, 1, 2, WOOD); } }
+    // Weapon raised back over the shoulder.
+    rect(ax - 1, 9, 3, 4, MD); rect(ax, 7, 2, 2, R.skin);
+    if (w === 'sword') { rect(ax, 0, 2, 7, METAL); rect(ax - 1, 6, 4, 1, WOOD_D); }
+    else if (w === 'axe' || w === 'pick' || w === 'cleaver' || w === 'club' || w === 'greataxe') {
+      line(ax - 5, 1, ax + 1, 9, WOOD);
+      if (w === 'axe' || w === 'greataxe') rect(ax - 8, -1, 4, w === 'greataxe' ? 7 : 5, METAL);
+      else if (w === 'cleaver') rect(ax - 8, 0, 4, 4, METAL_D);
+      else if (w === 'club') rect(ax - 8, -1, 4, 5, WOOD_D);
+      else rect(ax - 9, 1, 8, 1, METAL);
+    } else if (w === 'javelin') { line(ax - 6, 0, ax + 4, 14, WOOD); rect(ax - 7, -1, 2, 2, METAL); }
+    else { line(ax - 4, 0, ax + 4, 22, WOOD); rect(ax - 5, -2, 2, 3, w === 'fork' ? WOOD : METAL); }
   } else if (pose === 'strike') {
-    rect(19, 13, 5, 3, T); rect(24, 13, 2, 3, body.skin);
-    if (w === 'sword') { rect(26, 13, 1, 3, WOOD); rect(27, 14, 5, 1, METAL); rect(27, 13, 4, 1, METAL); }
-    else if (w === 'axe' || w === 'pick') { rect(24, 14, 6, 1, WOOD); if (w === 'axe') rect(28, 11, 3, 6, METAL); else rect(29, 10, 1, 8, METAL); }
-    else { line(10, 15, 29, 14, WOOD); rect(29, 13, 3, 3, w === 'fork' ? WOOD : METAL); if (w === 'fork') { rect(29, 12, 3, 1, WOOD); rect(29, 16, 3, 1, WOOD); } }
+    // Weapon thrust or swung forward.
+    rect(ax, 13, 4, 3, MD); rect(ax + 4, 13, 2, 3, R.skin);
+    if (w === 'sword') { rect(ax + 6, 14, 1, 1, WOOD_D); rect(ax + 7, 13, 6, 2, METAL); }
+    else if (w === 'axe' || w === 'pick' || w === 'cleaver' || w === 'club' || w === 'greataxe') {
+      rect(ax + 5, 14, 7, 1, WOOD);
+      if (w === 'axe' || w === 'greataxe') rect(ax + 10, w === 'greataxe' ? 10 : 11, 3, w === 'greataxe' ? 9 : 7, METAL);
+      else if (w === 'cleaver') rect(ax + 10, 12, 4, 5, METAL_D);
+      else if (w === 'club') rect(ax + 9, 12, 5, 5, WOOD_D);
+      else rect(ax + 11, 10, 1, 9, METAL);
+    } else if (w === 'javelin') { rect(ax + 4, 14, 12, 1, WOOD); rect(ax + 16, 13, 2, 3, METAL); }
+    else { line(ax - 6, 15, ax + 12, 14, WOOD); rect(ax + 12, 13, 3, 3, w === 'fork' ? WOOD : METAL); }
   } else {
-    rect(19, 13, 2, 5, T); rect(19, 18, 2, 2, body.skin);
-    if (w === 'sword') { rect(21, 17, 1, 2, WOOD); rect(20, 19, 3, 1, WOOD); rect(21, 20, 1, 7, METAL); }
-    else if (w === 'axe') { rect(21, 8, 1, 14, WOOD); rect(22, 8, 3, 5, METAL); }
-    else if (w === 'pick') { rect(21, 8, 1, 14, WOOD); rect(18, 8, 7, 1, METAL); }
-    else { rect(21, 3, 1, 26, WOOD); rect(21, 0, 1, 4, w === 'fork' ? WOOD : METAL); if (w === 'fork') { rect(20, 0, 1, 2, WOOD); rect(22, 0, 1, 2, WOOD); } else { rect(20, 2, 3, 1, METAL); } }
+    // At rest: the weapon held upright.
+    rect(ax, 13, 2, 5, MD); rect(ax, 18, 2, 2, R.skin);
+    if (w === 'sword') { rect(ax + 2, 17, 1, 3, WOOD_D); rect(ax + 1, 19, 3, 1, WOOD_D); rect(ax + 2, 20, 1, 7, METAL); }
+    else if (w === 'axe' || w === 'pick' || w === 'cleaver' || w === 'club' || w === 'greataxe') {
+      rect(ax + 2, 9, 1, 14, WOOD);
+      if (w === 'axe' || w === 'greataxe') rect(ax + 3, 8, 3, w === 'greataxe' ? 8 : 5, METAL);
+      else if (w === 'cleaver') rect(ax + 3, 9, 3, 4, METAL_D);
+      else if (w === 'club') rect(ax + 1, 6, 3, 5, WOOD_D);
+      else rect(ax - 1, 9, 7, 1, METAL);
+    } else {
+      rect(ax + 2, 2, 1, 26, WOOD); rect(ax + 2, -1, 1, 4, w === 'fork' ? WOOD : METAL);
+      if (w === 'fork') { rect(ax + 1, -1, 1, 2, WOOD); rect(ax + 3, -1, 1, 2, WOOD); } else rect(ax + 1, 1, 3, 1, METAL);
+    }
   }
   oy = 0;
-  // Dark outline around everything, like the other sprites.
+  // Dark outline around the whole figure.
   const out = px.slice();
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     if (px[y * 32 + x]) continue;
@@ -147,13 +162,13 @@ function paintSoldier(look, team, pose) {
   return out;
 }
 
-function soldierSheet(look, team) {
+function characterSheet(look, team) {
   const c = document.createElement('canvas');
   c.width = 32 * 6; c.height = 32;
   const g = c.getContext('2d');
   const d = g.createImageData(c.width, c.height);
   ['idle', 'walkA', 'walkB', 'windup', 'strike'].forEach((pose, f) => {
-    const px = paintSoldier(look, team, pose);
+    const px = paintCharacter(look, team, pose);
     for (let i = 0; i < 32 * 32; i++) {
       if (!px[i]) continue;
       const x = f * 32 + (i % 32), y = Math.floor(i / 32), k = (y * c.width + x) * 4;
@@ -167,64 +182,60 @@ function soldierSheet(look, team) {
 }
 
 // ---------------------------------------------------------------- sprite cache
-// Every unit asks for its sprite through spriteFor(kind, team) and gets a ready-made sheet.
+// What each kind of character wears and carries.
+const LOOKS = {
+  gunther: { mat: 'leather', helm: null, weapon: 'bow', cloak: 'long', skirt: false, hair: 'red' },
+  recruit: { mat: 'cloth', helm: null, weapon: 'fork' },
+  spear: { mat: 'mail', helm: 'cap', shield: 'round', weapon: 'spear' },
+  sword: { mat: 'plate', helm: 'full', shield: 'heater', weapon: 'sword', tabard: true },
+  archer: { mat: 'leather', helm: 'band', weapon: 'bow', cloak: 'short' },
+  elfscout: { body: 'elf', mat: 'elf', helm: 'hood', hoodC: 'team', weapon: 'bow', cloak: 'long' },
+  elfarcher: { body: 'elf', mat: 'elf', helm: null, weapon: 'bow', cloak: 'long' },
+  sentinel: { body: 'elf', mat: 'mail', helm: 'circlet', weapon: 'bow', cloak: 'long' },
+  elfblade: { body: 'elf', mat: 'elf', helm: 'circlet', weapon: 'sword', cloak: 'long' },
+  dwarfminer: { body: 'dwarf', mat: 'leather', helm: null, weapon: 'pick' },
+  dwarfaxe: { body: 'dwarf', mat: 'mail', helm: 'cap', shield: 'round', weapon: 'axe' },
+  ironguard: { body: 'dwarf', mat: 'plate', helm: 'full', shield: 'tower', weapon: 'axe' },
+  dwarfxbow: { body: 'dwarf', mat: 'leather', helm: 'cap', weapon: 'crossbow', cloak: 'short' },
+  grunt: { body: 'orc', mat: 'hide', helm: null, weapon: 'cleaver', legs: 'orc' },
+  brute: { body: 'brute', mat: 'hide', helm: null, shield: 'round', weapon: 'club', legs: 'orc' },
+  shaman: { body: 'orc', mat: 'hide', helm: 'hood', weapon: 'javelin', legs: 'orc', cloak: 'short' },
+  warlord: { body: 'brute', mat: 'plate', helm: 'horned', weapon: 'greataxe', cloak: 'long', legs: 'orc' }
+};
+// Map sprite names from the troop list to the looks above. Orcs keep their own dark red colours.
+const SPRITE_KIND = { gunther: 'gunther', archer: 'archer', grunt: 'grunt', brute: 'brute', shaman: 'shaman', warlord: 'warlord' };
+const ORC_RED = '#8e3a2a';
 const cache = {};
-const RANGER_CLOAK = [[90, 70, 29], [59, 45, 10], [110, 86, 41], [74, 56, 18]];
-const ORC_CLOAK = [[130, 119, 23], [158, 157, 36]];
 
 export function spriteFor(kind, team) {
   const key = kind + team;
   if (cache[key]) return cache[key];
-  let sheet;
-  if (kind === 'archer') {
-    // The archer sheet with the cloak in team colours, so Gunther (who keeps the original
-    // brown cloak) still stands out.
-    const T = hex(team);
-    sheet = recolour(img.gunther, [[RANGER_CLOAK[0], shade(T, 0.72)], [RANGER_CLOAK[1], shade(T, 0.45)], [RANGER_CLOAK[2], shade(T, 0.9)], [RANGER_CLOAK[3], shade(T, 0.58)]]);
-  } else if (kind === 'shaman') {
-    sheet = recolour(img['orc-yellow'], [[ORC_CLOAK[0], [92, 70, 50]], [ORC_CLOAK[1], [120, 94, 64]]]);
-  } else {
-    const looks = {
-      recruit: { helm: null, shield: null, weapon: 'fork' },
-      spear: { helm: 'cap', shield: 'round', weapon: 'spear' },
-      sword: { helm: 'full', shield: 'kite', weapon: 'sword' },
-      elfscout: { race: 'elf', helm: 'hood', weapon: 'bow', cloak: true },
-      elfarcher: { race: 'elf', helm: null, weapon: 'bow', cloak: true },
-      sentinel: { race: 'elf', helm: 'circlet', weapon: 'bow', cloak: true },
-      elfblade: { race: 'elf', helm: 'circlet', weapon: 'sword', cloak: true },
-      dwarfminer: { race: 'dwarf', helm: null, weapon: 'pick' },
-      dwarfaxe: { race: 'dwarf', helm: 'cap', shield: 'round', weapon: 'axe' },
-      ironguard: { race: 'dwarf', helm: 'full', shield: 'tower', weapon: 'axe' },
-      dwarfxbow: { race: 'dwarf', helm: 'cap', weapon: 'crossbow' }
-    };
-    sheet = soldierSheet(looks[kind], team);
-  }
-  cache[key] = sheet;
-  return sheet;
+  const look = LOOKS[kind] || LOOKS.recruit;
+  let t = team;
+  if (look.body === 'orc' || look.body === 'brute') t = ORC_RED;
+  if (kind === 'gunther') t = '#f2c14e';
+  const sheet = characterSheet(look, t);
+  return (cache[key] = sheet);
 }
 
-// Draws any unit sprite. anim is idle / walk / attack / cast / dead; t is time in that anim.
-// Sheets come in two layouts: the 10-column archer/orc sheets and the 6-frame painted soldiers.
+// Gunther's hair is auburn; the painter reads it from here.
+BODY.gunther = Object.assign({}, BODY.human, { hair: C('#9a3a1e') });
+LOOKS.gunther.body = 'gunther';
+LEGS.gunther = C('#4a3a2c');
+
+function sheetFor(sprite, kind, team) {
+  if (sprite === 'soldier') return spriteFor(kind, team);
+  return spriteFor(SPRITE_KIND[sprite] || sprite, team);
+}
+
+// Draws any unit sprite. anim is idle / walk / attack / dead; t is time in that anim.
 export function drawUnit(sprite, kind, team, x, y, scale, anim, t, flip) {
-  let sheet, col = 0, row = 0;
-  if (sprite === 'soldier') {
-    sheet = spriteFor(kind, team);
-    if (anim === 'walk') col = 1 + Math.floor(t * 6) % 2;
-    else if (anim === 'attack') col = t < 0.18 ? 3 : 4;
-    else if (anim === 'dead') col = 5;
-    drawFrame(sheet, 32, 32, col, 0, x, y - 14 * scale, scale, flip);
-    return;
-  }
-  if (sprite === 'gunther') sheet = img.gunther;
-  else if (sprite === 'archer') sheet = spriteFor('archer', team);
-  else if (sprite === 'shaman') sheet = spriteFor('shaman', '');
-  else sheet = img[sprite];
-  col = Math.floor(t * 8) % 10;
-  if (anim === 'walk') { row = 2; col = Math.floor(t * 12) % 10; }
-  else if (anim === 'attack') { row = 3; col = sprite === 'gunther' || sprite === 'archer' ? 3 + Math.min(Math.floor(t * 24), 5) : 5 + Math.min(Math.floor(t * 14), 4); }
-  else if (anim === 'cast') { row = 1; col = 3 + Math.min(Math.floor(t * 12), 6); }
-  else if (anim === 'dead') { row = 4; col = Math.min(Math.floor(t * 10), 9); }
-  drawFrame(sheet, 32, 32, col, row, x, y - 13 * scale, scale, flip);
+  const sheet = sheetFor(sprite, kind, team);
+  let col = 0;
+  if (anim === 'walk') col = 1 + Math.floor(t * 6) % 2;
+  else if (anim === 'attack' || anim === 'cast') col = t < 0.18 ? 3 : 4;
+  else if (anim === 'dead') col = 5;
+  drawFrame(sheet, 32, 32, col, 0, x, y - 14 * scale, scale, flip);
 }
 
 // A little covered wagon for merchant caravans on the world map.
@@ -264,13 +275,6 @@ export function portrait(sprite, kind, team) {
   const key = sprite + '|' + kind + '|' + team;
   if (portraits[key]) return portraits[key];
   const c = document.createElement('canvas'); c.width = 32; c.height = 32;
-  const g = c.getContext('2d');
-  let sheet;
-  if (sprite === 'soldier') sheet = spriteFor(kind, team);
-  else if (sprite === 'gunther') sheet = img.gunther;
-  else if (sprite === 'archer') sheet = spriteFor('archer', team);
-  else if (sprite === 'shaman') sheet = spriteFor('shaman', '');
-  else sheet = img[sprite];
-  if (sheet) g.drawImage(sheet, 0, 0, 32, 32, 0, 0, 32, 32);
+  c.getContext('2d').drawImage(sheetFor(sprite, kind, team), 0, 0, 32, 32, 0, 0, 32, 32);
   return (portraits[key] = c.toDataURL());
 }

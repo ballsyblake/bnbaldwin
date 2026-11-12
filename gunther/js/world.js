@@ -579,7 +579,7 @@ export const mapScene = {
     shadow(x, y + 4, 16, hostileToMe ? 'rgba(220, 60, 50, 0.45)' : 'rgba(20, 40, 20, 0.3)');
     const anim = p.moving ? 'walk' : 'idle';
     if (p.kind === 'caravan') drawWagon(x, y, f.colour, p.flip);
-    else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'orc-red' : 'orc-yellow', '', '', x, y, 2, anim, p.time, p.flip);
+    else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'brute' : 'grunt', '', '', x, y, 2, anim, p.time, p.flip);
     else drawUnit('soldier', p.lord || p.troops.knight ? 'sword' : 'spear', f.colour, x, y, 2, anim, p.time, p.flip);
     if (p.lord) text(lord(p.lord).name, x, y + 22, 13, '#fff', 'center');
     drawBanner(x + 10, y - 66, f.colour);
