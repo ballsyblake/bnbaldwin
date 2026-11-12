@@ -4,7 +4,7 @@
 
 import { showPanel, hidePanel, panelOpen, onKeyPress, overlay, setScene, rand, randInt, pick, dist, esc, clamp } from './core.js';
 import { portrait } from './sprites.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RACES } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RACES, MODS, deviceMods, saveDeviceMods } from './data.js';
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
@@ -71,12 +71,51 @@ export function openTitle() {
     (saved ? '<button data-act="continue" class="primary">Continue <span class="hk">Day ' + game.day + '</span></button>' : '') +
     '<button data-act="new"' + (saved ? '' : ' class="primary"') + '>New campaign</button>' +
     '<button data-act="help">How to play</button>' +
-    '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.5 prototype</span></div>',
+    '<button data-act="mods">Mods</button>' +
+    '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.5 prototype</span>' +
+      (MODS.some(m => m.on && !m.error) ? '<span>' + MODS.filter(m => m.on && !m.error).length + ' mod(s) on</span>' : '') + '</div>',
     {
       continue: () => { loadSave(); populate(); setScene(mapScene); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
-      help: () => openHelp(openTitle)
+      help: () => openHelp(openTitle),
+      mods: () => openMods()
     }, 'title');
+}
+
+// Mods: JSON files that change the game's data (troops, places, lords...). Players can load one
+// from their device; it is kept in this browser and applied the next time the page loads.
+function openMods(msg) {
+  const rows = MODS.map(m => {
+    const state = m.error ? '<span class="bad">Not applied: ' + esc(m.error) + '</span>' : m.on ? '<span class="good">On</span>' : 'Off';
+    const btns = m.source === 'device' ? '<button class="mini" data-act="toggle" data-arg="' + esc(m.name) + '">' + (m.on ? 'Turn off' : 'Turn on') + '</button> <button class="mini secondary" data-act="remove" data-arg="' + esc(m.name) + '">Remove</button>' : '<span class="small">from the site</span>';
+    return '<tr><td>' + esc(m.title || m.name) + (m.about ? '<br><span class="small">' + esc(m.about) + '</span>' : '') + '</td><td>' + state + '</td><td>' + btns + '</td></tr>';
+  }).join('');
+  const reload = '<button data-act="reload">Reload to apply</button>';
+  showPanel('<h2>Mods</h2>' + (msg ? '<p class="msg">' + msg + '</p>' + reload : '') +
+    '<p>A mod is a JSON file that changes the game\'s data: troop stats, new troops, places, lords, names, prices, how long a year is. <a href="data/README.md" target="_blank" rel="noopener">How to make one</a>.</p>' +
+    (rows ? '<table>' + rows + '</table>' : '<p>No mods loaded.</p>') +
+    '<p class="small">Mods are applied when the page loads. Start a new campaign after changing them: an old save may not match.</p>' +
+    '<label class="filebtn"><input type="file" accept=".json,application/json" hidden><span>Load a mod from your device</span></label>' +
+    '<button data-act="back" class="secondary">Back</button>', {
+    toggle: name => { const l = deviceMods(); const m = l.find(x => x.name === name); if (m) m.on = m.on === false; saveDeviceMods(l); openMods(esc(name) + (m && m.on ? ' will be turned on.' : ' will be turned off.')); },
+    remove: name => { saveDeviceMods(deviceMods().filter(x => x.name !== name)); openMods(esc(name) + ' will be removed.'); },
+    reload: () => location.reload(),
+    back: () => openTitle()
+  }, true);
+  const input = overlay.querySelector('input[type=file]');
+  input.addEventListener('change', () => {
+    const f = input.files[0];
+    if (!f) return;
+    f.text().then(t => {
+      let d;
+      try { d = JSON.parse(t); } catch (e) { return openMods('<span class="bad">' + esc(f.name) + ' is not valid JSON: ' + esc(e.message) + '</span>'); }
+      if (!d || typeof d !== 'object' || Array.isArray(d)) return openMods('<span class="bad">A mod must be one JSON object.</span>');
+      const l = deviceMods().filter(x => x.name !== f.name);
+      l.push({ name: f.name, data: d, on: true });
+      if (!saveDeviceMods(l)) return openMods('<span class="bad">This browser would not store the mod (private mode?).</span>');
+      openMods(esc(f.name) + ' loaded.');
+    });
+  });
 }
 
 function openHelp(back) {
@@ -229,7 +268,7 @@ function hire(s, n) {
 // Sellswords in the tavern: a band of trained troops for hire, refreshed each week.
 function mercs(s) {
   const st = game.sites[s.id], week = Math.floor(game.day / 7);
-  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(['spearman', 'bowman', 'spearman', 'knight', 'ranger', 'elfarcher', 'elfblade', 'dwarfaxe', 'dwarfxbow']), n: randInt(2, 5) }; }
+  if (st.mercWeek !== week) { st.mercWeek = week; st.mercs = { type: pick(Object.keys(TROOPS).filter(t => !TROOPS[t].orc && TROOPS[t].power >= 2 && TROOPS[t].power < 5)), n: randInt(2, 5) }; }
   return st.mercs;
 }
 
@@ -291,7 +330,7 @@ function offerQuest(s) {
   let q;
   if (Math.random() < 0.55 && !game.hordeBroken) {
     const camps = SETTLEMENTS.filter(c => c.kind === 'camp' && !game.sites[c.id].burned);
-    const camp = camps.length ? pick(camps) : site('skullrock');
+    const camp = camps.length ? pick(camps) : SETTLEMENTS.find(c => c.kind === 'stronghold');
     const chief = pick(ORC_CHIEFS);
     q = { kind: 'hunt', giver: s.id, chief, near: v.id, camp: camp.id, title: 'Hunt ' + chief + "'s raiders near " + v.name, reward: 90 + game.day * 6, deadline: game.day + 14 };
     showPanel('<h2>Work</h2><p>"An orc chief called ' + chief + ' has been raiding around ' + v.name + '. Bring me word that his band is broken and you will have ' + q.reward + ' gold."</p>' +
@@ -413,10 +452,10 @@ function openLordTalk(p) {
   if (orcs) lines.push('"My scouts saw ' + orcs.name + ' near ' + nearestPlace(orcs.x, orcs.y) + '."');
   const foes = enemiesOf(l.faction);
   if (foes.length) lines.push(l.traits.includes('cruel') ? '"This war will be won by burning their fields, not by talk."' : '"This war with ' + FACTIONS[foes[0]].short + ' bleeds us both while the orcs grow fat."');
-  if (st.opinion >= 20 && !game.contract) lines.push('"If you want honest work, the hall in ' + site(LORDSHOME[l.faction]).name + ' hires good swords."');
+  const hall = SETTLEMENTS.find(s => s.kind === 'town' && s.faction === l.faction);
+  if (st.opinion >= 20 && !game.contract && hall) lines.push('"If you want honest work, the hall in ' + hall.name + ' hires good swords."');
   showPanel('<h2>' + l.name + '</h2>' + lines.map(x => '<p>' + x + '</p>').join('') + '<button data-act="back">Back</button>', { back: () => openEncounter(p, false) });
 }
-const LORDSHOME = { vale: 'brightwater', march: 'redcliff', elves: 'elthir', dwarves: 'dunmar' };
 
 function openConfirmAttack(p) {
   const f = FACTIONS[p.faction];

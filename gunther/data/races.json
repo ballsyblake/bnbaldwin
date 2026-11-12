@@ -1,0 +1,32 @@
+{
+  "human": {
+    "name": "Human",
+    "recruit": "recruit",
+    "army": [["recruit", "recruit"], ["spearman", "bowman"], ["knight", "ranger"]],
+    "adult": 16,
+    "old": 55,
+    "titles": {"ruler": ["King", "Queen"], "lord": ["Sir", "Lady"]},
+    "names": {
+      "m": ["Edric", "Osric", "Alden", "Rowan", "Tobin", "Hal", "Bram", "Cedric", "Wystan", "Godric"],
+      "f": ["Ada", "Elowen", "Maud", "Isobel", "Wren", "Edith", "Rosalind", "Bryony", "Agnes", "Linnet"]
+    }
+  },
+  "elf": {
+    "name": "Elf",
+    "recruit": "elfscout",
+    "army": [["elfscout", "elfscout"], ["elfblade", "elfarcher"], ["elfblade", "sentinel"]],
+    "adult": 40,
+    "old": 240,
+    "titles": {"ruler": ["King", "Queen"], "lord": ["Lord", "Lady"]},
+    "names": {"m": ["Caelir", "Thalion", "Erevan", "Aerin", "Lorien", "Sylvar"], "f": ["Ilyth", "Naeva", "Siora", "Elara", "Liriel", "Aeris"]}
+  },
+  "dwarf": {
+    "name": "Dwarf",
+    "recruit": "dwarfminer",
+    "army": [["dwarfminer", "dwarfminer"], ["dwarfaxe", "dwarfxbow"], ["ironguard", "dwarfxbow"]],
+    "adult": 30,
+    "old": 130,
+    "titles": {"ruler": ["High Thane", "High Thane"], "lord": ["Thane", "Thane"]},
+    "names": {"m": ["Torvald", "Brok", "Durin", "Hakon", "Grim", "Ulfar"], "f": ["Helga", "Sigrun", "Brynja", "Dagny", "Thora", "Ragna"]}
+  }
+}

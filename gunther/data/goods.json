@@ -1,0 +1,10 @@
+{
+  "grain": {"name": "Grain", "base": 10, "food": true},
+  "fish": {"name": "Salt fish", "base": 16, "food": true},
+  "wool": {"name": "Wool", "base": 24},
+  "timber": {"name": "Elven timber", "base": 34},
+  "tools": {"name": "Dwarven tools", "base": 64},
+  "ale": {"name": "Ale", "base": 30},
+  "iron": {"name": "Iron", "base": 46},
+  "spice": {"name": "Spices", "base": 85}
+}

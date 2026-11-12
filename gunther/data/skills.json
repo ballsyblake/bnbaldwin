@@ -1,0 +1,8 @@
+{
+  "archery": {"name": "Archery", "how": "hitting enemies with your bow", "effect": "+4% bow damage and a faster, steadier draw per level"},
+  "blade": {"name": "Bladework", "how": "landing and blocking sword blows", "effect": "+5% sword damage, quicker swings and a wider parry window per level"},
+  "leadership": {"name": "Leadership", "how": "leading your men to victory", "effect": "+2 party size and steadier morale per level"},
+  "trade": {"name": "Trade", "how": "buying and selling goods", "effect": "2% better prices per level"},
+  "tactics": {"name": "Tactics", "how": "winning battles against strong enemies", "effect": "+6% strength in auto-resolved battles per level"},
+  "medicine": {"name": "Medicine", "how": "tending your wounded", "effect": "More of your fallen men survive, and they heal faster"}
+}

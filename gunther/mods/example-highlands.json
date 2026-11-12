@@ -1,0 +1,17 @@
+{
+  "name": "Highland clans (example)",
+  "description": "An example mod: tougher spearmen, a new highland troop for the March, a new village, and longer years.",
+  "rules": { "yearDays": 60 },
+  "troops": {
+    "spearman": { "hp": 40 },
+    "clansman": { "name": "Highland clansman", "guard": 0.45, "sprite": "soldier", "kind": "sword", "hp": 44, "dmg": 10, "cd": 0.85, "range": 32, "speed": 82, "power": 3.2, "wage": 3, "block": 0.3, "upgrades": [] }
+  },
+  "races": {
+    "human": { "army": [["recruit", "recruit"], ["clansman", "bowman"], ["knight", "ranger"]] }
+  },
+  "settlements": [
+    { "id": "glenmoor", "name": "Glenmoor", "kind": "village", "faction": "march", "bound": "redcliff", "x": 2560, "y": 1180, "makes": ["wool"], "wants": ["ale"] }
+  ],
+  "roads": { "add": [["glenmoor", "redcliff"]] },
+  "orcChiefs": { "add": ["Grashnak", "Uzbag"] }
+}

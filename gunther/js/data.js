@@ -1,150 +1,128 @@
-// The game's fixed facts: realms, troop types, trade goods and the places on the island.
-// Tweak numbers here to rebalance the game without touching any logic.
+// The game's fixed facts (realms, peoples, troops, goods, places, lords, skills) live in JSON files
+// in gunther/data/, so they can be changed without touching any code. See data/README.md.
+// This module loads them, applies any mods, checks the result, and exports it under the same
+// names the rest of the game has always used.
 
 export const WORLD_W = 3600;
 export const WORLD_H = 2400;
-export const DAY_SECONDS = 10;          // seconds of travel that make one in-game day
-export const YEAR_DAYS = 40;            // days in a year (four seasons of 10 days); everyone ages one year per year
 
-// ---------------------------------------------------------------- realms
-// 'player' is Gunther's own warband. 'free' is the neutral market town.
-export const FACTIONS = {
-  player: { name: "Gunther's warband", colour: '#f2c14e', short: 'You' },
-  vale: { name: 'Kingdom of the Vale', colour: '#4f86d9', short: 'the Vale', ruler: 'Queen Isolde' },
-  march: { name: 'The Ember March', colour: '#d0563c', short: 'the March', ruler: 'Lord Brannoc' },
-  free: { name: 'Free city of Fairmeet', colour: '#9aa3b2', short: 'Fairmeet' },
-  elves: { name: 'The Elthir Wood', colour: '#3aa58f', short: 'the Elthir Wood', ruler: 'Queen Ilyra', race: 'elf' },
-  dwarves: { name: 'The Dunmar Holds', colour: '#c08a3e', short: 'the Dunmar Holds', ruler: 'High Thane Borga', race: 'dwarf' },
-  horde: { name: 'The Gorrak Horde', colour: '#7c9a2e', short: 'the Horde' }
-};
-export const KINGDOMS = ['vale', 'march', 'elves', 'dwarves'];
+const FILES = ['rules', 'factions', 'races', 'troops', 'goods', 'places', 'lords', 'skills', 'names'];
+const MOD_STORE = 'gunther-mods';
 
-// ---------------------------------------------------------------- races
-// Four peoples share Aldmoor. None of them use magic: what sets them apart is how they live and fight.
-//  Humans: all-rounders.  Elves: fast, deadly archers, lightly armoured.
-//  Dwarves: slow, very tough, heavy shields and crossbows.  Orcs: raiders from over the sea.
-// recruit: what volunteers join as. army: what a lord of that people fields, from weakest to best
-// as [melee, ranged] pairs.
-// adult: age a child comes of age. old: age after which death by old age becomes likely.
-// titles: [for a man, for a woman] for a ruler and for a lord. names: first names for heirs and spouses.
-export const RACES = {
-  human: { name: 'Human', recruit: 'recruit', army: [['recruit', 'recruit'], ['spearman', 'bowman'], ['knight', 'ranger']],
-    adult: 16, old: 55, titles: { ruler: ['King', 'Queen'], lord: ['Sir', 'Lady'] },
-    names: { m: ['Edric', 'Osric', 'Alden', 'Rowan', 'Tobin', 'Hal', 'Bram', 'Cedric', 'Wystan', 'Godric'], f: ['Ada', 'Elowen', 'Maud', 'Isobel', 'Wren', 'Edith', 'Rosalind', 'Bryony', 'Agnes', 'Linnet'] } },
-  elf: { name: 'Elf', recruit: 'elfscout', army: [['elfscout', 'elfscout'], ['elfblade', 'elfarcher'], ['elfblade', 'sentinel']],
-    adult: 40, old: 240, titles: { ruler: ['King', 'Queen'], lord: ['Lord', 'Lady'] },
-    names: { m: ['Caelir', 'Thalion', 'Erevan', 'Aerin', 'Lorien', 'Sylvar'], f: ['Ilyth', 'Naeva', 'Siora', 'Elara', 'Liriel', 'Aeris'] } },
-  dwarf: { name: 'Dwarf', recruit: 'dwarfminer', army: [['dwarfminer', 'dwarfminer'], ['dwarfaxe', 'dwarfxbow'], ['ironguard', 'dwarfxbow']],
-    adult: 30, old: 130, titles: { ruler: ['High Thane', 'High Thane'], lord: ['Thane', 'Thane'] },
-    names: { m: ['Torvald', 'Brok', 'Durin', 'Hakon', 'Grim', 'Ulfar'], f: ['Helga', 'Sigrun', 'Brynja', 'Dagny', 'Thora', 'Ragna'] } }
-};
+async function getJson(url) {
+  const r = await fetch(url, { cache: 'no-cache' });
+  if (!r.ok) throw new Error('Could not load ' + url + ' (' + r.status + ')');
+  return r.json();
+}
+
+const base = {};
+await Promise.all(FILES.map(async f => { base[f] = await getJson(new URL('../data/' + f + '.json', import.meta.url)); }));
+
+// ---------------------------------------------------------------- mods
+// A mod is one JSON object whose keys are the data files above (plus "settlements" and "roads",
+// which live in places.json). Records are merged by key or id; see data/README.md for the rules.
+function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+function merge(into, from) {
+  for (const k in from) {
+    if (from[k] === null) delete into[k];
+    else if (isObj(from[k]) && isObj(into[k])) merge(into[k], from[k]);
+    else into[k] = JSON.parse(JSON.stringify(from[k]));
+  }
+  return into;
+}
+// Lists of records with an id: change, remove ("remove": true) or add entries.
+function mergeList(list, changes) {
+  for (const c of changes) {
+    const i = list.findIndex(x => x.id === c.id);
+    if (c.remove) { if (i >= 0) list.splice(i, 1); continue; }
+    if (i >= 0) merge(list[i], c); else list.push(JSON.parse(JSON.stringify(c)));
+  }
+}
+// Plain lists: replace them, or give { "add": [...] } to append.
+function mergePlain(list, change) { return Array.isArray(change) ? change.slice() : list.concat(change.add || []); }
+
+function applyMod(d, mod) {
+  for (const k of ['rules', 'factions', 'races', 'troops', 'goods', 'skills']) if (isObj(mod[k])) merge(d[k], mod[k]);
+  if (Array.isArray(mod.settlements)) mergeList(d.places.settlements, mod.settlements);
+  if (Array.isArray(mod.lords)) mergeList(d.lords, mod.lords);
+  if (mod.roads) d.places.roads = mergePlain(d.places.roads, mod.roads);
+  if (mod.orcChiefs) d.names.orcChiefs = mergePlain(d.names.orcChiefs, mod.orcChiefs);
+}
+
+// Everything must point at things that exist, or the game would break in odd ways later.
+function problems(d) {
+  const out = [], T = d.troops, F = d.factions, R = d.races, S = d.places.settlements;
+  for (const t in T) for (const u of T[t].upgrades || []) if (!T[u.to]) out.push('troop ' + t + ' upgrades to unknown troop ' + u.to);
+  for (const r in R) {
+    if (!T[R[r].recruit]) out.push('race ' + r + ' recruits unknown troop ' + R[r].recruit);
+    for (const pair of R[r].army || []) for (const t of pair) if (!T[t]) out.push('race ' + r + ' army uses unknown troop ' + t);
+    if (!R[r].names || !R[r].titles) out.push('race ' + r + ' needs names and titles');
+  }
+  for (const f in F) if (F[f].race && !R[F[f].race]) out.push('faction ' + f + ' has unknown race ' + F[f].race);
+  for (const s of S) {
+    if (!F[s.faction]) out.push('place ' + s.id + ' has unknown faction ' + s.faction);
+    if (s.bound && !S.some(t => t.id === s.bound)) out.push('village ' + s.id + ' is bound to unknown town ' + s.bound);
+    if (typeof s.x !== 'number' || typeof s.y !== 'number') out.push('place ' + s.id + ' needs x and y');
+  }
+  for (const [a, b] of d.places.roads) if (!S.some(s => s.id === a) || !S.some(s => s.id === b)) out.push('road ' + a + '-' + b + ' joins an unknown place');
+  for (const l of d.lords) {
+    if (!F[l.faction]) out.push('lord ' + l.id + ' has unknown faction ' + l.faction);
+    if (!S.some(s => s.id === l.home)) out.push('lord ' + l.id + ' has unknown home ' + l.home);
+  }
+  for (const need of ['player', 'free', 'horde']) if (!F[need]) out.push('the ' + need + ' faction cannot be removed');
+  for (const need of ['recruit', 'bowman', 'grunt', 'brute', 'shaman', 'warlord']) if (!T[need]) out.push('the ' + need + ' troop cannot be removed');
+  for (const need of ['grain', 'fish']) if (!d.goods[need]) out.push('the ' + need + ' goods cannot be removed');
+  if (!S.some(s => s.kind === 'stronghold')) out.push('there must be an orc stronghold');
+  return out;
+}
+
+// Mods come from two places: files listed in mods/mods.json (for whoever hosts the game), and
+// mods a player loaded from their own device (kept in this browser).
+export const MODS = [];          // { name, source, on, error, title, about }
+async function modList() {
+  const list = [];
+  try {
+    const index = await getJson(new URL('../mods/mods.json', import.meta.url));
+    for (const file of index.mods || []) {
+      try { list.push({ name: file, source: 'site', data: await getJson(new URL('../mods/' + file, import.meta.url)), on: true }); }
+      catch (e) { list.push({ name: file, source: 'site', on: false, error: e.message }); }
+    }
+  } catch (e) { /* no mods folder: fine */ }
+  for (const m of deviceMods()) list.push({ name: m.name, source: 'device', data: m.data, on: m.on !== false });
+  return list;
+}
+
+// Player mods, for the title screen's Mods menu. Changes take effect after a reload.
+export function deviceMods() { try { return JSON.parse(localStorage.getItem(MOD_STORE) || '[]'); } catch (e) { return []; } }
+export function saveDeviceMods(list) { try { localStorage.setItem(MOD_STORE, JSON.stringify(list)); return true; } catch (e) { return false; } }
+
+const data = JSON.parse(JSON.stringify(base));
+for (const m of await modList()) {
+  if (m.on && m.data && !m.error) {
+    // Try the mod on a copy first, so a broken one can't take the game down with it.
+    const trial = JSON.parse(JSON.stringify(data));
+    try {
+      if (!isObj(m.data)) throw new Error('a mod must be one JSON object');
+      applyMod(trial, m.data);
+      const bad = problems(trial);
+      if (bad.length) m.error = bad.slice(0, 3).join('; ');
+      else applyMod(data, m.data);
+    } catch (e) { m.error = e.message; }
+  }
+  MODS.push({ name: m.name, source: m.source, on: m.on, error: m.error || null, title: isObj(m.data) ? m.data.name : null, about: isObj(m.data) ? m.data.description : null });
+}
+
+// ---------------------------------------------------------------- the game's data
+export const DAY_SECONDS = data.rules.daySeconds;     // seconds of travel that make one in-game day
+export const YEAR_DAYS = data.rules.yearDays;         // days in a year; everyone ages one year per year
+export const FACTIONS = data.factions;
+export const KINGDOMS = Object.keys(FACTIONS).filter(k => FACTIONS[k].kingdom);
+export const RACES = data.races;
 export function raceOf(faction) { return (FACTIONS[faction] && FACTIONS[faction].race) || 'human'; }
-
-// ---------------------------------------------------------------- troops
-// hp: health. dmg: damage per hit. cd: seconds between attacks. range: reach in pixels.
-// power: rough fighting worth, used for auto-resolved battles and AI decisions.
-// wage: gold per week. upgrades: what this troop can be trained into, for xp and gold.
-export const TROOPS = {
-  recruit: { name: 'Recruit', guard: 0.08, sprite: 'soldier', kind: 'recruit', hp: 22, dmg: 5, cd: 1.0, range: 30, speed: 80, power: 1, wage: 1,
-    upgrades: [{ to: 'spearman', xp: 25, cost: 10 }, { to: 'bowman', xp: 25, cost: 12 }] },
-  spearman: { name: 'Spearman', guard: 0.35, sprite: 'soldier', kind: 'spear', hp: 36, dmg: 7, cd: 0.9, range: 36, speed: 76, power: 2.2, wage: 2, block: 0.4,
-    upgrades: [{ to: 'knight', xp: 70, cost: 35 }] },
-  knight: { name: 'Sworn Blade', guard: 0.6, sprite: 'soldier', kind: 'sword', hp: 58, dmg: 11, cd: 0.8, range: 32, speed: 74, power: 4.5, wage: 5, block: 0.65, upgrades: [] },
-  bowman: { name: 'Bowman', sprite: 'archer', kind: 'archer', hp: 24, dmg: 6, cd: 1.5, range: 320, speed: 80, power: 2, wage: 2, ranged: true,
-    upgrades: [{ to: 'ranger', xp: 70, cost: 35 }] },
-  ranger: { name: 'Ranger', sprite: 'archer', kind: 'archer', hp: 32, dmg: 9, cd: 1.15, range: 380, speed: 84, power: 4, wage: 4, ranged: true, upgrades: [] },
-  // Elves: quick on their feet, the best bows on the island, little armour.
-  elfscout: { name: 'Elf scout', race: 'elf', sprite: 'soldier', kind: 'elfscout', hp: 20, dmg: 5, cd: 1.3, range: 330, speed: 94, power: 1.6, wage: 2, ranged: true,
-    upgrades: [{ to: 'elfarcher', xp: 30, cost: 15 }, { to: 'elfblade', xp: 30, cost: 15 }] },
-  elfarcher: { name: 'Elf archer', race: 'elf', sprite: 'soldier', kind: 'elfarcher', hp: 28, dmg: 9, cd: 1.05, range: 400, speed: 94, power: 3.6, wage: 4, ranged: true,
-    upgrades: [{ to: 'sentinel', xp: 80, cost: 40 }] },
-  sentinel: { name: 'Elf sentinel', race: 'elf', sprite: 'soldier', kind: 'sentinel', hp: 34, dmg: 12, cd: 0.95, range: 440, speed: 96, power: 5.6, wage: 6, ranged: true, upgrades: [] },
-  elfblade: { name: 'Elf bladedancer', guard: 0.65, race: 'elf', sprite: 'soldier', kind: 'elfblade', hp: 34, dmg: 8, cd: 0.6, range: 30, speed: 100, power: 3.6, wage: 4, block: 0.2, upgrades: [] },
-  // Dwarves: slow and stubborn, hard to kill, with axes, heavy shields and crossbows.
-  dwarfminer: { name: 'Dwarf miner', guard: 0.15, race: 'dwarf', sprite: 'soldier', kind: 'dwarfminer', hp: 32, dmg: 6, cd: 1.0, range: 30, speed: 64, power: 1.7, wage: 2,
-    upgrades: [{ to: 'dwarfaxe', xp: 30, cost: 15 }, { to: 'dwarfxbow', xp: 30, cost: 15 }] },
-  dwarfaxe: { name: 'Dwarf axeman', guard: 0.4, race: 'dwarf', sprite: 'soldier', kind: 'dwarfaxe', hp: 50, dmg: 9, cd: 1.0, range: 30, speed: 62, power: 3.3, wage: 3, block: 0.45,
-    upgrades: [{ to: 'ironguard', xp: 80, cost: 40 }] },
-  ironguard: { name: 'Dwarf ironguard', guard: 0.7, race: 'dwarf', sprite: 'soldier', kind: 'ironguard', hp: 78, dmg: 12, cd: 1.0, range: 32, speed: 58, power: 5.8, wage: 6, block: 0.75, upgrades: [] },
-  dwarfxbow: { name: 'Dwarf crossbowman', race: 'dwarf', sprite: 'soldier', kind: 'dwarfxbow', hp: 36, dmg: 14, cd: 2.4, range: 360, speed: 62, power: 3.2, wage: 3, ranged: true, bolt: true, upgrades: [] },
-  // The Horde.
-  grunt: { name: 'Orc grunt', guard: 0.15, sprite: 'grunt', hp: 30, dmg: 6, cd: 1.0, range: 32, speed: 74, power: 1.6, orc: true },
-  brute: { name: 'Orc brute', guard: 0.3, sprite: 'brute', hp: 60, dmg: 11, cd: 1.1, range: 34, speed: 70, power: 3.6, orc: true },
-  shaman: { name: 'Orc skirmisher', sprite: 'shaman', hp: 24, dmg: 9, cd: 2.2, range: 280, speed: 72, power: 2.6, orc: true, ranged: true, javelin: true },
-  warlord: { name: 'Warlord Gorrak', guard: 0.55, sprite: 'warlord', hp: 360, dmg: 20, cd: 1.0, range: 44, speed: 66, power: 26, orc: true, scale: 3 }
-};
-
-// ---------------------------------------------------------------- trade goods
-// food: true means the party can eat it.
-export const GOODS = {
-  grain: { name: 'Grain', base: 10, food: true },
-  fish: { name: 'Salt fish', base: 16, food: true },
-  wool: { name: 'Wool', base: 24 },
-  timber: { name: 'Elven timber', base: 34 },
-  tools: { name: 'Dwarven tools', base: 64 },
-  ale: { name: 'Ale', base: 30 },
-  iron: { name: 'Iron', base: 46 },
-  spice: { name: 'Spices', base: 85 }
-};
-
-// ---------------------------------------------------------------- places
-// kind: town (market, tavern, smith, recruits, walls and a garrison), village (recruits, grain), camp (orc camp),
-// stronghold (the Horde's fortress). makes: cheap here. wants: pays well here.
-// bound: the town a village belongs to. Whoever takes the town takes its villages too.
-// faction is who holds a place at the start; towns can change hands in sieges.
-export const SETTLEMENTS = [
-  { id: 'brightwater', name: 'Brightwater', kind: 'town', faction: 'vale', x: 760, y: 1300, art: 0, makes: ['ale'], wants: ['wool', 'spice', 'iron'] },
-  { id: 'millford', name: 'Millford', kind: 'village', faction: 'vale', bound: 'brightwater', x: 560, y: 900, makes: ['grain', 'wool'], wants: ['ale'] },
-  { id: 'oakhollow', name: 'Oakhollow', kind: 'village', faction: 'vale', bound: 'brightwater', x: 1060, y: 1760, makes: ['grain', 'fish'], wants: ['iron'] },
-  { id: 'fairmeet', name: 'Fairmeet', kind: 'town', faction: 'free', x: 1780, y: 1460, art: 1, makes: ['spice'], wants: ['fish', 'ale', 'wool'] },
-  { id: 'redcliff', name: 'Redcliff', kind: 'town', faction: 'march', x: 2760, y: 1480, art: 2, makes: ['iron'], wants: ['grain', 'wool', 'spice'] },
-  { id: 'ashby', name: 'Ashby', kind: 'village', faction: 'march', bound: 'redcliff', x: 2340, y: 1900, makes: ['wool', 'ale'], wants: ['iron'] },
-  { id: 'stonefold', name: 'Stonefold', kind: 'village', faction: 'march', bound: 'redcliff', x: 3060, y: 1080, makes: ['iron', 'fish'], wants: ['grain', 'ale'] },
-  { id: 'elthir', name: 'Elthir', kind: 'town', faction: 'elves', race: 'elf', x: 560, y: 1990, art: 1, makes: ['timber'], wants: ['tools', 'spice', 'fish'] },
-  { id: 'silverbrook', name: 'Silverbrook', kind: 'village', faction: 'elves', race: 'elf', bound: 'elthir', x: 1230, y: 2060, makes: ['timber', 'wool'], wants: ['iron'] },
-  { id: 'dunmar', name: 'Dunmar', kind: 'town', faction: 'dwarves', race: 'dwarf', x: 2980, y: 760, art: 2, makes: ['tools', 'iron'], wants: ['grain', 'ale', 'timber'] },
-  { id: 'irondeep', name: 'Irondeep', kind: 'village', faction: 'dwarves', race: 'dwarf', bound: 'dunmar', x: 3220, y: 920, makes: ['iron'], wants: ['grain', 'ale'] },
-  { id: 'camp-west', name: 'Bonepit Camp', kind: 'camp', faction: 'horde', x: 1180, y: 640 },
-  { id: 'camp-mid', name: 'Gutrot Camp', kind: 'camp', faction: 'horde', x: 2080, y: 760 },
-  { id: 'camp-east', name: 'Fangmire Camp', kind: 'camp', faction: 'horde', x: 2640, y: 640 },
-  { id: 'skullrock', name: 'Skullrock', kind: 'stronghold', faction: 'horde', x: 1700, y: 420 }
-];
-
-export const ROADS = [
-  ['millford', 'brightwater'], ['brightwater', 'oakhollow'], ['brightwater', 'fairmeet'],
-  ['oakhollow', 'fairmeet'], ['fairmeet', 'redcliff'], ['fairmeet', 'ashby'], ['redcliff', 'ashby'], ['redcliff', 'stonefold'],
-  ['elthir', 'oakhollow'], ['silverbrook', 'oakhollow'], ['silverbrook', 'fairmeet'], ['dunmar', 'stonefold'], ['dunmar', 'irondeep']
-];
-
-// Names for roaming orc warbands.
-export const ORC_CHIEFS = ['Gruk', 'Morza', 'Uthak', 'Snagga', 'Bolg', 'Rakha', 'Dushnak', 'Ugra', 'Krimp', 'Zogg', 'Harrug', 'Nazgra'];
-
-// ---------------------------------------------------------------- lords
-// Each kingdom is run by a few named lords who lead its armies. Their traits decide what they do:
-//  bold: picks fights at worse odds.      cautious: only fights when well ahead.
-//  honourable: hunts orcs, respects mercy. cruel: burns enemy villages in wartime.
-//  greedy: preys on enemy caravans, likes gold.
-// sex and age matter for ageing and heirs: when a lord dies, a son or daughter of the house takes over.
-export const LORDS = [
-  { id: 'isolde', name: 'Queen Isolde', faction: 'vale', ruler: true, traits: ['honourable', 'cautious'], sex: 'f', age: 52, home: 'brightwater' },
-  { id: 'aldric', name: 'Sir Aldric Fenn', faction: 'vale', traits: ['bold', 'honourable'], sex: 'm', age: 34, house: 'Fenn', home: 'oakhollow' },
-  { id: 'maren', name: 'Lady Maren Holt', faction: 'vale', traits: ['greedy', 'cautious'], sex: 'f', age: 41, house: 'Holt', home: 'millford' },
-  { id: 'brannoc', name: 'Lord Brannoc', faction: 'march', ruler: true, traits: ['cruel', 'bold'], sex: 'm', age: 61, home: 'redcliff' },
-  { id: 'corwen', name: 'Sir Corwen Ashe', faction: 'march', traits: ['honourable', 'cautious'], sex: 'm', age: 47, house: 'Ashe', home: 'stonefold' },
-  { id: 'tamsin', name: 'Lady Tamsin Vey', faction: 'march', traits: ['greedy', 'bold'], sex: 'f', age: 29, house: 'Vey', home: 'ashby' },
-  { id: 'ilyra', name: 'Queen Ilyra', faction: 'elves', ruler: true, traits: ['honourable', 'cautious'], sex: 'f', age: 190, home: 'elthir' },
-  { id: 'faelan', name: 'Lord Faelan', faction: 'elves', traits: ['bold', 'cruel'], sex: 'm', age: 95, home: 'silverbrook' },
-  { id: 'borga', name: 'High Thane Borga', faction: 'dwarves', ruler: true, traits: ['greedy', 'bold'], sex: 'f', age: 126, home: 'dunmar' },
-  { id: 'halvar', name: 'Thane Halvar', faction: 'dwarves', traits: ['honourable', 'cautious'], sex: 'm', age: 66, home: 'irondeep' }
-];
-
-// ---------------------------------------------------------------- skills
-// Gunther's skills improve by doing the thing, not by spending points.
-export const SKILLS = {
-  archery: { name: 'Archery', how: 'hitting enemies with your bow', effect: '+4% bow damage and a faster, steadier draw per level' },
-  blade: { name: 'Bladework', how: 'landing and blocking sword blows', effect: '+5% sword damage, quicker swings and a wider parry window per level' },
-  leadership: { name: 'Leadership', how: 'leading your men to victory', effect: '+2 party size and steadier morale per level' },
-  trade: { name: 'Trade', how: 'buying and selling goods', effect: '2% better prices per level' },
-  tactics: { name: 'Tactics', how: 'winning battles against strong enemies', effect: '+6% strength in auto-resolved battles per level' },
-  medicine: { name: 'Medicine', how: 'tending your wounded', effect: 'More of your fallen men survive, and they heal faster' }
-};
+export const TROOPS = data.troops;
+export const GOODS = data.goods;
+export const SETTLEMENTS = data.places.settlements;
+export const ROADS = data.places.roads;
+export const ORC_CHIEFS = data.names.orcChiefs;
+export const LORDS = data.lords;
+export const SKILLS = data.skills;

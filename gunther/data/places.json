@@ -1,0 +1,34 @@
+{
+  "settlements": [
+    {"id": "brightwater", "name": "Brightwater", "kind": "town", "faction": "vale", "x": 760, "y": 1300, "art": 0, "makes": ["ale"], "wants": ["wool", "spice", "iron"]},
+    {"id": "millford", "name": "Millford", "kind": "village", "faction": "vale", "bound": "brightwater", "x": 560, "y": 900, "makes": ["grain", "wool"], "wants": ["ale"]},
+    {"id": "oakhollow", "name": "Oakhollow", "kind": "village", "faction": "vale", "bound": "brightwater", "x": 1060, "y": 1760, "makes": ["grain", "fish"], "wants": ["iron"]},
+    {"id": "fairmeet", "name": "Fairmeet", "kind": "town", "faction": "free", "x": 1780, "y": 1460, "art": 1, "makes": ["spice"], "wants": ["fish", "ale", "wool"]},
+    {"id": "redcliff", "name": "Redcliff", "kind": "town", "faction": "march", "x": 2760, "y": 1480, "art": 2, "makes": ["iron"], "wants": ["grain", "wool", "spice"]},
+    {"id": "ashby", "name": "Ashby", "kind": "village", "faction": "march", "bound": "redcliff", "x": 2340, "y": 1900, "makes": ["wool", "ale"], "wants": ["iron"]},
+    {"id": "stonefold", "name": "Stonefold", "kind": "village", "faction": "march", "bound": "redcliff", "x": 3060, "y": 1080, "makes": ["iron", "fish"], "wants": ["grain", "ale"]},
+    {"id": "elthir", "name": "Elthir", "kind": "town", "faction": "elves", "race": "elf", "x": 560, "y": 1990, "art": 1, "makes": ["timber"], "wants": ["tools", "spice", "fish"]},
+    {"id": "silverbrook", "name": "Silverbrook", "kind": "village", "faction": "elves", "race": "elf", "bound": "elthir", "x": 1230, "y": 2060, "makes": ["timber", "wool"], "wants": ["iron"]},
+    {"id": "dunmar", "name": "Dunmar", "kind": "town", "faction": "dwarves", "race": "dwarf", "x": 2980, "y": 760, "art": 2, "makes": ["tools", "iron"], "wants": ["grain", "ale", "timber"]},
+    {"id": "irondeep", "name": "Irondeep", "kind": "village", "faction": "dwarves", "race": "dwarf", "bound": "dunmar", "x": 3220, "y": 920, "makes": ["iron"], "wants": ["grain", "ale"]},
+    {"id": "camp-west", "name": "Bonepit Camp", "kind": "camp", "faction": "horde", "x": 1180, "y": 640},
+    {"id": "camp-mid", "name": "Gutrot Camp", "kind": "camp", "faction": "horde", "x": 2080, "y": 760},
+    {"id": "camp-east", "name": "Fangmire Camp", "kind": "camp", "faction": "horde", "x": 2640, "y": 640},
+    {"id": "skullrock", "name": "Skullrock", "kind": "stronghold", "faction": "horde", "x": 1700, "y": 420}
+  ],
+  "roads": [
+    ["millford", "brightwater"],
+    ["brightwater", "oakhollow"],
+    ["brightwater", "fairmeet"],
+    ["oakhollow", "fairmeet"],
+    ["fairmeet", "redcliff"],
+    ["fairmeet", "ashby"],
+    ["redcliff", "ashby"],
+    ["redcliff", "stonefold"],
+    ["elthir", "oakhollow"],
+    ["silverbrook", "oakhollow"],
+    ["silverbrook", "fairmeet"],
+    ["dunmar", "stonefold"],
+    ["dunmar", "irondeep"]
+  ]
+}
