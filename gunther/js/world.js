@@ -2,11 +2,11 @@
 // merchant caravans go about their own business, whether or not Gunther is watching. Time only passes while you are moving or
 // camping, so you can always stop and think.
 
-import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, hint, setHud, setScene, panelOpen, bar, onKeyPress, getScene } from './core.js';
+import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
 import { WORLD_W, WORLD_H, DAY_SECONDS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
-import { game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
+import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
 import { openSettlement, openEncounter, openParty, autoResolve } from './menus.js';
 
 const SIGHT = 360;
@@ -231,18 +231,101 @@ export const mapScene = {
   camping: false,
   time: 0,
   hover: null,
+  speed: 1,              // 0 paused, 1 normal, 3 fast
+  bigMap: false,
   enter() {
     this.target = null;
     this.camping = false;
+    this.bigMap = false;
+    if (!this.speed) this.speed = 1;
     this.grace = 0.6;     // a moment after leaving a town or battle before anyone can catch you
     this.hud();
     save();
   },
+  // Builds the map HUD once; refreshHud() then keeps the numbers current.
   hud() {
-    setHud('<button data-act="party">Party</button><button data-act="camp">' + (this.camping ? 'Break camp' : 'Camp') + '</button>', {
-      party: () => openParty(),
-      camp: () => { this.camping = !this.camping; this.target = null; this.hud(); }
-    });
+    const mm = this.minimap();
+    const u = n => 'calc(var(--u) * ' + n + ')';
+    const sp = (v, label, hk) => '<button data-act="speed" data-arg="' + v + '" class="' + (this.speed === v ? 'primary' : '') + '" title="' + hk + '">' + label + '</button>';
+    const act = (a, label, hk, cls) => '<button data-act="' + a + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<small>' + hk + '</small></button>';
+    setHud(
+      '<div class="box abs mstats" data-k="stats">' +
+        '<div class="top"><b class="px" data-k="day"></b><span data-k="season"></span></div>' +
+        '<div class="tiles">' +
+          '<div class="tile"><span class="lbl">Gold</span><b class="px gold" data-k="gold"></b></div>' +
+          '<div class="tile"><span class="lbl">Men</span><b class="px" data-k="men"></b></div>' +
+          '<div class="tile"><span class="lbl">Food</span><b class="px" data-k="food"></b></div>' +
+          '<div class="tile"><span class="lbl">Morale</span><b class="px" data-k="morale"></b></div>' +
+        '</div>' +
+        '<div class="bars2">' +
+          '<div><div class="meterhead"><span class="lbl">Health</span><span data-k="hpp"></span></div><div class="meter"><i data-k="hpbar"></i></div></div>' +
+          '<div><div class="meterhead"><span class="lbl" data-k="lvl"></span><span data-k="lvp"></span></div><div class="meter"><i data-k="lvbar" style="background:var(--gold)"></i></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="box abs legend" data-k="legend" style="left:' + u(mm.x - 3) + ';top:' + u(mm.y + mm.h + 6) + ';width:' + u(mm.w + 6) + '"></div>' +
+      '<div class="box abs place" data-k="place" style="display:none"></div>' +
+      '<div class="box abs speed">' + sp(0, 'II', 'Pause (Space)') + sp(1, '&gt;', 'Normal speed') + sp(3, '&gt;&gt;', 'Fast') + '</div>' +
+      '<div class="box abs actions">' + act('party', 'Party', 'P', 'primary') + act('quests', 'Quests', 'J') + act('map', 'Map', 'M', this.bigMap ? 'sel' : '') +
+        act('camp', this.camping ? 'Break camp' : 'Camp', 'C', this.camping ? 'sel' : '') + '</div>',
+      {
+        party: () => openParty(),
+        quests: () => openParty('', 'gunther'),
+        map: () => { this.bigMap = !this.bigMap; this.hud(); },
+        camp: () => this.toggleCamp(),
+        speed: v => { this.speed = +v; this.hud(); },
+        enter: () => this.enterNear()
+      });
+    this.hudTimer = 0;
+    this.refreshHud();
+  },
+  toggleCamp() { this.camping = !this.camping; this.target = null; this.hud(); },
+  // The settlement Gunther is standing beside, if any.
+  nearSite() {
+    if (this.target || this.moving) return null;
+    let best = null, bd = 110;
+    for (const s of SETTLEMENTS) { const d = dist(this.pos.x, this.pos.y, s.x, s.y + 30); if (d < bd) { bd = d; best = s; } }
+    return best;
+  },
+  enterNear() { const s = this.nearSite(); if (s) { this.target = { site: s }; if (!this.speed) this.speed = 1; } },
+  refreshHud() {
+    const food = foodStock(), days = Math.floor(food / foodPerDay());
+    uiSet('day', 'Day <span class="num">' + game.day + '</span>');
+    uiSet('season', seasonText());
+    uiSet('gold', game.gold.toLocaleString('en-AU'));
+    uiSet('men', troopCount() + ' <small>/ ' + partyLimit() + ' cap</small>');
+    uiSet('food', '<span class="' + (days < 2 ? 'dangerc' : '') + '">' + days + (days === 1 ? ' day' : ' days') + '</span>');
+    const mo = Math.round(game.morale);
+    uiSet('morale', '<span class="' + (mo >= 50 ? 'goodc' : mo >= 25 ? 'gold' : 'dangerc') + '">' + mo + '</span>');
+    const hp = game.health / game.maxHealth;
+    uiSet('hpp', Math.round(hp * 100) + '%');
+    uiBar('hpbar', hp, hp > 0.3 ? 'var(--good)' : 'var(--danger)');
+    const r = renownLevel();
+    uiSet('lvl', 'Renown &middot; Lv ' + r.lv);
+    uiSet('lvp', Math.round(r.frac * 100) + '%');
+    uiBar('lvbar', r.frac);
+    // Legend under the minimap.
+    const leg = [['var(--gold)', 'You'], ['var(--blue)', game.contract ? FACTIONS[game.contract.faction].short.replace(/^the /, '') + ' (your lord)' : 'Friendly'], ['var(--danger)', 'Hostile'], ['#9a917f', 'Neutral']];
+    uiSet('legend', leg.map(([c, l]) => '<span><i class="sw" style="background:' + c + '"></i>' + esc(l) + '</span>').join(''));
+    uiShow('legend', !view.portrait && !this.bigMap);
+    uiShow('stats', !this.bigMap);
+    // The card for the place Gunther stands beside.
+    const s = this.bigMap ? null : this.nearSite();
+    uiShow('place', !!s);
+    if (s) {
+      uiSet('place', placeCard(s));
+      const el = document.querySelector('[data-k="place"]');
+      if (el && !el.dataset.wired) {
+        el.dataset.wired = '1';
+        el.addEventListener('pointerdown', e => e.stopPropagation());
+        el.addEventListener('click', e => { if (e.target.closest('button')) this.enterNear(); });
+      }
+      const cam = this.camera();
+      const pos = view.portrait ? 'left:calc(var(--u) * 120);top:calc(var(--u) * ' + (view.H - 380) + ')'
+        : (() => { const mm = this.minimap(), x = clamp(s.x - cam.x + 70, 10, view.W - 200);
+            const minTop = x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
+            return 'left:calc(var(--u) * ' + x + ');top:calc(var(--u) * ' + clamp(s.y - cam.y - 100, minTop, view.H - 220) + ')'; })();
+      if (el && el.dataset.pos !== pos) { el.dataset.pos = pos; el.style.cssText = pos; }
+    }
   },
   camera() {
     return { x: clamp(this.pos.x - view.W / 2, 0, WORLD_W - view.W), y: clamp(this.pos.y - view.H / 2, 0, WORLD_H - view.H) };
@@ -264,7 +347,24 @@ export const mapScene = {
     this.time += dt;
     for (const m of log) m.age += dt;
     if (panelOpen()) return;
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) { this.hudTimer = 0.15; this.refreshHud(); }
     const P = this.pos;
+    // The full map: a click picks somewhere to travel and closes it.
+    if (this.bigMap) {
+      this.hover = null;
+      if (pointer.clicked) {
+        const r = this.bigMapRect();
+        if (pointer.x > r.x && pointer.x < r.x + r.w && pointer.y > r.y && pointer.y < r.y + r.h) {
+          this.target = nearestLand((pointer.x - r.x) / r.w * WORLD_W, (pointer.y - r.y) / r.h * WORLD_H);
+          if (!this.speed) this.speed = 1;
+          this.camping = false;
+        }
+        this.bigMap = false; this.hud();
+      }
+      pointer.clicked = false;
+      return;
+    }
     // Clicks: the minimap, a party, a settlement, or plain ground.
     this.hover = pointer.touch ? null : this.pickAt(pointer.x, pointer.y);
     if (pointer.clicked || (pointer.down && !pointer.touch && !this.target?.party && !this.target?.site)) {
@@ -278,8 +378,11 @@ export const mapScene = {
         this.target = hit || { x: pointer.x + cam.x, y: pointer.y + cam.y };
       } else this.target = { x: pointer.x + cam.x, y: pointer.y + cam.y };
       if (this.camping) { this.camping = false; this.hud(); }
+      if (!this.speed) { this.speed = 1; this.hud(); }
     }
     pointer.clicked = false;
+    if (!this.speed && !this.camping) { this.moving = false; return; }
+    dt *= this.camping ? 1 : this.speed;
 
     // Where Gunther is heading.
     let tx = null, ty = null;
@@ -426,6 +529,32 @@ export const mapScene = {
       text('Camping... time passes', W / 2, H / 2 - 80, 22, '#ffe08a', 'center');
     }
     this.drawHud();
+    if (this.bigMap) this.drawBigMap();
+  },
+  bigMapRect() {
+    const W = view.W, H = view.H, top = view.portrait ? 40 : 30, bottom = view.portrait ? 100 : 70;
+    const w = Math.min(W - 40, (H - top - bottom) * WORLD_W / WORLD_H), h = w * WORLD_H / WORLD_W;
+    return { x: (W - w) / 2, y: top + (H - top - bottom - h) / 2, w, h };
+  },
+  drawBigMap() {
+    const r = this.bigMapRect();
+    ctx.fillStyle = 'rgba(13, 11, 9, 0.7)'; ctx.fillRect(0, 0, view.W, view.H);
+    frame(r.x, r.y, r.w, r.h);
+    ctx.drawImage(terrainCanvas, r.x, r.y, r.w, r.h);
+    const sx = r.w / WORLD_W, sy = r.h / WORLD_H;
+    for (const s of SETTLEMENTS) {
+      const x = r.x + s.x * sx, y = r.y + s.y * sy, big = s.kind === 'town' || s.kind === 'stronghold';
+      ctx.fillStyle = '#0d0b09'; ctx.fillRect(x - (big ? 6 : 5), y - (big ? 6 : 5), big ? 12 : 10, big ? 12 : 10);
+      ctx.fillStyle = siteColour(s); ctx.fillRect(x - (big ? 4 : 3), y - (big ? 4 : 3), big ? 8 : 6, big ? 8 : 6);
+      text(s.name, x, y - 9, big ? 12 : 10, '#f4ead2', 'center');
+    }
+    for (const p of game.parties) {
+      if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
+      ctx.fillStyle = partyColour(p); ctx.fillRect(r.x + p.x * sx - 2, r.y + p.y * sy - 2, 4, 4);
+    }
+    ctx.fillStyle = '#0d0b09'; ctx.fillRect(r.x + this.pos.x * sx - 5, r.y + this.pos.y * sy - 5, 10, 10);
+    ctx.fillStyle = '#f2c14e'; ctx.fillRect(r.x + this.pos.x * sx - 3, r.y + this.pos.y * sy - 3, 6, 6);
+    text(pointer.touch ? 'Tap a spot to travel there. Tap outside to close.' : 'Click a spot to travel there. M or click outside to close.', view.W / 2, r.y + r.h + 22, 13, '#c9bb9c', 'center');
   },
   drawSite(s, x, y) {
     const st = game.sites[s.id];
@@ -450,7 +579,7 @@ export const mapScene = {
     shadow(x, y + 4, 16, hostileToMe ? 'rgba(220, 60, 50, 0.45)' : 'rgba(20, 40, 20, 0.3)');
     const anim = p.moving ? 'walk' : 'idle';
     if (p.kind === 'caravan') drawWagon(x, y, f.colour, p.flip);
-    else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'orc-red' : 'orc-yellow', '', '', x, y, 2, anim, p.time, p.flip);
+    else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'brute' : 'grunt', '', '', x, y, 2, anim, p.time, p.flip);
     else drawUnit('soldier', p.lord || p.troops.knight ? 'sword' : 'spear', f.colour, x, y, 2, anim, p.time, p.flip);
     if (p.lord) text(lord(p.lord).name, x, y + 22, 13, '#fff', 'center');
     drawBanner(x + 10, y - 66, f.colour);
@@ -470,49 +599,100 @@ export const mapScene = {
       lines = [s.name, kind + ' of ' + FACTIONS[s.faction].short];
     }
     const x = clamp(pointer.x + 16, 8, view.W - 230), y = clamp(pointer.y + 12, 8, view.H - 80);
-    ctx.fillStyle = 'rgba(20, 22, 28, 0.88)'; ctx.fillRect(x, y, 220, 14 + lines.length * 18);
-    lines.forEach((l, i) => text(l, x + 8, y + 20 + i * 18, 13, i ? '#c5cad6' : '#ffe08a'));
+    frame(x, y, 220, 14 + lines.length * 18);
+    lines.forEach((l, i) => plain(l, x + 10, y + 21 + i * 18, i ? 12 : 14, i ? '#c9bb9c' : '#f2c14e', i ? 500 : 700));
   },
   drawHud() {
-    const W = view.W;
-    // Top-left status.
-    const food = foodStock(), days = Math.floor(food / foodPerDay());
-    const parts = ['Day ' + game.day, 'Gold ' + game.gold, 'Men ' + troopCount() + '/' + partyLimit(), 'Food ' + days + 'd', 'Morale ' + Math.round(game.morale)];
-    if (view.portrait) { text(parts.slice(0, 3).join('   '), 12, 24, 15); text(parts.slice(3).join('   '), 12, 44, 15, days < 2 ? '#ff9a8a' : '#fff'); }
-    else text(parts.join('   '), 12, 24, 16, days < 2 ? '#ffcfa0' : '#fff');
-    bar(12, view.portrait ? 54 : 34, 120, 5, game.health / game.maxHealth, '#50f08b');
-    bar(12, view.portrait ? 62 : 42, 120, 4, game.dayTime / DAY_SECONDS, '#ffe08a');
-    // Minimap.
+    // Minimap (the stats and buttons are HTML, see hud()).
     const mm = this.minimap();
-    ctx.globalAlpha = 0.92;
-    ctx.fillStyle = '#20262e'; ctx.fillRect(mm.x - 3, mm.y - 3, mm.w + 6, mm.h + 6);
+    frame(mm.x, mm.y, mm.w, mm.h);
     ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
-    ctx.globalAlpha = 1;
     const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
     for (const s of SETTLEMENTS) {
-      ctx.fillStyle = FACTIONS[s.faction].colour;
-      if (game.sites[s.id].burned) ctx.fillStyle = '#555';
+      ctx.fillStyle = siteColour(s);
       ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
     }
     for (const p of game.parties) {
       if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
-      ctx.fillStyle = enemies(p, { faction: 'player' }) ? '#ff4a3a' : p.lord ? FACTIONS[p.faction].colour : '#f4f4f4';
+      ctx.fillStyle = partyColour(p);
       ctx.fillRect(mm.x + p.x * sx - 1, mm.y + p.y * sy - 1, 3, 3);
     }
     const cam = this.camera();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#f4ead2'; ctx.lineWidth = 1;
     ctx.strokeRect(mm.x + cam.x * sx, mm.y + cam.y * sy, view.W * sx, view.H * sy);
-    ctx.fillStyle = FACTIONS.player.colour; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
-    // Event feed.
+    ctx.fillStyle = '#f2c14e'; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
+    // Event feed, above the speed controls.
+    const base = view.H - (view.portrait ? 150 : 66);
     const feed = log.filter(m => m.age < 9);
     feed.forEach((m, i) => {
       ctx.globalAlpha = clamp((9 - m.age) / 1.5, 0, 1);
-      text(m.msg, 12, view.H - (view.portrait ? 92 : 44) - (feed.length - 1 - i) * 20, 14, m.colour);
+      text(m.msg, 12, base - (feed.length - 1 - i) * 20, 14, m.colour);
     });
     ctx.globalAlpha = 1;
-    if (!feed.length && game.day < 3 && !this.moving) hint('Click to travel. Click a town to visit, or a party to meet it.', 'Tap to travel. Tap towns and parties.');
+    if (!feed.length && game.day < 3 && !this.moving && !this.bigMap && getScene() === this) text(pointer.touch ? 'Tap to travel. Tap towns and parties.' : 'Click to travel. Click a town to visit, or a party to meet it.', view.W / 2, base, 15, '#f4ead2', 'center');
   }
 };
+
+// Panel look from the style guide, drawn on the canvas: outline, bevel, dark fill.
+function frame(x, y, w, h) {
+  ctx.fillStyle = '#0d0b09'; ctx.fillRect(x - 5, y - 5, w + 10, h + 10);
+  ctx.fillStyle = '#4a3f31'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+  ctx.fillStyle = '#1d1a16'; ctx.fillRect(x, y, w, h);
+}
+// Text without the dark outline, for use inside panels.
+function plain(str, x, y, size, colour, weight) {
+  ctx.font = (weight || 600) + ' ' + size + 'px ' + FONT;
+  ctx.textAlign = 'left'; ctx.fillStyle = colour; ctx.fillText(str, x, y);
+}
+
+// Map colours follow the style guide: gold is you, blue is friendly, red is hostile, grey is neutral.
+function friendly(f) { return (game.contract && game.contract.faction === f) || (game.relations[f] !== undefined && game.relations[f] >= 15); }
+function siteColour(s) {
+  if (game.sites[s.id].burned) return '#4a4036';
+  if (game.contract && game.contract.fief === s.id) return '#f2c14e';
+  if (hostile('player', s.faction)) return '#e0533d';
+  return friendly(s.faction) ? '#3b7dd8' : '#9a917f';
+}
+function partyColour(p) {
+  if (enemies(p, { faction: 'player' })) return '#e0533d';
+  return friendly(p.faction) ? '#7fb0ff' : '#e8e0cc';
+}
+
+const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
+const WEATHER = ['Clear skies', 'Clear skies', 'Overcast', 'Light rain', 'Windy', 'Morning fog'];
+function seasonText() {
+  const season = SEASONS[Math.floor((game.day - 1) / 30) % 4];
+  let w = WEATHER[Math.floor(seeded(game.day * 7919 + 13)() * WEATHER.length)];
+  if (season === 'Winter' && w === 'Light rain') w = 'Light snow';
+  return season + ' &middot; ' + w;
+}
+// Renown turned into a level, so the HUD can show progress towards the next one.
+export function renownLevel() {
+  const r = Math.max(0, game.renown);
+  const lv = Math.floor(Math.sqrt(r / 10)) + 1;
+  const lo = 10 * (lv - 1) * (lv - 1), hi = 10 * lv * lv;
+  return { lv, frac: (r - lo) / (hi - lo) };
+}
+
+function placeCard(s) {
+  const st = game.sites[s.id], f = FACTIONS[s.faction];
+  const kind = { town: 'Town', village: 'Village', camp: 'Orc camp', stronghold: 'Orc stronghold' }[s.kind];
+  const col = siteColour(s) === '#9a917f' ? 'var(--muted)' : siteColour(s);
+  let rows = '';
+  const row = (a, b) => '<div class="row"><span>' + a + '</span><b>' + b + '</b></div>';
+  if (s.kind === 'camp' || s.kind === 'stronghold') {
+    const g = campGarrison(s); let n = 0; for (const t in g) n += g[t];
+    rows += st.burned ? row('State', 'Burned') : row('Defenders', 'about ' + n);
+  } else {
+    rows += row('Recruits', st.recruits);
+    if (s.kind === 'town' && f.ruler) rows += row('Ruler', esc(f.ruler));
+    if (game.relations[s.faction] !== undefined) rows += row('Standing', relationWord(game.relations[s.faction]));
+    if (st.raided) rows += row('State', '<span class="dangerc">Raided</span>');
+  }
+  const verb = s.kind === 'camp' || s.kind === 'stronghold' ? (st.burned ? 'Search the ruins' : 'Approach the camp') : 'Enter ' + s.kind;
+  return '<div class="kind" style="color:' + col + '">' + kind + ' &middot; ' + esc(f.short.replace(/^the /, '')) + '</div><h3>' + esc(s.name) + '</h3>' + rows +
+    '<button class="primary">' + verb + ' <small>(E)</small></button>';
+}
 
 // Standing in a settlement: the map stays drawn behind the menu.
 export const siteScene = {
@@ -525,7 +705,11 @@ export const siteScene = {
 onKeyPress(k => {
   if (getScene() !== mapScene || panelOpen()) return;
   if (k === 'p') openParty();
-  if (k === ' ' || k === 'c') { mapScene.camping = !mapScene.camping; mapScene.target = null; mapScene.hud(); }
+  if (k === 'j') openParty('', 'gunther');
+  if (k === 'm') { mapScene.bigMap = !mapScene.bigMap; mapScene.hud(); }
+  if (k === 'e') mapScene.enterNear();
+  if (k === 'c') mapScene.toggleCamp();
+  if (k === ' ') { mapScene.speed = mapScene.speed ? 0 : 1; mapScene.hud(); }
 });
 
 export { TROOPS, terrainAt, T };

@@ -8,7 +8,7 @@ export const DAY_SECONDS = 10;          // seconds of travel that make one in-ga
 // ---------------------------------------------------------------- realms
 // 'player' is Gunther's own warband. 'free' is the neutral market town.
 export const FACTIONS = {
-  player: { name: "Gunther's warband", colour: '#e8b83a', short: 'You' },
+  player: { name: "Gunther's warband", colour: '#f2c14e', short: 'You' },
   vale: { name: 'Kingdom of the Vale', colour: '#4f86d9', short: 'the Vale', ruler: 'Queen Isolde' },
   march: { name: 'The Ember March', colour: '#d0563c', short: 'the March', ruler: 'Lord Brannoc' },
   free: { name: 'Free city of Fairmeet', colour: '#9aa3b2', short: 'Fairmeet' },
@@ -59,10 +59,10 @@ export const TROOPS = {
   ironguard: { name: 'Dwarf ironguard', race: 'dwarf', sprite: 'soldier', kind: 'ironguard', hp: 78, dmg: 12, cd: 1.0, range: 32, speed: 58, power: 5.8, wage: 6, block: 0.75, upgrades: [] },
   dwarfxbow: { name: 'Dwarf crossbowman', race: 'dwarf', sprite: 'soldier', kind: 'dwarfxbow', hp: 36, dmg: 14, cd: 2.4, range: 360, speed: 62, power: 3.2, wage: 3, ranged: true, bolt: true, upgrades: [] },
   // The Horde.
-  grunt: { name: 'Orc grunt', sprite: 'orc-yellow', hp: 30, dmg: 6, cd: 1.0, range: 32, speed: 74, power: 1.6, orc: true },
-  brute: { name: 'Orc brute', sprite: 'orc-red', hp: 60, dmg: 11, cd: 1.1, range: 34, speed: 70, power: 3.6, orc: true },
+  grunt: { name: 'Orc grunt', sprite: 'grunt', hp: 30, dmg: 6, cd: 1.0, range: 32, speed: 74, power: 1.6, orc: true },
+  brute: { name: 'Orc brute', sprite: 'brute', hp: 60, dmg: 11, cd: 1.1, range: 34, speed: 70, power: 3.6, orc: true },
   shaman: { name: 'Orc skirmisher', sprite: 'shaman', hp: 24, dmg: 9, cd: 2.2, range: 280, speed: 72, power: 2.6, orc: true, ranged: true, javelin: true },
-  warlord: { name: 'Warlord Gorrak', sprite: 'orc-red', hp: 360, dmg: 20, cd: 1.0, range: 44, speed: 66, power: 26, orc: true, scale: 3 }
+  warlord: { name: 'Warlord Gorrak', sprite: 'warlord', hp: 360, dmg: 20, cd: 1.0, range: 44, speed: 66, power: 26, orc: true, scale: 3 }
 };
 
 // ---------------------------------------------------------------- trade goods

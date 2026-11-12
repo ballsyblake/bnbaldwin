@@ -8,7 +8,7 @@
 export const canvas = document.getElementById('game');
 export const ctx = canvas.getContext('2d');
 export const overlay = document.getElementById('overlay');
-export const hud = document.getElementById('hud');
+export const ui = document.getElementById('ui');
 const stage = document.getElementById('stage');
 
 // Logical size of the play area. Wide on desktop and sideways phones, tall on upright phones.
@@ -39,7 +39,7 @@ window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (!keys[k]) keyPressListeners.forEach(fn => fn(k));
   keys[k] = true;
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k) && !overlay.classList.contains('show')) e.preventDefault();
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'f1', 'f2', 'f3', 'f4'].includes(k) && !overlay.classList.contains('show')) e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; pointer.down = false; });
@@ -110,8 +110,9 @@ export function shadow(x, y, r, colour) {
   ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
 }
 
+export const FONT = 'Inter, system-ui, sans-serif';
 export function text(str, x, y, size, colour, align) {
-  ctx.font = '600 ' + size + 'px system-ui, sans-serif';
+  ctx.font = '600 ' + size + 'px ' + FONT;
   ctx.textAlign = align || 'left';
   ctx.lineWidth = 4;
   ctx.lineJoin = 'round';
@@ -131,9 +132,16 @@ export function bar(x, y, w, h, frac, colour) {
 
 // ---------------------------------------------------------------- menus (HTML drawn over the canvas)
 // `handlers` maps each button's data-act to a function. Buttons can pass an argument with data-arg.
-export function showPanel(html, handlers, wide) {
-  overlay.innerHTML = '<div class="panel' + (wide ? ' wide' : '') + '">' + html + '</div>';
-  overlay.classList.add('show');
+// `kind` is true for a wide panel, or a class name such as 'title'.
+export function showPanel(html, handlers, kind) {
+  overlay.innerHTML = '<div class="panel' + (kind ? ' ' + (kind === true ? 'wide' : kind) : '') + '">' + html + '</div>';
+  overlay.className = 'show' + (kind === 'title' ? ' left' : '');
+  // The style guide allows one gold button per screen: the first real choice, unless a panel picks its own.
+  const panel = overlay.firstChild;
+  if (!panel.querySelector('button.primary')) {
+    const b = [...panel.querySelectorAll('button')].find(b => !b.disabled && !b.classList.contains('secondary') && !b.classList.contains('mini') && !b.closest('.tabs') && !b.classList.contains('card'));
+    if (b) b.classList.add('primary');
+  }
   overlay.querySelectorAll('[data-act]').forEach(b => {
     b.addEventListener('click', () => {
       const fn = handlers[b.dataset.act];
@@ -143,15 +151,42 @@ export function showPanel(html, handlers, wide) {
   const first = overlay.querySelector('button:not(:disabled)');
   if (first && !pointer.touch) first.focus({ preventScroll: true });
 }
-export function hidePanel() { overlay.classList.remove('show'); overlay.innerHTML = ''; }
+export function hidePanel() { overlay.className = ''; overlay.innerHTML = ''; }
 export function panelOpen() { return overlay.classList.contains('show'); }
 
-// Buttons drawn as HTML along the bottom of the play area (Party, Camp, battle orders...).
+// The HUD: HTML boxes over the canvas (stat panels, action bars, battle orders).
+// Positions use --u, one canvas pixel, so they line up with the canvas at any size.
+const uiCache = {};
 export function setHud(html, handlers) {
-  hud.innerHTML = html || '';
-  hud.querySelectorAll('[data-act]').forEach(b => {
+  ui.innerHTML = html || '';
+  for (const k in uiCache) delete uiCache[k];
+  ui.querySelectorAll('[data-act]').forEach(b => {
+    b.addEventListener('pointerdown', e => e.stopPropagation());
     b.addEventListener('click', e => { e.stopPropagation(); handlers[b.dataset.act](b.dataset.arg); });
   });
+}
+// Updates one marked piece of the HUD (data-k="key"), only touching the page when it changed.
+export function uiSet(key, html) {
+  if (uiCache[key] === html) return;
+  uiCache[key] = html;
+  const el = ui.querySelector('[data-k="' + key + '"]');
+  if (el) el.innerHTML = html;
+}
+// Same for a bar: frac from 0 to 1, optional colour.
+export function uiBar(key, frac, colour) {
+  const v = Math.round(clamp(frac, 0, 1) * 1000) / 10 + '%' + (colour || '');
+  if (uiCache[key] === v) return;
+  uiCache[key] = v;
+  const el = ui.querySelector('[data-k="' + key + '"]');
+  if (el) { el.style.width = Math.round(clamp(frac, 0, 1) * 1000) / 10 + '%'; if (colour) el.style.background = colour; }
+}
+// Shows or hides a marked piece of the HUD.
+export function uiShow(key, on) {
+  const v = on ? 'show' : 'hide';
+  if (uiCache['vis:' + key] === v) return;
+  uiCache['vis:' + key] = v;
+  const el = ui.querySelector('[data-k="' + key + '"]');
+  if (el) el.style.display = on ? '' : 'none';
 }
 
 export function esc(s) {
