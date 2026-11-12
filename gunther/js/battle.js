@@ -8,6 +8,9 @@ import { TROOPS, FACTIONS } from './data.js';
 import { game, playerFit, skill, trainSkill, strength } from './state.js';
 
 const PX = 3;
+const HERO_SPEED = 115;      // soldiers walk at 58 to 100
+const HERO_FOCUS = 0.6;      // chance an enemy near Gunther picks him over the nearest man
+const HERO_HURT = 1.25;      // Gunther takes this much more damage than the raw blow (he is in the thick of it)
 
 // ---------------------------------------------------------------- battlefield
 let ground = null;
@@ -277,7 +280,7 @@ export const battleScene = {
   },
   hurt(u, amount, source) {
     if (u.dead) return;
-    if (u.isHero) amount *= 1 - Math.min(0.5, (game.armourLevel - 1) * 0.08);
+    if (u.isHero) amount *= HERO_HURT * (1 - Math.min(0.45, (game.armourLevel - 1) * 0.07));
     u.hp -= amount;
     u.flash = 0.12;
     if (u.isHero) game.health = Math.max(0, u.hp);
@@ -324,9 +327,11 @@ export const battleScene = {
         if (Math.hypot(jx, jy) > 12) { mx = jx; my = jy; }
       }
       const len = Math.hypot(mx, my);
-      const slow = (H.blocking ? 0.5 : 1) * (H.swing && !H.swing.released ? 0.7 : 1) * (H.stagger > 0 ? 0.4 : 1);
+      // Gunther is a little quicker than a soldier in kit, not fast enough to outrun a battle,
+      // and drawing a bow or winding up a blow slows him further.
+      const slow = (H.blocking ? 0.5 : 1) * (H.swing && !H.swing.released ? 0.7 : 1) * (H.stagger > 0 ? 0.4 : 1) * (H.drawing ? 0.55 : 1);
       H.anim = len > 0 ? 'walk' : 'idle';
-      if (len > 0) { H.x += mx / len * 190 * slow * dt; H.y += my / len * 190 * slow * dt; }
+      if (len > 0) { H.x += mx / len * HERO_SPEED * slow * dt; H.y += my / len * HERO_SPEED * slow * dt; }
       if (pointer.touch) {
         const o = this.nearestFoe(H, sword ? 160 : 520);
         if (this.tap) this.aim = Math.atan2(this.tap.y - (H.y - 26), this.tap.x - H.x);
@@ -373,6 +378,8 @@ export const battleScene = {
         if (order === 'follow') reach = def.ranged ? def.range : 110;
         if (order === 'fallback') reach = dist(u.x, u.y, u.holdX, u.holdY) > 20 ? 30 : (def.ranged ? def.range : 60);
         u.target = this.nearestFoe(u, reach);
+        // Enemies know who leads the warband: within reach, most of them go for Gunther.
+        if (u.side === 1 && !H.dead && u.target !== H && dist(u.x, u.y, H.x, H.y) < (def.ranged ? def.range : 240) && Math.random() < HERO_FOCUS) u.target = H;
       }
       const T = u.target;
       const wind = u.windT || 0.16;
@@ -519,7 +526,7 @@ export const battleScene = {
         trainSkill('blade', 0.5);
         return;
       }
-      const dmg = (11 + 2.5 * (game.swordLevel - 1)) * (1 + skill('blade') * 0.05) * (0.55 + 0.8 * s.charge) * (s.dir === 'over' ? 1.2 : 1) * rand(0.9, 1.1);
+      const dmg = (10 + 2 * (game.swordLevel - 1)) * (1 + skill('blade') * 0.05) * (0.55 + 0.8 * s.charge) * (s.dir === 'over' ? 1.2 : 1) * rand(0.9, 1.1);
       this.hurt(u, dmg, 'hero');
       this.effects.push({ x: u.x, y: u.y - 30, t: 0, kind: 'hit' });
       trainSkill('blade', 1);
@@ -537,9 +544,9 @@ export const battleScene = {
     if (pointer.touch) {
       this.fireTimer -= dt;
       if (this.nearestFoe(H, 520) && this.fireTimer <= 0) {
-        this.fireTimer = Math.max(0.5 * Math.pow(0.8, game.bowLevel - 1) * (1 - skill('archery') * 0.02), 0.13);
+        this.fireTimer = Math.max(0.85 * Math.pow(0.9, game.bowLevel - 1) * (1 - skill('archery') * 0.02), 0.35);
         H.shootT = 0;
-        this.shoot(H, this.aim, (14 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04), 'arrow', 0, 760);
+        this.shoot(H, this.aim + rand(-0.06, 0.06), (11 + 1.5 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04), 'arrow', 0, 700);
       }
       return;
     }
@@ -552,7 +559,7 @@ export const battleScene = {
       const shaky = Math.min(0.14, Math.max(0, this.drawT - full - 1.6) * 0.06);
       const spread = (1 - p) * 0.18 + (H.anim === 'walk' ? 0.07 : 0) + shaky;
       H.shootT = 0;
-      this.shoot(H, this.aim + rand(-spread, spread), (17 + 2.5 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04) * (0.3 + 0.7 * p), 'arrow', 0, 480 + 340 * p);
+      this.shoot(H, this.aim + rand(-spread, spread), (15 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04) * (0.3 + 0.7 * p), 'arrow', 0, 480 + 340 * p);
     }
     this.drawT = 0;
   },
