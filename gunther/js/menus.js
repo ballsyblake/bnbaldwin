@@ -14,6 +14,7 @@ import {
 } from './state.js';
 import { mapScene, populate, spawnWarband, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { battleScene } from './battle.js';
+import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
 import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
 import { openHall, openRansom, openCapturedLord, lordBlurb, lordGreeting, skillsTable, prisonersSection, convertPrisoner, contractLine, lordsTable } from './court.js';
 
@@ -86,6 +87,7 @@ function openHelp(back) {
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
     '<p><b>Fighting.</b> Q swaps between bow and sword. Bow: hold click to draw and release to shoot; a full draw hits hardest and flies straightest, but moving or holding too long makes it shaky. Sword: move the mouse left, right or up to pick the side you swing from (the gold marker), hold click to wind up and release to strike. Each enemy shows its guard as a grey bar; strike a side it is not guarding, or hit it while it is winding up. Right click cancels a swing, which lets you feint. Red arrows show where a blow is coming from: hold right click with your marker on that side to block, and block just before it lands to parry and stun them. On a phone, tap left, right or above Gunther to swing and hold the Block button. Bladework improves as you fight.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
+    '<p><b>Towns and sieges.</b> Towns have walls and a garrison, and a town\'s villages belong to whoever holds the town. Lords at war march on enemy towns, camp outside for a few days and then storm them, so towns change hands. You can besiege any town you are not sworn to (that means war with its owner): build ladders for two days, then fight your way in through the breaches while their archers shoot from behind the wall. As a vassal your lord grants you the towns you take; as a mercenary you are paid a bounty; on your own you hold them yourself. Leave men in a town\'s garrison to keep it, and collect its rent.</p>' +
     '<p><b>Family.</b> Years pass (one every 40 days) and everyone ages. Lords die of old age or in battle, and their son or daughter takes over, remembering half of what their parent felt about you. Marry into a lord\'s house through their kingdom\'s hall and you may have children. When your captain dies, of old age or struck down in battle, a grown child (or a cousin) takes over with the gear, some gold and renown, and a little of the skill. Death in battle can be turned off on the Party screen.</p>' +
     '<p><b>Lords.</b> Each kingdom is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
     '<p><b>Peoples.</b> Men hold the Vale and the March. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
@@ -112,10 +114,11 @@ export function openSettlement(s, msg) {
   msg = msg ? '<p class="msg">' + msg + '</p>' : '';
   if (s.kind === 'camp' || s.kind === 'stronghold') return openCamp(s, msg);
   const rel = game.relations[s.faction];
-  const mine = game.contract && game.contract.fief === s.id;
-  const head = '<h2>' + s.name + (mine ? ' <span class="good">(your village)</span>' : '') + '</h2><p>' + (s.kind === 'town' ? 'Town' : 'Village') + ' of ' + f.name +
+  const mine = isHeld(s);
+  const head = '<h2>' + s.name + (mine ? ' <span class="good">(yours)</span>' : '') + '</h2><p>' + (s.kind === 'town' ? 'Town' : 'Village') + (s.faction === 'player' ? ' held in your own name' : ' of ' + f.name) +
     (rel !== undefined ? ' &middot; ' + relationWord(rel) + ' (' + rel + ')' : '') + (st.raided ? ' &middot; <span class="bad">recently raided</span>' : '') + '</p>' + statusLine();
   if (hostile(s.faction, 'player')) {
+    if (s.kind === 'town') return openSiege(s, head + msg);
     showPanel(head + '<p class="bad">The gates are barred. Nobody here will deal with you.</p><button data-act="leave">Leave</button>', { leave });
     return;
   }
@@ -126,8 +129,23 @@ export function openSettlement(s, msg) {
   if (quest) html += '<button data-act="deliver"' + ((game.goods[quest.good] || 0) < quest.amount ? ' disabled' : '') + '>Deliver ' + quest.amount + ' ' + GOODS[quest.good].name + ' for the quest</button>';
   if (s.kind === 'town') html += '<button data-act="tavern">Tavern</button><button data-act="smith">Smith</button>';
   if (s.kind === 'town' && KINGDOMS.includes(s.faction)) html += '<button data-act="hall">Hall of ' + FACTIONS[s.faction].short + '</button>';
+  if (mine && s.kind === 'town') html += '<button data-act="garrison">Garrison</button>';
+  // Any town you are not sworn to can be attacked, at the cost of war with whoever holds it.
+  const canAttack = s.kind === 'town' && !mine && s.faction !== 'player' && !(game.contract && game.contract.faction === s.faction);
   html += '<button data-act="leave" class="secondary">Leave</button>';
+  if (canAttack) html += '<button data-act="attack" class="secondary">Lay siege to ' + s.name + '</button>';
   showPanel(html, {
+    garrison: () => openGarrison(s),
+    attack: () => showPanel('<h2>Besiege ' + s.name + '?</h2><p>' + f.name + ' will count you an enemy (relation -40), and its lords will remember. ' + (s.faction === 'free' ? '' : 'Expect them to come for you.') + '</p>' +
+      '<button data-act="yes">Declare war and besiege</button><button data-act="no" class="secondary">Think again</button>', {
+      yes: () => {
+        if (game.relations[s.faction] !== undefined) changeRelation(s.faction, Math.min(0, -40 - game.relations[s.faction]));
+        for (const id in game.lords) if (lord(id).faction === s.faction) remember(id, 'Gunther attacked ' + s.name + ' without cause', -25);
+        chronicle('Gunther declared war on ' + FACTIONS[s.faction].short + ' and marched on ' + s.name + '.');
+        save(); openSettlement(s);
+      },
+      no: () => openSettlement(s)
+    }),
     hall: () => openHall(s, () => openSettlement(s)),
     market: () => openMarket(s),
     recruit: () => openRecruit(s),
@@ -176,7 +194,7 @@ function sellGoods(s, g, n) {
 
 function recruitCost(s) {
   const rel = game.relations[s.faction] || 0;
-  const fief = game.contract && game.contract.fief === s.id ? 0.5 : 1;
+  const fief = isHeld(s) ? 0.5 : 1;
   return Math.max(3, Math.round((s.kind === 'town' ? 14 : 10) * (1 - rel / 200) * fief));
 }
 function openRecruit(s, msg) {
@@ -469,13 +487,13 @@ function afterBattle(foe, res) {
     } else lines.push(esc(game.hero.name) + ' was knocked senseless but will recover.');
   }
   const slain = count(res.enemyKilled);
-  const orcs = foe.site || (foe.party && foe.party.faction === 'horde');
+  const orcs = (foe.site && !foe.siege) || (foe.party && foe.party.faction === 'horde');
   if (orcs) game.stats.orcsSlain += slain;
 
   if (!res.won) {
     // The enemy keeps what is left of its army.
     if (foe.party) { foe.party.troops = res.enemyRemaining; if (!count(res.enemyRemaining)) foe.party.gone = true; }
-    if (foe.site) game.sites[foe.site.id].garrison = Object.keys(res.enemyRemaining).length ? res.enemyRemaining : campGarrison(foe.site);
+    if (foe.site) game.sites[foe.site.id].garrison = Object.keys(res.enemyRemaining).length ? res.enemyRemaining : (foe.siege ? townGarrison(foe.site.faction) : campGarrison(foe.site));
     return defeat(lines);
   }
 
@@ -502,7 +520,7 @@ function afterBattle(foe, res) {
       if (hostile(p.faction, foe.party.faction)) { remember(p.lord, 'Gunther fought ' + foe.party.name + ' near ' + nearestPlace(p.x, p.y), 8); lines.push(lord(p.lord).name + ' saw you fight and will remember it.'); }
     }
   }
-  let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * 4 + 60);
+  let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * 4 + (foe.siege ? 220 : 60));
   const renown = Math.max(1, Math.round(enemyPower / 5));
   game.gold += gold; game.renown += renown;
   game.morale = clamp(game.morale + 8, 0, 100);
@@ -519,9 +537,9 @@ function afterBattle(foe, res) {
     let near = null, nd = Infinity;
     for (const s of SETTLEMENTS) if (KINGDOMS.includes(s.faction)) { const d = dist(s.x, s.y, mapScene.pos.x, mapScene.pos.y); if (d < nd) { nd = d; near = s; } }
     if (near && nd < 1000) changeRelation(near.faction, 2);
-  } else if (foe.party && KINGDOMS.includes(foe.party.faction)) {
+  } else if (foe.party && KINGDOMS.includes(foe.party.faction) || foe.siege && KINGDOMS.includes(foe.site.faction)) {
     // Every kingdom at war with the beaten one is grateful; your employer most of all.
-    for (const other of enemiesOf(foe.party.faction)) changeRelation(other, game.contract && game.contract.faction === other ? 6 : 4);
+    for (const other of enemiesOf(foe.party ? foe.party.faction : foe.site.faction)) changeRelation(other, game.contract && game.contract.faction === other ? 6 : 4);
   }
   if (foe.party && foe.party.kind === 'caravan') {
     const g = pick(Object.keys(GOODS)), n = randInt(3, 8);
@@ -534,9 +552,12 @@ function afterBattle(foe, res) {
     const q = game.quests.find(q => q.party === foe.party.id);
     if (q) completeQuest(q), lines.push('Quest complete! +' + q.reward + ' gold.');
     if (foe.party.lord) { capturedLord = foe.party.lord; chronicle('Gunther defeated ' + lord(capturedLord).name + ' near ' + nearestPlace(foe.party.x, foe.party.y) + '.'); }
-  } else if (foe.site) chronicle('Gunther stormed ' + foe.site.name + '.');
+  } else if (foe.site && !foe.siege) chronicle('Gunther stormed ' + foe.site.name + '.');
   let title = 'Victory';
-  if (foe.site) {
+  if (foe.siege) {
+    title = foe.site.name + ' has fallen';
+    takeTown(foe.site).forEach(l => lines.push(l));
+  } else if (foe.site) {
     const st = game.sites[foe.site.id];
     st.garrison = null;
     if (foe.site.kind === 'stronghold') {
@@ -584,6 +605,82 @@ function defeat(lines) {
     '<p>Your warband is routed. ' + (scattered ? plural(scattered, 'man') + ' scattered or were lost, and you' : 'You') + ' lost ' + lostGold + ' gold.' +
     (best ? ' Two days later you limp into ' + best.name + '.' : '') + '</p>' + statusLine() +
     '<button data-act="map">Carry on</button>', { map: () => { setScene(mapScene); mapScene.grace = 2; } });
+}
+
+// ---------------------------------------------------------------- sieges
+// Outside the walls of a hostile town: build ladders for two days, then storm it in person.
+function openSiege(s, head) {
+  const g = game.sites[s.id].garrison || {};
+  const others = besiegers(s).map(p => p.lord ? lord(p.lord).name : p.name);
+  const fit = troopCount(true);
+  showPanel(head + '<p class="bad">The gates are barred against you.</p>' +
+    '<p>Garrison: ' + troopList(g) + '.</p><p>' + compare(strength(g) / WALL_BONUS) + ' <span class="small">(walls count for a lot)</span></p>' +
+    (others.length ? '<p>' + others.join(', ') + (others.length > 1 ? ' are' : ' is') + ' already besieging the town.</p>' : '') +
+    '<p class="small">Building ladders takes 2 days. Then you storm the walls: the defenders hold the breaches and their archers shoot from behind the wall.</p>' +
+    '<button data-act="siege"' + (fit < 5 ? ' disabled' : '') + '>Build ladders and storm the walls' + (fit < 5 ? ' (needs 5 fit men)' : '') + '</button>' +
+    '<button data-act="leave" class="secondary">Leave</button>', {
+    siege: () => {
+      dailyTick(); dailyTick(); populate();
+      if (!hostile(s.faction, 'player') || game.pendingDeath) return leave();
+      const gar = game.sites[s.id].garrison || {};
+      if (!count(gar)) { afterBattle({ site: s, siege: true }, { won: true, killed: {}, wounded: {}, enemyKilled: {}, enemyRemaining: {}, heroDown: false }); return; }
+      startBattle({ troops: gar, faction: s.faction, name: s.name + ' garrison' }, 'siege', res => afterBattle({ site: s, siege: true }, res));
+    },
+    leave
+  });
+}
+
+// What happens to a town Gunther takes: his lord's if he is sworn to one, otherwise his own.
+function takeTown(s) {
+  const old = s.faction, c = game.contract, lines = [];
+  const lordOf = c && KINGDOMS.includes(c.faction) && c.faction !== old ? c.faction : null;
+  if (lordOf && c.kind === 'vassal') {
+    capture(s, lordOf, 'player', 'Gunther');
+    const ruler = LORDSLIST().find(l => l.faction === lordOf && l.ruler);
+    if (ruler) remember(ruler.id, 'Gunther won ' + s.name + ' for our crown', 12);
+    lines.push(FACTIONS[lordOf].ruler + ' grants you ' + s.name + ' and its villages to hold. It pays 80 gold a day while it is not raided or besieged.');
+  } else if (lordOf) {
+    capture(s, lordOf, null, 'Gunther');
+    game.gold += 150;
+    lines.push(s.name + ' now belongs to ' + FACTIONS[lordOf].name + '. As their mercenary you are paid a bounty of 150 gold.');
+  } else {
+    capture(s, 'player', 'player', 'Gunther');
+    lines.push(s.name + ' and its villages are yours, held in your own name. ' + (FACTIONS[old].short.replace(/^the /, 'The ')) + ' will want it back.');
+  }
+  // The garrison is gone. A handful of militia hold the walls until you leave men there.
+  const militia = RACES[s.race || (FACTIONS[originalFaction(s)].race || 'human')].recruit;
+  game.sites[s.id].garrison = { [militia]: 3 };
+  if (isHeld(s)) lines.push('Only 3 militia hold the walls. Leave men there from the town\'s Garrison menu, or it will not stay yours for long.');
+  if (game.relations[old] !== undefined) changeRelation(old, -10);
+  return lines;
+}
+const LORDSLIST = () => Object.keys(game.lords).map(id => lord(id));
+
+// Moving men between the warband and the garrison of a town Gunther holds.
+function openGarrison(s, msg) {
+  const st = game.sites[s.id], g = st.garrison || (st.garrison = {});
+  const fit = playerFit(), room = partyLimit() - troopCount();
+  let rows = '';
+  const types = [...new Set(Object.keys(fit).concat(Object.keys(g)))].sort((a, b) => TROOPS[b].power - TROOPS[a].power);
+  for (const t of types) {
+    const here = fit[t] || 0, there = g[t] || 0;
+    rows += '<tr><td>' + TROOPS[t].name + '</td><td>' + here + '</td><td>' + there + '</td>' +
+      '<td><button class="mini" data-act="leave1" data-arg="' + t + '"' + (here ? '' : ' disabled') + '>Leave 1</button> <button class="mini secondary" data-act="leaveall" data-arg="' + t + '"' + (here ? '' : ' disabled') + '>All</button></td>' +
+      '<td><button class="mini" data-act="take1" data-arg="' + t + '"' + (there && room > 0 ? '' : ' disabled') + '>Take 1</button> <button class="mini secondary" data-act="takeall" data-arg="' + t + '"' + (there && room > 0 ? '' : ' disabled') + '>All</button></td></tr>';
+  }
+  const move = (t, n, out) => {
+    if (out) { n = Math.min(n, fit[t] || 0); removeTroops(t, n); g[t] = (g[t] || 0) + n; }
+    else { n = Math.min(n, g[t] || 0, partyLimit() - troopCount()); addTroops(t, n); g[t] -= n; if (!g[t]) delete g[t]; }
+    save(); openGarrison(s);
+  };
+  showPanel('<h2>' + s.name + ' garrison</h2>' + (msg ? '<p class="msg">' + msg + '</p>' : '') +
+    '<p>Men you leave here defend the walls when a lord comes to besiege the town, and are paid half wages. The town also raises a few militia of its own. Garrison strength ' + Math.round(strength(g)) + '.</p>' +
+    '<table><tr><th>Troop</th><th>With you</th><th>Here</th><th></th><th></th></tr>' + rows + '</table>' +
+    '<button data-act="back" class="secondary">Back</button>', {
+    leave1: t => move(t, 1, true), leaveall: t => move(t, 999, true),
+    take1: t => move(t, 1, false), takeall: t => move(t, 999, false),
+    back: () => openSettlement(s)
+  }, true);
 }
 
 // ---------------------------------------------------------------- death and the heir

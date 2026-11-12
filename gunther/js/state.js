@@ -5,6 +5,7 @@
 import { clamp, randInt, rand, pick } from './core.js';
 import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
 import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
+import { applyOwners, townGarrison, siegeTick, holdingsRent, garrisonWages, heldSites, peopleOf, originalFaction } from './sieges.js';
 
 const SAVE_KEY = 'gunther-save-v2';
 const OLD_SAVE_KEY = 'gunther-save-v1';
@@ -46,7 +47,7 @@ export function newGame(migrate) {
   } catch (e) { /* ignore */ }
 }
 
-function newSite(s) { return { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) }; }
+function newSite(s) { return { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) || (s.kind === 'town' ? townGarrison(originalFaction(s)) : null) }; }
 
 export function campGarrison(s) {
   if (s.kind === 'camp') return { grunt: 10, brute: 3, shaman: 2 };
@@ -98,6 +99,10 @@ function ensureFields() {
   if (!game.dynasty) game.dynasty = [];
   if (game.battleDeath === undefined) game.battleDeath = true;
   applyLords();
+  // Town ownership and sieges. Older saves kept the vassal's village on the contract.
+  for (const s of SETTLEMENTS) if (s.kind === 'town' && !game.sites[s.id].garrison) game.sites[s.id].garrison = townGarrison(game.sites[s.id].owner || originalFaction(s));
+  if (game.contract && game.contract.fief) { game.sites[game.contract.fief].holder = 'player'; delete game.contract.fief; }
+  applyOwners();
 }
 
 // ---------------------------------------------------------------- chronicle
@@ -146,11 +151,7 @@ export function contractPay() {
   if (!c) return 0;
   return c.kind === 'merc' ? 6 + Math.floor(game.renown / 8) : 0;
 }
-export function fiefRent() {
-  const c = game.contract;
-  if (!c || c.kind !== 'vassal' || !c.fief) return 0;
-  return game.sites[c.fief].raided ? 0 : 40;
-}
+export function fiefRent() { return holdingsRent(); }
 export function employer() { return game.contract ? game.contract.faction : null; }
 
 // ---------------------------------------------------------------- messages
@@ -196,7 +197,7 @@ export function playerStrength() { return strength(playerFit()) + (game.health >
 export function wages() {
   let w = 0;
   for (const t in game.troops) w += (TROOPS[t].wage || 0) * game.troops[t].n;
-  return w;
+  return w + garrisonWages();
 }
 export function foodStock() { let n = 0; for (const g in game.goods) if (GOODS[g].food) n += game.goods[g]; return n; }
 export function foodPerDay() { return Math.ceil((troopCount() + 1 + prisonerCount()) / 6); }
@@ -225,7 +226,7 @@ export function warsText() {
   return w.map(([a, b]) => cap(FACTIONS[a].short) + ' and ' + FACTIONS[b].short + ' are at war.').join(' ');
 }
 // What people a faction's volunteers are.
-export function raceOfSite(s) { return s.race || (FACTIONS[s.faction] && FACTIONS[s.faction].race) || 'human'; }
+export function raceOfSite(s) { return peopleOf(s); }
 export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
 
 export function hostile(a, b) {
@@ -301,7 +302,7 @@ export function dailyTick() {
   // Pay from your employer, and rent from your village.
   const pay = contractPay() + fiefRent();
   if (pay) game.gold += pay;
-  if (game.contract && game.contract.kind === 'vassal' && game.contract.fief && game.sites[game.contract.fief].raided && game.day % 3 === 0) msgs.push([site(game.contract.fief).name + ' lies raided and pays no rent.', '#ff9a8a']);
+  if (game.day % 3 === 0) for (const h of heldSites()) if (game.sites[h.id].raided) msgs.push([h.name + ' lies raided and pays no rent.', '#ff9a8a']);
   if (game.contract && (game.relations[game.contract.faction] || 0) < -5) {
     msgs.push([FACTIONS[game.contract.faction].name + ' has dismissed you from its service.', '#ff9a8a']);
     chronicle(FACTIONS[game.contract.faction].short + ' cast Gunther out of its service.');
@@ -339,6 +340,8 @@ export function dailyTick() {
     if (st.burned > 0 && !game.hordeBroken) { st.burned--; if (st.burned === 0) { st.garrison = campGarrison(s); msgs.push(['The orcs have rebuilt ' + s.name + '.', '#ff9a8a']); } }
     if (st.garrison && st.burned === 0 && s.kind === 'camp' && game.day % 4 === 0) st.garrison.grunt = Math.min(st.garrison.grunt + 2, 10 + Math.floor(game.day / 6));
   }
+  // Garrisons, and lords storming the towns they besiege.
+  siegeTick();
   // War and peace between each pair of kingdoms. A kingdom with most of its lords beaten or
   // captured sues for peace sooner, and no kingdom picks a second war while it is fighting one.
   const beaten = k => { const ls = LORDS.filter(l => l.faction === k); return ls.filter(l => game.lords[l.id].status !== 'free').length >= Math.ceil(ls.length * 0.6); };

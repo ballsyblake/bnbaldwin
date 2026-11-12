@@ -22,6 +22,11 @@ function buildGround(kind) {
   const HILL = [[178, 186, 120], [162, 170, 110]];
   const DIRT = [[204, 170, 112], [192, 158, 102]], DIRT_EDGE = [178, 170, 92], TUFT = [206, 228, 112];
   const camp = kind === 'camp' || kind === 'stronghold';
+  // A siege: a town wall across the field with two breaches. The town is on the enemy's side.
+  const wall = kind === 'siege' ? (view.portrait
+    ? { axis: 'y', pos: Math.round(H * 0.36), gaps: [[W * 0.28 - 34, W * 0.28 + 34], [W * 0.72 - 34, W * 0.72 + 34]] }
+    : { axis: 'x', pos: Math.round(W * 0.62), gaps: [[H * 0.38 - 34, H * 0.38 + 34], [H * 0.72 - 34, H * 0.72 + 34]] }) : null;
+  const COBBLE = [[150, 142, 124], [140, 132, 116], [160, 152, 132]];
   for (let py = 0; py < c.height; py++) {
     for (let px = 0; px < c.width; px++) {
       const x = px * PX + 1, y = py * PX + 1, i = (py * c.width + px) * 4;
@@ -32,6 +37,10 @@ function buildGround(kind) {
         const clearing = Math.hypot(dx, dy) + 0.3 * (noise(x / 70 + 3, y / 70 + 8) - 0.5);
         if (clearing < 0.64) col = noise(x / 40, y / 40) > 0.55 ? DIRT[1] : DIRT[0];
         else if (clearing < 0.72) col = DIRT_EDGE;
+      }
+      if (wall && (wall.axis === 'x' ? x > wall.pos : y < wall.pos)) {
+        const n = noise(x / 30 + 5, y / 30 + 9);
+        col = (Math.floor(x / 9) + Math.floor(y / 9)) % 2 ? COBBLE[n > 0.55 ? 2 : 0] : COBBLE[1];
       }
       if (!col) {
         const s = noise(x / 120 + 40, y / 120 + 40) - Math.max(0, (110 - edge) / 110) * 0.4;
@@ -58,7 +67,12 @@ function buildGround(kind) {
   // Things to fight around.
   const props = [];
   const P = (fx, fy, kind2, r, v) => props.push({ x: fx * W, y: fy * H, kind: kind2, r, v });
-  if (camp) {
+  if (wall) {
+    // Houses inside the walls, clear of the breaches.
+    if (view.portrait) { P(0.14, 0.2, 'house', 26, 0); P(0.5, 0.2, 'house', 26, 1); P(0.86, 0.2, 'house', 26, 2); }
+    else { P(0.86, 0.24, 'house', 26, 0); P(0.9, 0.55, 'house', 26, 1); P(0.84, 0.82, 'house', 26, 2); }
+    P(view.portrait ? 0.5 : 0.3, view.portrait ? 0.62 : 0.55, 'rock', 20, 1);
+  } else if (camp) {
     P(0.5, 0.36, 'fire', 18);
     if (view.portrait) { P(0.22, 0.24, 'tent', 30); P(0.78, 0.24, 'tent', 30); } else { P(0.36, 0.24, 'tent', 30); P(0.64, 0.24, 'tent', 30); }
     if (kind === 'stronghold') { P(0.82, 0.62, 'tent', 30); P(0.18, 0.62, 'tent', 30); }
@@ -66,7 +80,7 @@ function buildGround(kind) {
     P(0.3, 0.3, 'rock', 20, 0); P(0.72, 0.74, 'rock', 20, 2);
     if (kind === 'forest') { P(0.5, 0.5, 'tree', 16, 2); P(0.2, 0.75, 'tree', 16, 1); }
   }
-  ground = { canvas: c, trees, props, kind, W, H };
+  ground = { canvas: c, trees, props, kind, W, H, wall };
 }
 
 // ---------------------------------------------------------------- battle scene
@@ -76,6 +90,7 @@ export const battleScene = {
   // opts: { enemy: { troops, faction, name }, kind: 'field' | 'forest' | 'hills' | 'camp' | 'stronghold', onEnd(result) }
   enter(opts) {
     this.opts = opts;
+    this.siege = opts.kind === 'siege';
     this.enemyFaction = opts.enemy.faction;
     if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H) buildGround(opts.kind);
     this.units = []; this.shots = []; this.effects = []; this.floats = [];
@@ -240,6 +255,13 @@ export const battleScene = {
       if (type === 'warlord') { x = view.portrait ? view.W / 2 : b.x1 - 140; y = view.portrait ? b.y0 + 80 : view.H * 0.55; }
       const u = this.addUnit(side, type, x, y);
       u.holdX = clamp(x, b.x0, b.x1); u.holdY = clamp(y, b.y0, b.y1);
+      // Defenders of a town: foot men guard the breaches, archers stand behind the wall.
+      if (this.siege && side === 1) {
+        const w = ground.wall, gap = w.gaps[k % 2], back = ranged ? rand(36, 70) : rand(30, 64);
+        const al = ranged ? rand(w.axis === 'x' ? b.y0 + 10 : b.x0 + 10, w.axis === 'x' ? b.y1 - 10 : b.x1 - 10) : (gap[0] + gap[1]) / 2 + rand(-30, 30);
+        if (w.axis === 'x') { u.holdX = w.pos + back; u.holdY = al; } else { u.holdX = al; u.holdY = w.pos - back; }
+        if (initial) { u.x = u.holdX; u.y = u.holdY; }
+      }
       k++;
     }
   },
@@ -346,7 +368,7 @@ export const battleScene = {
       if (u.retarget <= 0 || !u.target || u.target.dead || u.target.fled) {
         u.retarget = rand(0.3, 0.6);
         let reach = Infinity;
-        const order = u.side === 0 ? this.orders[groupOf(u)] : 'charge';
+        const order = u.side === 0 ? this.orders[groupOf(u)] : (this.siege ? 'hold' : 'charge');
         if (order === 'hold') reach = def.ranged ? def.range : 90;
         if (order === 'follow') reach = def.ranged ? def.range : 110;
         if (order === 'fallback') reach = dist(u.x, u.y, u.holdX, u.holdY) > 20 ? 30 : (def.ranged ? def.range : 60);
@@ -396,7 +418,7 @@ export const battleScene = {
         const ang = k * 2.4, r = 50 + (k % 3) * 22;
         if (dist(u.x, u.y, H.x + Math.cos(ang) * r, H.y + Math.sin(ang) * r * 0.6) > 12) this.walk(u, H.x + Math.cos(ang) * r, H.y + Math.sin(ang) * r * 0.6, speed * 1.1, dt);
         else u.anim = 'idle';
-      } else if (u.side === 0 && this.orders[groupOf(u)] !== 'charge') {
+      } else if ((u.side === 0 && this.orders[groupOf(u)] !== 'charge') || (u.side === 1 && this.siege)) {
         if (dist(u.x, u.y, u.holdX, u.holdY) > 8) this.walk(u, u.holdX, u.holdY, speed, dt); else u.anim = 'idle';
       } else u.anim = 'idle';
     }
@@ -411,6 +433,7 @@ export const battleScene = {
         if (d > 0 && d < r) { const push = (r - d) / 2; a.x += dx / d * push; a.y += dy / d * push; c.x -= dx / d * push; c.y -= dy / d * push; }
       }
       for (const p of ground.props) pushOut(a, p.x, p.y, p.r + 10);
+      if (ground.wall) wallBlock(a);
       if (!a.fleeing && (a.x > -5 && a.x < view.W + 5 && a.y > -5 && a.y < view.H + 5)) {
         // Units walking in from the edge are allowed outside the bounds until they arrive.
         if (a.x > b.x0 - 1 && a.x < b.x1 + 1 && a.y > b.y0 - 1 && a.y < b.y1 + 1) a.inside = true;
@@ -429,7 +452,9 @@ export const battleScene = {
         if (dist(s.x, s.y, u.x, u.y - 18 * big) < 16 * big) {
           s.gone = true;
           const block = u.def && u.def.block || 0;
-          this.hurt(u, s.dmg * (1 - block * 0.55), s.hero ? 'hero' : 'shot');
+          // Defenders standing just behind the wall are hard to hit.
+          const cover = ground.wall && u.side === 1 && behindWall(u) ? 0.5 : 1;
+          this.hurt(u, s.dmg * (1 - block * 0.55) * cover, s.hero ? 'hero' : 'shot');
           if (s.hero) trainSkill('archery', 1);
           break;
         }
@@ -586,6 +611,7 @@ export const battleScene = {
     }
   },
   walk(u, tx, ty, speed, dt) {
+    if (ground.wall) ({ x: tx, y: ty } = routeAround(u, tx, ty));
     const d = dist(u.x, u.y, tx, ty);
     if (d < 1) return;
     const step = Math.min(speed * dt, d);
@@ -626,6 +652,7 @@ export const battleScene = {
     const W = view.W, Hh = view.H;
     ctx.drawImage(ground.canvas, 0, 0, W, Hh);
     const things = [];
+    if (ground.wall) { if (ground.wall.axis === 'x') drawWall(); else things.push({ y: ground.wall.pos + 12, draw: drawWall }); }
     for (const t of ground.trees) things.push({ y: t.y, draw: () => {
       shadow(t.x, t.y + 12, 16);
       if (t.rock) ctx.drawImage(img.rocks, (t.v % 3) * 16, 0, 16, 16, t.x - 24, t.y - 30, 48, 48);
@@ -634,6 +661,7 @@ export const battleScene = {
     for (const p of ground.props) things.push({ y: p.y, draw: () => {
       if (p.kind === 'tent') { shadow(p.x, p.y + 20, 38); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, p.x - 48, p.y - 66, 96, 96); }
       else if (p.kind === 'rock') { shadow(p.x, p.y + 8, 22); ctx.drawImage(img.rocks, p.v * 16, 0, 16, 16, p.x - 24, p.y - 34, 48, 48); }
+      else if (p.kind === 'house') { shadow(p.x, p.y + 12, 30); ctx.drawImage(img.houses, p.v * 16, 16, 16, 16, p.x - 30, p.y - 44, 60, 60); }
       else if (p.kind === 'tree') { shadow(p.x, p.y + 10, 18); ctx.drawImage(img.trees, p.v * 16, 0, 16, 16, p.x - 24, p.y - 38, 48, 48); }
       else drawCampfire(p.x, p.y, this.time);
     } });
@@ -704,6 +732,58 @@ export const battleScene = {
     }
   }
 };
+
+// ---------------------------------------------------------------- town walls (sieges)
+const WALL_T = 12;      // half the wall's thickness
+function wAcross(x, y) { return ground.wall.axis === 'x' ? x : y; }
+function wAlong(x, y) { return ground.wall.axis === 'x' ? y : x; }
+function inGap(a) { return ground.wall.gaps.some(([g0, g1]) => a > g0 + 6 && a < g1 - 6); }
+function behindWall(u) { const w = ground.wall, d = wAcross(u.x, u.y) - w.pos; return (w.axis === 'x' ? d > 0 : d < 0) && Math.abs(d) < 90; }
+// Nobody walks through the wall: only through a breach.
+function wallBlock(u) {
+  const w = ground.wall, d = wAcross(u.x, u.y) - w.pos;
+  if (Math.abs(d) >= WALL_T) { u.ws = Math.sign(d); return; }
+  if (inGap(wAlong(u.x, u.y))) return;
+  const c = w.pos + (u.ws || Math.sign(d) || 1) * WALL_T;
+  if (w.axis === 'x') u.x = c; else u.y = c;
+}
+// Someone heading for the other side of the wall makes for the nearest breach first.
+function routeAround(u, tx, ty) {
+  const w = ground.wall, c0 = wAcross(u.x, u.y) - w.pos, c1 = wAcross(tx, ty) - w.pos;
+  if (Math.sign(c0) === Math.sign(c1) || Math.abs(c1) < WALL_T) return { x: tx, y: ty };
+  const a = wAlong(u.x, u.y), ta = wAlong(tx, ty);
+  let gc = 0, best = Infinity;
+  for (const [g0, g1] of w.gaps) { const m = (g0 + g1) / 2, cost = Math.abs(a - m) + Math.abs(ta - m); if (cost < best) { best = cost; gc = m; } }
+  const near = Math.abs(a - gc) < 22;
+  // Line up with the breach on this side, then go through it to the far side.
+  const across = near ? w.pos + Math.sign(c1) * (WALL_T + 16) : w.pos + Math.sign(c0) * (WALL_T + 18);
+  return w.axis === 'x' ? { x: across, y: gc } : { x: gc, y: across };
+}
+function drawWall() {
+  const w = ground.wall, len = w.axis === 'x' ? view.H : view.W;
+  const segs = [];
+  let from = -10;
+  for (const [g0, g1] of w.gaps) { segs.push([from, g0]); from = g1; }
+  segs.push([from, len + 10]);
+  const rect = (a0, a1, c0, c1, col) => { ctx.fillStyle = col; if (w.axis === 'x') ctx.fillRect(c0, a0, c1 - c0, a1 - a0); else ctx.fillRect(a0, c0, a1 - a0, c1 - c0); };
+  for (const [a0, a1] of segs) {
+    rect(a0 - 3, a1 + 3, w.pos - WALL_T - 3, w.pos + WALL_T + 3, '#0d0b09');
+    rect(a0, a1, w.pos - WALL_T, w.pos + WALL_T, '#9a9282');
+    // Mortar lines and battlements on the attackers' side.
+    for (let a = Math.ceil(a0 / 12) * 12; a < a1; a += 12) rect(a, a + 2, w.pos - WALL_T, w.pos + WALL_T, '#7d766a');
+    const out = w.axis === 'x' ? -1 : 1;
+    for (let a = Math.ceil(a0 / 18) * 18; a < a1 - 8; a += 18) {
+      const c = w.pos + out * WALL_T;
+      rect(a, a + 9, Math.min(c, c + out * 8), Math.max(c, c + out * 8), '#0d0b09');
+      rect(a + 2, a + 7, Math.min(c, c + out * 6), Math.max(c, c + out * 6), '#b3ab99');
+    }
+  }
+  // Rubble in the breaches.
+  for (const [g0, g1] of w.gaps) for (let k = 0; k < 5; k++) {
+    const a = g0 + 6 + ((k * 37) % Math.max(1, g1 - g0 - 12)), c = w.pos + ((k * 13) % 20) - 10;
+    rect(a, a + 6, c, c + 5, '#7d766a');
+  }
+}
 
 function hexA(h, a) { return 'rgba(' + parseInt(h.slice(1, 3), 16) + ',' + parseInt(h.slice(3, 5), 16) + ',' + parseInt(h.slice(5, 7), 16) + ',' + a + ')'; }
 

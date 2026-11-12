@@ -8,6 +8,7 @@ import {
   chronicle, prisonerCount, prisonerLimit, ransomPrice, lordRansom, contractPay, fiefRent, skill, skillProgress, troopName
 } from './state.js';
 import { lordAge, canMarry, marry } from './dynasty.js';
+import { heldSites, isHeld, applyOwners } from './sieges.js';
 
 const TRAIT_WORDS = { bold: 'bold', cautious: 'cautious', honourable: 'honourable', cruel: 'cruel', greedy: 'greedy' };
 
@@ -54,15 +55,16 @@ export function openHall(s, back) {
     body += '<p class="warn">You are sworn to ' + FACTIONS[c.faction].name + '. They will not hire a rival\'s sword.</p>';
   } else if (c.kind === 'merc') {
     const served = game.day - c.since;
-    const fief = SETTLEMENTS.find(v => v.kind === 'village' && v.faction === k);
+    const fief = SETTLEMENTS.find(v => v.kind === 'village' && v.faction === k && !isHeld(v));
     const ok = game.renown >= 60 && rel >= 20 && served >= 10 && avgOpinion >= 0;
     body += '<p>You have served ' + served + ' days as a mercenary.</p>' +
       '<p>A vassal swears an oath to ' + ruler.name + ' and is given a village to hold. Its rent is yours, and its people will join you cheaply.</p>' +
       (ok ? '' : '<p class="warn">To be offered land you need renown 60, standing 20, 10 days of service, and the lords of ' + f.short + ' not to dislike you (their average opinion: ' + Math.round(avgOpinion) + ').</p>') +
-      '<button data-act="vassal"' + (ok ? '' : ' disabled') + '>Swear fealty and receive ' + fief.name + '</button>' +
+      (fief ? '<button data-act="vassal"' + (ok ? '' : ' disabled') + '>Swear fealty and receive ' + fief.name + '</button>' : '<p class="warn">' + f.short.replace(/^the /, 'The ') + ' has no village left to grant.</p>') +
       '<button data-act="quit" class="secondary">End your contract</button>';
     handlers.vassal = () => {
-      game.contract = { faction: k, kind: 'vassal', since: game.day, fief: fief.id };
+      game.contract = { faction: k, kind: 'vassal', since: game.day };
+      game.sites[fief.id].holder = 'player';
       chronicle(ruler.name + ' made Gunther a vassal and granted the village of ' + fief.name + '.');
       for (const l of lords) remember(l.id, 'Gunther swore fealty to our crown', 8);
       game.renown += 10;
@@ -70,10 +72,14 @@ export function openHall(s, back) {
     };
     handlers.quit = () => { game.contract = null; chronicle('Gunther left the service of ' + f.short + '.'); save(); openHall(s, back); };
   } else {
-    body += '<p>You are a sworn vassal of ' + ruler.name + ' and hold ' + site(c.fief).name + ', which pays ' + fiefRent() + ' gold a day' + (game.sites[c.fief].raided ? ' (nothing while it is raided)' : '') + '.</p>' +
+    const mine = heldSites().filter(h => h.faction === k);
+    body += '<p>You are a sworn vassal of ' + ruler.name + (mine.length ? ' and hold ' + mine.map(h => h.name).join(', ') : '') + '. Your holdings pay ' + fiefRent() + ' gold a day (nothing from places that are raided or besieged). Take enemy towns and ' + ruler.name + ' will grant them to you.</p>' +
+      '<p class="small">If you renounce your oath you keep what you hold, in your own name, and ' + f.short + ' will want it back.</p>' +
       '<button data-act="renounce" class="secondary">Renounce your oath</button>';
     handlers.renounce = () => {
       game.contract = null;
+      for (const h of heldSites()) if (h.faction === k) game.sites[h.id].owner = 'player';
+      applyOwners();
       changeRelation(k, -20);
       for (const l of lords) remember(l.id, 'Gunther broke an oath to our crown', -15);
       chronicle('Gunther renounced the oath to ' + ruler.name + '.');
@@ -200,9 +206,13 @@ export function convertPrisoner(t) {
 
 export function contractLine() {
   const c = game.contract;
-  if (!c) return 'You serve no one. Kingdom halls in Brightwater, Redcliff, Elthir and Dunmar hire mercenaries.';
+  if (!c) {
+    const held = heldSites();
+    return (held.length ? 'You serve no one and hold ' + held.map(h => h.name).join(', ') + ' in your own name (' + fiefRent() + ' gold a day). ' : 'You serve no one. ') + 'Kingdom halls hire mercenaries.';
+  }
   if (c.kind === 'merc') return 'Mercenary of ' + FACTIONS[c.faction].name + ', paid ' + contractPay() + ' gold a day.';
-  return 'Sworn vassal of ' + FACTIONS[c.faction].name + ', holding ' + site(c.fief).name + ' (' + fiefRent() + ' gold a day).';
+  const held = heldSites();
+  return 'Sworn vassal of ' + FACTIONS[c.faction].name + (held.length ? ', holding ' + held.map(h => h.name).join(', ') + ' (' + fiefRent() + ' gold a day)' : '') + '.';
 }
 
 export function lordsTable() {
