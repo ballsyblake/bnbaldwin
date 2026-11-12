@@ -213,6 +213,21 @@ export const battleScene = {
   },
   // Floating words over the field: Blocked, Parry!, Interrupted.
   float(x, y, msg, colour) { this.floats.push({ x, y, msg, colour, t: 0 }); },
+  // Is the shot coming at u from the side it faces (towards its target, or the enemy's edge)?
+  facesShot(u, s) {
+    let fx, fy;
+    if (u.target && !u.target.dead) { fx = u.target.x - u.x; fy = u.target.y - u.y; }
+    else if (view.portrait) { fx = 0; fy = u.side === 1 ? 1 : -1; }
+    else { fx = u.side === 1 ? -1 : 1; fy = 0; }
+    const fl = Math.hypot(fx, fy) || 1, vl = Math.hypot(s.vx, s.vy) || 1;
+    return (-s.vx * fx - s.vy * fy) / (fl * vl) > 0.34;      // within about 70 degrees of straight on
+  },
+  // Gunther's arrows bouncing off: say so, and after a few, suggest the sword.
+  armourHint(u, why) {
+    this.float(u.x, u.y - 70, why === 'Shield' ? 'Shield!' : 'Glances off', '#c9bb9c');
+    this.bounced = (this.bounced || 0) + 1;
+    if (this.bounced === 4 && game.weapon !== 'sword') this.banner = { msg: pointer.touch ? 'Arrows bounce off. Tap Bow to draw your sword.' : 'Arrows bounce off. Press Q for your sword.', t: 0 };
+  },
   nextGroup() {
     this.group = { all: 'foot', foot: 'bows', bows: 'all' }[this.group];
     this.hud();
@@ -390,7 +405,7 @@ export const battleScene = {
           const dmg = def.dmg * rand(0.8, 1.2);
           if (T.isHero) this.strikeHero(u, dmg);
           else if (Math.random() < (T.def.guard || 0) * 0.3) { if (Math.random() < 0.3) this.effects.push({ x: (u.x + T.x) / 2, y: (u.y + T.y) / 2 - 26, t: 0, kind: 'block' }); }
-          else this.hurt(T, dmg * (1 - (T.def && T.def.block || 0) * 0.15), 'melee');
+          else this.hurt(T, dmg * (1 - (T.def && T.def.block || 0) * 0.15) * (1 - (T.def && T.def.armour || 0) * 0.2), 'melee');
         }
         continue;
       }
@@ -458,11 +473,19 @@ export const battleScene = {
         const big = u.def && u.def.scale ? 2.2 : 1;
         if (dist(s.x, s.y, u.x, u.y - 18 * big) < 16 * big) {
           s.gone = true;
-          const block = u.def && u.def.block || 0;
+          if (s.hero) trainSkill('archery', 1);
+          // A shield catches arrows that come at its bearer from the front.
+          if (u.def && u.def.shield && this.facesShot(u, s) && Math.random() < u.def.shield) {
+            this.effects.push({ x: u.x, y: u.y - 26, t: 0, kind: 'block' });
+            if (s.hero) this.armourHint(u, 'Shield');
+            break;
+          }
+          // Armour turns arrows aside. Crossbow bolts and javelins punch through more of it.
+          const armour = (u.def ? u.def.armour || 0 : 0) * (s.kind === 'bolt' ? 0.5 : s.kind === 'javelin' ? 0.7 : 1);
           // Defenders standing just behind the wall are hard to hit.
           const cover = ground.wall && u.side === 1 && behindWall(u) ? 0.5 : 1;
-          this.hurt(u, s.dmg * (1 - block * 0.55) * cover, s.hero ? 'hero' : 'shot');
-          if (s.hero) trainSkill('archery', 1);
+          this.hurt(u, s.dmg * (1 - armour) * cover, s.hero ? 'hero' : 'shot');
+          if (s.hero && armour >= 0.45) this.armourHint(u, 'Armour');
           break;
         }
       }
@@ -527,7 +550,8 @@ export const battleScene = {
         return;
       }
       const dmg = (10 + 2 * (game.swordLevel - 1)) * (1 + skill('blade') * 0.05) * (0.55 + 0.8 * s.charge) * (s.dir === 'over' ? 1.2 : 1) * rand(0.9, 1.1);
-      this.hurt(u, dmg, 'hero');
+      // A good blow gets through most armour; arrows mostly do not.
+      this.hurt(u, dmg * (1 - (u.def.armour || 0) * 0.3), 'hero');
       this.effects.push({ x: u.x, y: u.y - 30, t: 0, kind: 'hit' });
       trainSkill('blade', 1);
       if (busy && !u.dead) { u.anim = 'idle'; u.struck = true; u.cd = Math.max(u.cd, 0.5); this.float(u.x, u.y - 70, 'Interrupted', '#f2c14e'); }
@@ -731,7 +755,7 @@ export const battleScene = {
     }
     const top = this.bounds().y0, bot = this.bounds().y1;
     if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, top + 24, 20, '#e0533d', 'center');
-    if (this.banner && this.banner.t < 2.5) text(this.banner.msg, W / 2, Hh / 2 - 40, 34, '#f2c14e', 'center');
+    if (this.banner && this.banner.t < (this.banner.msg.length > 24 ? 4 : 2.5)) text(this.banner.msg, W / 2, Hh / 2 - 40, this.banner.msg.length > 24 ? (view.portrait ? 18 : 24) : 34, '#f2c14e', 'center');
     if (this.time < 6 && !this.over) {
       const msg = pointer.touch ? (game.weapon === 'sword' ? 'Drag to move. Tap left, right or above Gunther to swing. Hold Block.' : view.portrait ? 'Drag to move. Buttons pick a group and give orders.' : 'Drag to move. Gunther shoots by himself. Buttons give orders.')
         : (game.weapon === 'sword' ? 'Move the mouse to pick a side, hold click to wind up. Right click blocks. Q: bow.' : 'WASD move, hold click to draw, release to shoot. Q: sword. 1 2 3 groups, F1 to F4 orders.');

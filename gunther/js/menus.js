@@ -24,6 +24,12 @@ function troopList(troops) {
   for (const t in troops) if (troops[t] > 0) parts.push(troops[t] + ' ' + troopName(t, troops[t]));
   return parts.join(', ') || 'nobody';
 }
+// Warns when arrows will struggle: most of the enemy wears good armour or carries shields.
+function armourNote(troops) {
+  let n = 0, hard = 0;
+  for (const t in troops) { n += troops[t]; if ((TROOPS[t].armour || 0) >= 0.45 || (TROOPS[t].shield || 0) >= 0.5) hard += troops[t]; }
+  return n && hard / n >= 0.4 ? '<p class="warn">Many of them are armoured or carry shields. Arrows will do little: be ready to use your sword.</p>' : '';
+}
 function count(troops) { let n = 0; for (const t in troops) n += troops[t]; return n; }
 function compare(theirs) {
   const mine = playerStrength();
@@ -124,7 +130,7 @@ function openHelp(back) {
     '<p><b>Map.</b> Click or tap to travel. Time only passes while you move, or while you camp. Click a town to visit it, or a party to meet it. Space pauses, the speed buttons bottom left fast-forward, M opens the full map, P the party, J skills and quests, C camps, and E enters the place you are standing beside.</p>' +
     '<p><b>Your warband.</b> Hire recruits in villages and towns. Feed them (grain or fish) and pay their wages each week, or morale drops and men desert. Winning battles gives your men experience: train them up from the Party screen.</p>' +
     '<p><b>Battles.</b> WASD to move, aim with the mouse, hold click to shoot. 1, 2 and 3 pick who you are ordering (All, Foot or Bows), and F1 to F4 tell them to Charge, Hold, Follow you or Fall back. On a phone: drag to move, Gunther shoots by himself, and the buttons give orders.</p>' +
-    '<p><b>Fighting.</b> Q swaps between bow and sword. Bow: hold click to draw and release to shoot; a full draw hits hardest and flies straightest, but moving or holding too long makes it shaky. Sword: move the mouse left, right or up to pick the side you swing from (the gold marker), hold click to wind up and release to strike. Each enemy shows its guard as a grey bar; strike a side it is not guarding, or hit it while it is winding up. Right click cancels a swing, which lets you feint. Red arrows show where a blow is coming from: hold right click with your marker on that side to block, and block just before it lands to parry and stun them. On a phone, tap left, right or above Gunther to swing and hold the Block button. Bladework improves as you fight.</p>' +
+    '<p><b>Fighting.</b> Q swaps between bow and sword. Bow: hold click to draw and release to shoot; a full draw hits hardest and flies straightest, but moving or holding too long makes it shaky. Sword: move the mouse left, right or up to pick the side you swing from (the gold marker), hold click to wind up and release to strike. Each enemy shows its guard as a grey bar; strike a side it is not guarding, or hit it while it is winding up. Right click cancels a swing, which lets you feint. Armour and shields matter: a shield stops most arrows that come at it from the front (shoot from the side or behind), and heavy armour makes arrows glance off, while a sword blow gets through most of it. Crossbow bolts pierce more armour than arrows. Red arrows show where a blow is coming from: hold right click with your marker on that side to block, and block just before it lands to parry and stun them. On a phone, tap left, right or above Gunther to swing and hold the Block button. Bladework improves as you fight.</p>' +
     '<p><b>Skills.</b> Gunther gets better at what he does: shooting raises Archery, winning raises Leadership and Tactics, trading raises Trade, and tending the wounded raises Medicine.</p>' +
     '<p><b>Towns and sieges.</b> Towns have walls and a garrison, and a town\'s villages belong to whoever holds the town. Lords at war march on enemy towns, camp outside for a few days and then storm them, so towns change hands. You can besiege any town you are not sworn to (that means war with its owner): build ladders for two days, then fight your way in through the breaches while their archers shoot from behind the wall. As a vassal your lord grants you the towns you take; as a mercenary you are paid a bounty; on your own you hold them yourself. Leave men in a town\'s garrison to keep it, and collect its rent.</p>' +
     '<p><b>Family.</b> Years pass (one every 40 days) and everyone ages. Lords die of old age or in battle, and their son or daughter takes over, remembering half of what their parent felt about you. Marry into a lord\'s house through their kingdom\'s hall and you may have children. When your captain dies, of old age or struck down in battle, a grown child (or a cousin) takes over with the gear, some gold and renown, and a little of the skill. Death in battle can be turned off on the Party screen.</p>' +
@@ -396,7 +402,7 @@ function openCamp(s, msg) {
   const big = s.kind === 'stronghold';
   showPanel('<h2>' + s.name + '</h2>' + msg +
     '<p>' + (big ? 'The Horde\'s fortress. Warlord Gorrak waits inside with his guard.' : 'An orc war camp. Raiders set out from here to burn the villages.') + '</p>' +
-    '<p>Defenders: ' + troopList(g) + '.</p><p>' + compare(strength(g)) + '</p>' + statusLine() +
+    '<p>Defenders: ' + troopList(g) + '.</p><p>' + compare(strength(g)) + '</p>' + armourNote(g) + statusLine() +
     '<button data-act="fight"' + (troopCount(true) < 1 && big ? ' disabled' : '') + '>' + (big ? 'Storm the fortress' : 'Attack the camp') + '</button>' +
     (big ? '' : '<button data-act="send" class="secondary">Send your men in (auto-resolve)</button>') +
     '<button data-act="leave" class="secondary">Leave</button>', {
@@ -412,7 +418,7 @@ export function openEncounter(p, forced) {
   const isHostile = enemies(p, { faction: 'player' });
   const desc = { warband: 'Orc raiders looking for easy prey.', lord: p.lord ? lordBlurb(p.lord) : '', caravan: 'Merchants hauling goods to ' + (p.dest ? site(p.dest).name : 'market') + '.' }[p.kind] || '';
   let html = '<h2>' + esc(p.name) + (p.lord ? '\'s host' : '') + '</h2><p>' + (p.lord ? '' : f.name + '. ') + desc + '</p>' + (p.lord ? '<p>' + lordGreeting(p.lord) + '</p>' : '') +
-    '<p>' + troopList(p.troops) + '.</p><p>' + compare(strength(p.troops)) + '</p>';
+    '<p>' + troopList(p.troops) + '.</p><p>' + compare(strength(p.troops)) + '</p>' + armourNote(p.troops);
   if (p.lord && grudge(p.lord) && !hostile(p.faction, 'player')) html += '<p class="warn">This is a personal grudge. Fighting back will not anger ' + f.short + '.</p>';
   if (forced) html += '<p class="bad">They are attacking you!</p>';
   const canSend = troopCount(true) > 0;
@@ -653,7 +659,7 @@ function openSiege(s, head) {
   const others = besiegers(s).map(p => p.lord ? lord(p.lord).name : p.name);
   const fit = troopCount(true);
   showPanel(head + '<p class="bad">The gates are barred against you.</p>' +
-    '<p>Garrison: ' + troopList(g) + '.</p><p>' + compare(strength(g) / WALL_BONUS) + ' <span class="small">(walls count for a lot)</span></p>' +
+    '<p>Garrison: ' + troopList(g) + '.</p><p>' + compare(strength(g) / WALL_BONUS) + ' <span class="small">(walls count for a lot)</span></p>' + armourNote(g) +
     (others.length ? '<p>' + others.join(', ') + (others.length > 1 ? ' are' : ' is') + ' already besieging the town.</p>' : '') +
     '<p class="small">Building ladders takes 2 days. Then you storm the walls: the defenders hold the breaches and their archers shoot from behind the wall.</p>' +
     '<button data-act="siege"' + (fit < 5 ? ' disabled' : '') + '>Build ladders and storm the walls' + (fit < 5 ? ' (needs 5 fit men)' : '') + '</button>' +
@@ -785,7 +791,7 @@ function rosterHtml() {
     const need = d.upgrades.length ? Math.min(...d.upgrades.map(u => u.xp)) : 0;
     det = '<div class="kind">' + ROLE(t) + ' &middot; ' + st.n + ' in the warband</div><h3>' + d.name + '</h3>' +
       (st.wounded ? '<p class="bad">' + st.wounded + ' wounded, they will not fight until they heal.</p>' : '') +
-      '<div class="sg">' + stat(d.ranged ? 'Ranged' : 'Melee', d.dmg) + stat('Health', d.hp) + stat('Defence', Math.round((d.block || 0) * 100) + '%') + stat('Speed', d.speed) +
+      '<div class="sg">' + stat(d.ranged ? 'Ranged' : 'Melee', d.dmg) + stat('Health', d.hp) + stat('Armour', Math.round((d.armour || 0) * 100) + '%') + stat('Shield', Math.round((d.shield || 0) * 100) + '%') + stat('Speed', d.speed) +
       stat('Range', d.ranged ? d.range : 'Close') + stat('Upkeep', d.wage + 'g/wk') + '</div>' +
       (need ? '<p class="lbl">Experience</p><div class="meter"><i style="width:' + Math.min(100, Math.round(st.xp / need * 100)) + '%;background:var(--gold)"></i></div><p class="small">' + Math.min(st.xp, need) + ' / ' + need + ' xp to train one man</p>' : '<p class="small">Fully trained.</p>') +
       ups + '<button data-act="dismiss" data-arg="' + t + '" class="secondary">Dismiss one</button>';
