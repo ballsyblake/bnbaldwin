@@ -8,10 +8,11 @@
 // When the step is done its scene is shown, with choices if it has any. A choice sets a flag that
 // later text, and later steps, can check with "if" or "unless".
 
-import { showPanel, hidePanel, panelOpen, rand, esc } from './core.js';
+import { showPanel, hidePanel, panelOpen, rand, esc, setScene } from './core.js';
 import { STORY, RACES, TROOPS } from './data.js';
 import { game, note, chronicle, site, addTroops, changeRelation, save, troopCount, partyLimit } from './state.js';
 import { spawnParty, mapScene } from './world.js';
+import { battleScene } from './battle.js';
 import { peopleOf } from './sieges.js';
 
 export function newStory() { return { ch: 0, on: false, offered: false, flags: {}, visited: [], done: false }; }
@@ -57,10 +58,41 @@ export function storyPlaces() {
   return [];
 }
 
-// ---------------------------------------------------------------- the prologue
+// ---------------------------------------------------------------- the opening
+// A new campaign starts with the story: the hanging at Ashby, then the fight on the Fairmeet road,
+// which teaches combat one step at a time. Three years later, the warband takes the road.
+export function startOpening() {
+  const P = STORY.prologue;
+  const start = game.troops;
+  game.troops = { recruit: { n: 3, wounded: 0, xp: 0 } };
+  game.story.offered = true;
+  showPanel('<h2>' + esc(P.title) + '</h2><div class="story">' + lines(P.text) + '</div>' +
+    '<button data-act="fight">' + esc(P.fight || 'Fight') + '</button><button data-act="skip" class="secondary">' + esc(P.skip || 'Skip') + '</button>', {
+    fight: () => {
+      hidePanel();
+      setScene(battleScene, { enemy: { troops: {}, faction: P.foeFaction || 'march', name: P.foeName || 'The tithe-wardens\' men' }, kind: 'field', tutorial: true, onEnd: () => afterOpening(start) });
+    },
+    skip: () => afterOpening(start)
+  });
+}
+function afterOpening(start) {
+  const P = STORY.prologue;
+  game.troops = start;
+  game.weapon = 'bow'; game.health = game.maxHealth;
+  game.story.on = true;
+  save();
+  setScene(mapScene);
+  const c = chapter();
+  showPanel('<h2>Three years later</h2><div class="story">' + lines(P.after) + '</div>' +
+    '<h3>' + esc(c.title) + '</h3><p>' + esc(c.goal) + '</p>' +
+    '<p class="small">A gold ! on the map marks where the story wants you. Buy food in towns, hire men, and keep your warband paid. Your story and quests are on the Quests screen (J); How to play is on the Party screen.</p>' +
+    '<button data-act="ok">To the road</button>', { ok: () => hidePanel() });
+}
+
+// ---------------------------------------------------------------- the prologue, for older saves
 export function openPrologue(back) {
   const P = STORY.prologue;
-  showPanel('<h2>' + esc(P.title) + '</h2><div class="story">' + lines(P.text) + '</div>' +
+  showPanel('<h2>' + esc(P.title) + '</h2><div class="story">' + lines(P.text) + lines(P.after) + '</div>' +
     '<button data-act="yes">' + esc(P.accept) + '</button><button data-act="no" class="secondary">' + esc(P.decline) + '</button>', {
     yes: () => { game.story.on = true; save(); openGoal(back); },
     no: () => { save(); note('You can take up the story later from the Quests screen.', '#d8dce6'); back ? back() : hidePanel(); }
