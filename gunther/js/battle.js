@@ -155,7 +155,7 @@ export const battleScene = {
     this.refreshHud(true);
   },
   topBar() {
-    const foe = this.opts.enemy, fc = this.enemyFaction === 'horde' ? 'var(--danger)' : FACTIONS[this.enemyFaction].colour;
+    const foe = this.opts.enemy, fc = FACTIONS[this.enemyFaction].colour;
     return '<div class="box abs btop" data-min="btop"><div class="mini" data-k="bmini"></div>' +
       '<div class="side"><div class="meterhead"><b class="px name gold">Gunther</b><span data-k="hp"></span></div><div class="meter"><i data-k="hpbar"></i></div>' +
         '<div class="meterhead"><span class="lbl">Men standing</span><b class="px" data-k="mine"></b></div><div class="meter"><i data-k="minebar" style="background:var(--gold)"></i></div></div>' +

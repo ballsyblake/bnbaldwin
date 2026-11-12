@@ -55,3 +55,7 @@ Each entry in `chapters` has:
 - `reward` (optional): any of `gold`, `spend` (gold paid), `renown`, `troops` ({type: n}), `recruits` (local recruits, `visits` only), `relations` ({faction: n}), `say`, `chronicle`.
 
 A mod changes the story with `"story": {"chapters": [...]}`; chapters merge by `id` like lords and places, and `"remove": true` drops one.
+
+## Realms and diplomacy
+
+Any faction with `"kingdom": true` is a realm: it has lords, holds towns, and makes war, peace and alliances with every other realm (js/diplomacy.js). The orc clans (`horde`) are a realm like the others, with race `orc`. A ruler's traits decide how warlike (bold, cruel; cautious holds back) and how faithless (cruel, greedy; honourable holds back) the realm is. `outlaws` fight everyone; `compact` fights only Gunther and is used by the story.

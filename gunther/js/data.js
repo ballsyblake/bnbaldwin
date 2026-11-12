@@ -78,7 +78,6 @@ function problems(d) {
   for (const need of ['player', 'free', 'horde']) if (!F[need]) out.push('the ' + need + ' faction cannot be removed');
   for (const need of ['recruit', 'bowman', 'grunt', 'brute', 'shaman', 'warlord']) if (!T[need]) out.push('the ' + need + ' troop cannot be removed');
   for (const need of ['grain', 'fish']) if (!d.goods[need]) out.push('the ' + need + ' goods cannot be removed');
-  if (!S.some(s => s.kind === 'stronghold')) out.push('there must be an orc stronghold');
   for (const c of d.story.chapters || []) for (const st of [].concat(c.step)) {
     if (!st || !['visit', 'visits', 'defeat'].includes(st.type)) { out.push('story chapter ' + c.id + ' has an unknown step type'); continue; }
     for (const id of [st.place, st.near].concat(st.places || [])) if (id && !S.some(s => s.id === id)) out.push('story chapter ' + c.id + ' uses unknown place ' + id);

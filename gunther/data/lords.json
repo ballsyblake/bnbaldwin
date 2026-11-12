@@ -8,5 +8,8 @@
   {"id": "ilyra", "name": "Queen Ilyra", "faction": "elves", "ruler": true, "traits": ["honourable", "cautious"], "sex": "f", "age": 190, "home": "elthir"},
   {"id": "faelan", "name": "Lord Faelan", "faction": "elves", "traits": ["bold", "cruel"], "sex": "m", "age": 95, "home": "silverbrook"},
   {"id": "borga", "name": "High Thane Borga", "faction": "dwarves", "ruler": true, "traits": ["greedy", "bold"], "sex": "f", "age": 126, "home": "dunmar"},
-  {"id": "halvar", "name": "Thane Halvar", "faction": "dwarves", "traits": ["honourable", "cautious"], "sex": "m", "age": 66, "home": "irondeep"}
+  {"id": "halvar", "name": "Thane Halvar", "faction": "dwarves", "traits": ["honourable", "cautious"], "sex": "m", "age": 66, "home": "irondeep"},
+  {"id": "gorrak", "name": "Warlord Gorrak", "faction": "horde", "ruler": true, "traits": ["cruel", "greedy"], "sex": "m", "age": 38, "home": "skullrock"},
+  {"id": "ugrasha", "name": "Chief Ugrasha", "faction": "horde", "traits": ["bold", "honourable"], "sex": "f", "age": 27, "home": "camp-west"},
+  {"id": "murzag", "name": "Chief Murzag", "faction": "horde", "traits": ["cautious", "greedy"], "sex": "m", "age": 33, "home": "camp-east"}
 ]

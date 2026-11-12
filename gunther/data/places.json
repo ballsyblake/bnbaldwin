@@ -11,10 +11,10 @@
     {"id": "silverbrook", "name": "Silverbrook", "kind": "village", "faction": "elves", "race": "elf", "bound": "elthir", "x": 1230, "y": 2060, "makes": ["timber", "wool"], "wants": ["iron"]},
     {"id": "dunmar", "name": "Dunmar", "kind": "town", "faction": "dwarves", "race": "dwarf", "x": 2980, "y": 760, "art": 2, "makes": ["tools", "iron"], "wants": ["grain", "ale", "timber"]},
     {"id": "irondeep", "name": "Irondeep", "kind": "village", "faction": "dwarves", "race": "dwarf", "bound": "dunmar", "x": 3220, "y": 920, "makes": ["iron"], "wants": ["grain", "ale"]},
-    {"id": "camp-west", "name": "Bonepit Camp", "kind": "camp", "faction": "horde", "x": 1180, "y": 640},
-    {"id": "camp-mid", "name": "Gutrot Camp", "kind": "camp", "faction": "horde", "x": 2080, "y": 760},
-    {"id": "camp-east", "name": "Fangmire Camp", "kind": "camp", "faction": "horde", "x": 2640, "y": 640},
-    {"id": "skullrock", "name": "Skullrock", "kind": "stronghold", "faction": "horde", "x": 1700, "y": 420}
+    {"id": "camp-west", "name": "Bonepit Camp", "kind": "village", "faction": "horde", "bound": "skullrock", "x": 1180, "y": 640, "makes": ["fish", "wool"], "wants": ["ale"]},
+    {"id": "camp-mid", "name": "Gutrot Camp", "kind": "village", "faction": "horde", "bound": "skullrock", "x": 2080, "y": 760, "makes": ["grain"], "wants": ["tools"]},
+    {"id": "camp-east", "name": "Fangmire Camp", "kind": "village", "faction": "horde", "bound": "skullrock", "x": 2640, "y": 640, "makes": ["iron"], "wants": ["grain"]},
+    {"id": "skullrock", "name": "Skullrock", "kind": "town", "faction": "horde", "x": 1700, "y": 420, "art": 0, "makes": ["iron", "wool"], "wants": ["ale", "grain", "spice"]}
   ],
   "roads": [
     ["millford", "brightwater"],

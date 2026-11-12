@@ -5,7 +5,7 @@
   "prologue": {
     "title": "The Wall Tithe",
     "text": [
-      "Every spring the tithe-wardens come to the villages of Aldmoor. A tenth of the grain, a tenth of the silver, and one son or daughter in ten for the levy. The Wall Tithe, they call it: the price of keeping the orcs in the north.",
+      "Every spring the tithe-wardens come to the villages of Aldmoor. A tenth of the grain, a tenth of the silver, and one son or daughter in ten for the levy. The Wall Tithe, they call it: the price of keeping the clans of Skullrock in the north.",
       "Three springs ago, on tithe day in Ashby, a quarry girl called Wren climbed onto the well and sang the Freeholder's Lament. It is an old song, and it has been banned for longer than anyone can remember. The wardens hanged her from the mill beam before sundown.",
       "You were there. She found your face in the crowd, and her last words were for you: \"The tithe never reaches the wall, Gunther. Ask where it goes.\"",
       "You left Ashby that night with a bow and nothing else. Now you have a warband, and men who follow you. Perhaps it is time to ask."
@@ -31,11 +31,11 @@
       "id": "runners",
       "title": "The tithe-runners",
       "goal": "Find the orc tithe-runners near Gutrot Camp and take the chest they carry. They are marked with ! on the map.",
-      "step": { "type": "defeat", "near": "camp-mid", "spread": 260, "party": { "name": "Tithe-runners", "faction": "horde", "troops": { "grunt": 6, "brute": 1 }, "desc": "Orcs hauling an iron-bound chest south. They are not raiding anyone." } },
+      "step": { "type": "defeat", "near": "camp-mid", "spread": 260, "party": { "name": "Tithe-runners", "faction": "compact", "troops": { "grunt": 6, "brute": 1 }, "desc": "Clan orcs hauling an iron-bound chest north to Skullrock, with no banner. They do not want to be seen." } },
       "scene": [
         "The chest is heavy with silver, stamped with the treasury marks of the Vale and the Ember March. Under the coins is a letter in a careful hand, sealed in grey wax with the print of a burnt oak leaf.",
         "\"To the Warlord, for the season. Raid where they grumble, spare where they pay. Burn Ashby again if it sings.\"",
-        "The orcs are not the enemy of the tithe. They are its servants. Someone pays Gorrak to frighten the villages, so the villages keep paying for protection. Someone who seals their letters with a burnt leaf.",
+        "The clans are not the enemy of the tithe. They are its hired hands. Someone pays Gorrak to burn villages on the border, so the villages keep paying for protection. Someone who seals their letters with a burnt leaf.",
         "There are four hundred silver marks in the chest."
       ],
       "choices": [
@@ -144,5 +144,5 @@
       "reward": { "renown": 100, "gold": 1000, "relations": { "vale": 15, "march": 15, "elves": 10, "dwarves": 10, "free": 10 }, "chronicle": "Gunther broke the Ashen Compact. The Wall Tithe is no more." }
     }
   ],
-  "ending": "The story of the Wall Tithe is over. The island is yours to roam: take towns, raise a family, or march on Skullrock."
+  "ending": "The story of the Wall Tithe is over. The island is yours to roam: take towns, raise a family, and play the realms against each other."
 }

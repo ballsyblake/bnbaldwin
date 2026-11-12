@@ -2,31 +2,205 @@
   "human": {
     "name": "Human",
     "recruit": "recruit",
-    "army": [["recruit", "recruit"], ["spearman", "bowman"], ["knight", "ranger"]],
+    "army": [
+      [
+        "recruit",
+        "recruit"
+      ],
+      [
+        "spearman",
+        "bowman"
+      ],
+      [
+        "knight",
+        "ranger"
+      ]
+    ],
     "adult": 16,
     "old": 55,
-    "titles": {"ruler": ["King", "Queen"], "lord": ["Sir", "Lady"]},
+    "titles": {
+      "ruler": [
+        "King",
+        "Queen"
+      ],
+      "lord": [
+        "Sir",
+        "Lady"
+      ]
+    },
     "names": {
-      "m": ["Edric", "Osric", "Alden", "Rowan", "Tobin", "Hal", "Bram", "Cedric", "Wystan", "Godric"],
-      "f": ["Ada", "Elowen", "Maud", "Isobel", "Wren", "Edith", "Rosalind", "Bryony", "Agnes", "Linnet"]
+      "m": [
+        "Edric",
+        "Osric",
+        "Alden",
+        "Rowan",
+        "Tobin",
+        "Hal",
+        "Bram",
+        "Cedric",
+        "Wystan",
+        "Godric"
+      ],
+      "f": [
+        "Ada",
+        "Elowen",
+        "Maud",
+        "Isobel",
+        "Wren",
+        "Edith",
+        "Rosalind",
+        "Bryony",
+        "Agnes",
+        "Linnet"
+      ]
     }
   },
   "elf": {
     "name": "Elf",
     "recruit": "elfscout",
-    "army": [["elfscout", "elfscout"], ["elfblade", "elfarcher"], ["elfblade", "sentinel"]],
+    "army": [
+      [
+        "elfscout",
+        "elfscout"
+      ],
+      [
+        "elfblade",
+        "elfarcher"
+      ],
+      [
+        "elfblade",
+        "sentinel"
+      ]
+    ],
     "adult": 40,
     "old": 240,
-    "titles": {"ruler": ["King", "Queen"], "lord": ["Lord", "Lady"]},
-    "names": {"m": ["Caelir", "Thalion", "Erevan", "Aerin", "Lorien", "Sylvar"], "f": ["Ilyth", "Naeva", "Siora", "Elara", "Liriel", "Aeris"]}
+    "titles": {
+      "ruler": [
+        "King",
+        "Queen"
+      ],
+      "lord": [
+        "Lord",
+        "Lady"
+      ]
+    },
+    "names": {
+      "m": [
+        "Caelir",
+        "Thalion",
+        "Erevan",
+        "Aerin",
+        "Lorien",
+        "Sylvar"
+      ],
+      "f": [
+        "Ilyth",
+        "Naeva",
+        "Siora",
+        "Elara",
+        "Liriel",
+        "Aeris"
+      ]
+    }
   },
   "dwarf": {
     "name": "Dwarf",
     "recruit": "dwarfminer",
-    "army": [["dwarfminer", "dwarfminer"], ["dwarfaxe", "dwarfxbow"], ["ironguard", "dwarfxbow"]],
+    "army": [
+      [
+        "dwarfminer",
+        "dwarfminer"
+      ],
+      [
+        "dwarfaxe",
+        "dwarfxbow"
+      ],
+      [
+        "ironguard",
+        "dwarfxbow"
+      ]
+    ],
     "adult": 30,
     "old": 130,
-    "titles": {"ruler": ["High Thane", "High Thane"], "lord": ["Thane", "Thane"]},
-    "names": {"m": ["Torvald", "Brok", "Durin", "Hakon", "Grim", "Ulfar"], "f": ["Helga", "Sigrun", "Brynja", "Dagny", "Thora", "Ragna"]}
+    "titles": {
+      "ruler": [
+        "High Thane",
+        "High Thane"
+      ],
+      "lord": [
+        "Thane",
+        "Thane"
+      ]
+    },
+    "names": {
+      "m": [
+        "Torvald",
+        "Brok",
+        "Durin",
+        "Hakon",
+        "Grim",
+        "Ulfar"
+      ],
+      "f": [
+        "Helga",
+        "Sigrun",
+        "Brynja",
+        "Dagny",
+        "Thora",
+        "Ragna"
+      ]
+    }
+  },
+  "orc": {
+    "name": "Orc",
+    "recruit": "grunt",
+    "army": [
+      [
+        "grunt",
+        "grunt"
+      ],
+      [
+        "grunt",
+        "shaman"
+      ],
+      [
+        "brute",
+        "shaman"
+      ]
+    ],
+    "adult": 14,
+    "old": 45,
+    "titles": {
+      "ruler": [
+        "Warlord",
+        "Warlord"
+      ],
+      "lord": [
+        "Chief",
+        "Chief"
+      ]
+    },
+    "names": {
+      "m": [
+        "Murzag",
+        "Drukk",
+        "Skarn",
+        "Ozzug",
+        "Thrak",
+        "Hrom",
+        "Varg",
+        "Brakka"
+      ],
+      "f": [
+        "Ugrasha",
+        "Bashra",
+        "Yazga",
+        "Ruka",
+        "Ghora",
+        "Narza",
+        "Shagra",
+        "Vruna"
+      ]
+    }
   }
 }
