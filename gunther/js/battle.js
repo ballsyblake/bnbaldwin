@@ -123,11 +123,11 @@ export const battleScene = {
     this.hero = this.addUnit(0, null, view.portrait ? view.W / 2 : b.x0 + 80, view.portrait ? b.y1 - 60 : view.H * 0.6);
     for (let s = 0; s < 2; s++) this.reinforce(s, true);
     this.routing = false;
-    this.tut = null; this.tutBlocks = 0;
+    this.tut = null; this.tutBlocks = 0; this.tutShield = false;
     if (opts.tutorial) tutorialStart(this);
     this.hud();
   },
-  bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 210 : 76) }; },
+  bounds() { return { x0: 40, y0: view.portrait ? 100 : 80, x1: view.W - 40, y1: view.H - (view.portrait ? 175 : 60) }; },
   // Battle HUD: a top bar with both sides and the odds, group cards bottom left, orders bottom right.
   hud() {
     const ORD = { charge: 'Charge', hold: 'Hold', follow: 'Follow', fallback: 'Fall back' };
@@ -303,6 +303,8 @@ export const battleScene = {
     u.hp -= amount;
     u.flash = 0.12;
     if (u.isHero) game.health = Math.max(0, u.hp);
+    // In the training fight's blocking lesson the warden stays up until Gunther has blocked.
+    if (u.hp <= 0 && u.side === 1 && this.tutShield) { u.hp = 1; u.stun = 0; if (Math.random() < 0.3) this.float(u.x, u.y - 70, 'Block him first!', '#f2c14e'); }
     if (u.hp <= 0) {
       u.dead = true; u.deadT = 0; u.anim = 'dead';
       if (u.isHero) { this.hud(); return; }

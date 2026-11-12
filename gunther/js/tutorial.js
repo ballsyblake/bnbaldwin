@@ -35,7 +35,8 @@ const STAGES = [
   {
     text: () => touch() ? 'Red arrows show where a blow is coming. Hold the Block button to stop it. Block it twice.'
       : 'Red arrows show where a blow is coming. Move your gold marker to that side and hold right click. Block it twice; just before it lands is a parry.',
-    begin(B) { B.tutBlocks = 0; spawn(B, 'recruit', 1, false, { dmgScale: 0.3, hp: 60 }); },
+    begin(B) { B.tutBlocks = 0; this.keep(B); },
+    keep(B) { spawn(B, 'recruit', 1, false, { dmgScale: 0.3, hp: 60 }); },
     done(B) { return B.tutBlocks >= 2; }
   },
   {
@@ -89,6 +90,11 @@ export function tutorialTick(B, dt) {
   // Gunther cannot fall here.
   B.hero.hp = Math.max(B.hero.hp, B.hero.max * 0.3); game.health = Math.max(game.health, game.maxHealth * 0.3);
   const st = STAGES[T.i];
+  // A lesson that needs someone to fight never runs out of enemies: if Gunther or his lads kill
+  // the warden before the lesson is learnt, another one steps up. The blocking lesson's warden
+  // can't be killed until Gunther has blocked twice.
+  B.tutShield = !!(st && st.keep && !st.done(B));
+  if (B.tutShield && !foesLeft(B)) st.keep(B);
   if (st && T.t > 0.6 && st.done(B)) {
     T.i++; T.t = 0;
     if (STAGES[T.i]) STAGES[T.i].begin(B);
@@ -106,15 +112,15 @@ export function tutorialText(B) {
 export function tutorialDraw(B, ctx) {
   const msg = tutorialText(B);
   if (!msg) return;
-  const W = view.W, maxW = Math.min(W - 40, 720), size = view.portrait ? 15 : 16;
+  const W = view.W, maxW = Math.min(W - 40, 560), size = view.portrait ? 14 : 13;
   ctx.font = '600 ' + size + 'px Inter, sans-serif';
   const words = msg.split(' '), lines = [];
   let cur = '';
   for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW - 32) { lines.push(cur); cur = w; } else cur = t; }
   if (cur) lines.push(cur);
-  const h = 36 + lines.length * (size + 6), y = B.bounds().y0 + 8, x = (W - maxW) / 2;
+  const h = 30 + lines.length * (size + 5), y = B.bounds().y0 + 4, x = (W - maxW) / 2;
   ctx.fillStyle = 'rgba(13, 11, 9, 0.82)'; ctx.fillRect(x, y, maxW, h);
   ctx.strokeStyle = '#f2c14e'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, maxW - 2, h - 2);
-  text('Training fight \u00b7 step ' + (B.tut.i + 1) + ' of ' + STAGES.length, W / 2, y + 17, 11, '#f2c14e', 'center');
-  lines.forEach((l, i) => text(l, W / 2, y + 36 + i * (size + 6) + size * 0.4, size, '#f4ead2', 'center'));
+  text('Training fight \u00b7 step ' + (B.tut.i + 1) + ' of ' + STAGES.length, W / 2, y + 14, 10, '#f2c14e', 'center');
+  lines.forEach((l, i) => text(l, W / 2, y + 30 + i * (size + 5) + size * 0.4, size, '#f4ead2', 'center'));
 }

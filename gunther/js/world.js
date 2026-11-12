@@ -301,7 +301,7 @@ export const mapScene = {
   // Builds the map HUD once; refreshHud() then keeps the numbers current.
   hud() {
     const mm = this.minimap();
-    const u = n => 'calc(var(--u) * ' + n + ')';
+    const u = n => 'calc(var(--cu) * ' + n + ')';
     const sp = (v, label, hk) => '<button data-act="speed" data-arg="' + v + '" class="' + (this.speed === v ? 'primary' : '') + '" title="' + hk + '">' + label + '</button>';
     const act = (a, label, hk, cls) => '<button data-act="' + a + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<small>' + hk + '</small></button>';
     setHud(
@@ -380,10 +380,10 @@ export const mapScene = {
         el.addEventListener('click', e => { if (e.target.closest('button')) this.enterNear(); });
       }
       const cam = this.camera();
-      const pos = view.portrait ? 'left:calc(var(--u) * 120);top:calc(var(--u) * ' + (view.H - 380) + ')'
+      const pos = view.portrait ? 'left:calc(var(--cu) * 120);top:calc(var(--cu) * ' + (view.H - 380) + ')'
         : (() => { const mm = this.minimap(), x = clamp(s.x - cam.x + 70, 10, view.W - 200);
             const minTop = uiMin('minimap') ? 60 : x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
-            return 'left:calc(var(--u) * ' + x + ');top:calc(var(--u) * ' + clamp(s.y - cam.y - 100, minTop, view.H - 220) + ')'; })();
+            return 'left:calc(var(--cu) * ' + x + ');top:calc(var(--cu) * ' + clamp(s.y - cam.y - 100, minTop, view.H - 220) + ')'; })();
       if (el && el.dataset.pos !== pos) { el.dataset.pos = pos; el.style.cssText = pos; }
     }
   },

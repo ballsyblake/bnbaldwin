@@ -85,7 +85,8 @@ export function openTitle() {
     '<div class="chips">' + (saved ? '<span>Last save: Day ' + game.day + ' &middot; near ' + esc(nearestPlace(game.player.x, game.player.y)) + '</span>' : '') + '<span>v0.5 prototype</span>' +
       (MODS.some(m => m.on && !m.error) ? '<span>' + MODS.filter(m => m.on && !m.error).length + ' mod(s) on</span>' : '') + '</div>',
     {
-      continue: () => { loadSave(); populate(); setScene(mapScene); },
+      // A campaign left during its opening (on day 1, story not yet begun) picks the opening up again.
+      continue: () => { loadSave(); populate(); setScene(mapScene); if (!game.story.on && !game.story.done && game.day <= 1) startOpening(); },
       new: () => { newGame(true); populate(); save(); setScene(mapScene); startOpening(); },
       help: () => openHelp(openTitle),
       mods: () => openMods()

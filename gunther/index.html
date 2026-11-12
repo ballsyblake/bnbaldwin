@@ -40,6 +40,14 @@
     .gold { color: var(--gold); } .goodc { color: var(--good); } .dangerc { color: var(--danger); } .bluec { color: #7fb0ff; } .mutedc { color: var(--muted); }
 
     /* ---- in-game HUD layer: sits over the canvas, lets clicks through except on its boxes ---- */
+    /* The HUD is drawn smaller than the canvas so it leaves room for the game: inside #ui, --u is
+       a fraction of a canvas pixel. --cu stays one canvas pixel, for boxes that sit on canvas art. */
+    #stage { --cu: calc(100cqw / 960); }
+    #stage.portrait { --cu: calc(100cqw / 540); }
+    #ui { --u: calc(100cqw / 960 * 0.72);
+      --fs-label: calc(var(--u) * 10); --fs-body: calc(var(--u) * 12); --fs-value: calc(var(--u) * 16); --fs-title: calc(var(--u) * 18); }
+    #stage.portrait #ui { --u: calc(100cqw / 540 * 0.8);
+      --fs-label: calc(var(--u) * 13); --fs-body: calc(var(--u) * 16); --fs-value: calc(var(--u) * 20); --fs-title: calc(var(--u) * 22); }
     #ui { position: absolute; inset: 0; pointer-events: none; font-size: var(--fs-body); }
     #ui .box, #ui button { pointer-events: auto; }
     #overlay.show ~ #ui { display: none; }
@@ -90,6 +98,8 @@
 
     /* battle: top bar, group cards, orders */
     .btop { left: calc(var(--u) * 10); right: calc(var(--u) * 10); top: calc(var(--u) * 8); padding: calc(var(--u) * 7) calc(var(--u) * 12); display: grid; grid-template-columns: 1fr auto 1fr; gap: calc(var(--u) * 18); align-items: center; }
+    /* Landscape: the top bar is a centred strip, not the full width. */
+    #stage:not(.portrait) .btop:not(.min) { left: 50%; right: auto; width: calc(var(--u) * 900); transform: translateX(-50%); }
     .btop .side .meter { margin: calc(var(--u) * 3) 0 calc(var(--u) * 5); }
     .btop .name { font-size: var(--fs-title); }
     .btop .right .meterhead { flex-direction: row-reverse; }
