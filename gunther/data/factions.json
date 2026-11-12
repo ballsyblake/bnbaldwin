@@ -5,5 +5,7 @@
   "free": {"name": "Free city of Fairmeet", "colour": "#9aa3b2", "short": "Fairmeet"},
   "elves": {"name": "The Elthir Wood", "colour": "#3aa58f", "short": "the Elthir Wood", "ruler": "Queen Ilyra", "race": "elf", "kingdom": true},
   "dwarves": {"name": "The Dunmar Holds", "colour": "#c08a3e", "short": "the Dunmar Holds", "ruler": "High Thane Borga", "race": "dwarf", "kingdom": true},
-  "horde": {"name": "The Gorrak Horde", "colour": "#7c9a2e", "short": "the Horde"}
+  "horde": {"name": "The Skullrock Clans", "colour": "#7c9a2e", "short": "the Clans", "ruler": "Warlord Gorrak", "race": "orc", "kingdom": true},
+  "compact": {"name": "The Ashen Compact", "colour": "#8b8478", "short": "the Compact"},
+  "outlaws": {"name": "Outlaws", "colour": "#5a4a3a", "short": "outlaws"}
 }

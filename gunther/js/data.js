@@ -6,7 +6,7 @@
 export const WORLD_W = 3600;
 export const WORLD_H = 2400;
 
-const FILES = ['rules', 'factions', 'races', 'troops', 'goods', 'places', 'lords', 'skills', 'names'];
+const FILES = ['rules', 'factions', 'races', 'troops', 'goods', 'places', 'lords', 'skills', 'names', 'story'];
 const MOD_STORE = 'gunther-mods';
 
 async function getJson(url) {
@@ -47,6 +47,12 @@ function applyMod(d, mod) {
   if (Array.isArray(mod.lords)) mergeList(d.lords, mod.lords);
   if (mod.roads) d.places.roads = mergePlain(d.places.roads, mod.roads);
   if (mod.orcChiefs) d.names.orcChiefs = mergePlain(d.names.orcChiefs, mod.orcChiefs);
+  // The story: chapters are changed, removed or added by id; the rest (title, prologue...) merges.
+  if (isObj(mod.story)) {
+    const { chapters, ...rest } = mod.story;
+    merge(d.story, rest);
+    if (Array.isArray(chapters)) mergeList(d.story.chapters, chapters);
+  }
 }
 
 // Everything must point at things that exist, or the game would break in odd ways later.
@@ -72,7 +78,14 @@ function problems(d) {
   for (const need of ['player', 'free', 'horde']) if (!F[need]) out.push('the ' + need + ' faction cannot be removed');
   for (const need of ['recruit', 'bowman', 'grunt', 'brute', 'shaman', 'warlord']) if (!T[need]) out.push('the ' + need + ' troop cannot be removed');
   for (const need of ['grain', 'fish']) if (!d.goods[need]) out.push('the ' + need + ' goods cannot be removed');
-  if (!S.some(s => s.kind === 'stronghold')) out.push('there must be an orc stronghold');
+  for (const c of d.story.chapters || []) for (const st of [].concat(c.step)) {
+    if (!st || !['visit', 'visits', 'defeat'].includes(st.type)) { out.push('story chapter ' + c.id + ' has an unknown step type'); continue; }
+    for (const id of [st.place, st.near].concat(st.places || [])) if (id && !S.some(s => s.id === id)) out.push('story chapter ' + c.id + ' uses unknown place ' + id);
+    if (st.party) {
+      if (!F[st.party.faction]) out.push('story chapter ' + c.id + ' has unknown faction ' + st.party.faction);
+      for (const t in st.party.troops || {}) if (!T[t]) out.push('story chapter ' + c.id + ' uses unknown troop ' + t);
+    }
+  }
   return out;
 }
 
@@ -126,3 +139,4 @@ export const ROADS = data.places.roads;
 export const ORC_CHIEFS = data.names.orcChiefs;
 export const LORDS = data.lords;
 export const SKILLS = data.skills;
+export const STORY = data.story;

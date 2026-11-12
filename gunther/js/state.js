@@ -5,6 +5,8 @@
 import { clamp, randInt, rand, pick } from './core.js';
 import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
 import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
+import { newStory } from './story.js';
+import { ensureDiplomacy, diplomacyTick, atWar } from './diplomacy.js';
 import { applyOwners, townGarrison, siegeTick, holdingsRent, garrisonWages, heldSites, peopleOf, originalFaction } from './sieges.js';
 
 const SAVE_KEY = 'gunther-save-v2';
@@ -21,7 +23,7 @@ export function newGame(migrate) {
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
-    relations: { vale: 0, march: 0, free: 5, elves: 0, dwarves: 0 },
+    relations: { vale: 0, march: 0, free: 5, elves: 0, dwarves: 0, horde: -5 },
     sites: {},
     parties: [],
     player: { x: 1640, y: 1500 },
@@ -81,11 +83,20 @@ function ensureFields() {
   if (game.contract === undefined) game.contract = null;
   for (const k of KINGDOMS) if (!(k in game.relations)) game.relations[k] = 0;
   for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = newSite(s);
-  // War and peace between each pair of kingdoms. Older saves only tracked the Vale and the March.
-  if (!game.wars) {
-    game.wars = {};
-    for (let i = 0; i < KINGDOMS.length; i++) for (let j = i + 1; j < KINGDOMS.length; j++) game.wars[KINGDOMS[i] + '|' + KINGDOMS[j]] = { on: false, timer: randInt(8, 30) };
-    if (game.atWar !== undefined) { game.wars['vale|march'] = { on: game.atWar, timer: game.warTimer || 10 }; delete game.atWar; delete game.warTimer; }
+  // War, peace and alliances between each pair of realms.
+  ensureDiplomacy();
+  // Saves from before the orc clans became a realm: their camps were raider nests that could be
+  // burned. Now they are ordinary villages of the clans, and Skullrock a walled town.
+  if (!game.clansRealm) {
+    game.clansRealm = true;
+    game.parties = game.parties.filter(p => p.kind !== 'warband' || p.story);
+    for (const s of SETTLEMENTS) if (originalFaction(s) === 'horde') {
+      const st = game.sites[s.id];
+      st.burned = 0; st.raided = 0; st.recruits = st.recruits || 4;
+      if (st.owner === undefined || st.owner === 'horde') st.owner = null;
+      st.garrison = s.kind === 'town' ? townGarrison('horde') : null;
+    }
+    delete game.hordeBroken;
   }
   if (!game.lords) game.lords = {};
   for (const l of LORDS) {
@@ -98,6 +109,8 @@ function ensureFields() {
   if (!game.children) game.children = [];
   if (!game.dynasty) game.dynasty = [];
   if (game.battleDeath === undefined) game.battleDeath = true;
+  // The story. A save that is already well under way is offered it straight away.
+  if (!game.story) game.story = newStory();
   applyLords();
   // Town ownership and sieges. Older saves kept the vassal's village on the contract.
   for (const s of SETTLEMENTS) if (s.kind === 'town' && !game.sites[s.id].garrison) game.sites[s.id].garrison = townGarrison(game.sites[s.id].owner || originalFaction(s));
@@ -214,24 +227,17 @@ export function troopName(type, n) {
 }
 
 // ---------------------------------------------------------------- realms
-function warKey(a, b) { return KINGDOMS.indexOf(a) < KINGDOMS.indexOf(b) ? a + '|' + b : b + '|' + a; }
-export function atWar(a, b) { const w = game.wars && game.wars[warKey(a, b)]; return !!(w && w.on); }
-export function enemiesOf(k) { return KINGDOMS.filter(o => o !== k && atWar(k, o)); }
-export function anyWar() { return Object.keys(game.wars).filter(k => game.wars[k].on).map(k => k.split('|')); }
+export { atWar, allied, enemiesOf, alliesOf, anyWar, warsText } from './diplomacy.js';
 export function realmName(k) { return FACTIONS[k].short.replace(/^the /, 'the '); }
-const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
-export function warsText() {
-  const w = anyWar();
-  if (!w.length) return 'All the kingdoms are at peace.';
-  return w.map(([a, b]) => cap(FACTIONS[a].short) + ' and ' + FACTIONS[b].short + ' are at war.').join(' ');
-}
 // What people a faction's volunteers are.
 export function raceOfSite(s) { return peopleOf(s); }
 export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
 
 export function hostile(a, b) {
   if (a === b) return false;
-  if (a === 'horde' || b === 'horde') return true;
+  if (a === 'outlaws' || b === 'outlaws') return true;
+  // The Ashen Compact works in secret: only Gunther crosses swords with it.
+  if (a === 'compact' || b === 'compact') return a === 'player' || b === 'player';
   if (a === 'player' || b === 'player') {
     const other = a === 'player' ? b : a;
     if ((game.relations[other] || 0) <= -20) return true;
@@ -342,26 +348,13 @@ export function dailyTick() {
   }
   // Garrisons, and lords storming the towns they besiege.
   siegeTick();
-  // War and peace between each pair of kingdoms. A kingdom with most of its lords beaten or
-  // captured sues for peace sooner, and no kingdom picks a second war while it is fighting one.
-  const beaten = k => { const ls = LORDS.filter(l => l.faction === k); return ls.filter(l => game.lords[l.id].status !== 'free').length >= Math.ceil(ls.length * 0.6); };
-  for (const key in game.wars) {
-    const w = game.wars[key], [a, b] = key.split('|');
-    w.timer--;
-    if (w.on && (beaten(a) || beaten(b))) w.timer--;
-    if (w.timer > 0) continue;
-    if (!w.on && (enemiesOf(a).length || enemiesOf(b).length)) { w.timer = randInt(4, 8); continue; }
-    w.on = !w.on;
-    w.timer = w.on ? randInt(12, 22) : randInt(14, 32);
-    const A = cap(FACTIONS[a].short), B = FACTIONS[b].short;
-    msgs.push([w.on ? 'War! ' + A + ' and ' + B + ' are fighting.' : A + ' and ' + B + ' have made peace.', '#ffd27a']);
-    chronicle(w.on ? 'War broke out between ' + FACTIONS[a].short + ' and ' + B + '.' : cap(FACTIONS[a].short) + ' and ' + B + ' made peace.');
-  }
+  // War, peace, alliances and betrayals between the realms.
+  diplomacyTick();
   // Birthdays, old age and heirs. Gunther dying is handled by the map, which shows the succession.
   if (dynastyTick() === 'hero' && !game.pendingDeath) game.pendingDeath = 'died of old age';
   // Quests that ran out of time.
   for (const q of game.quests) {
-    if (!q.done && game.day > q.deadline) { q.failed = true; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }
+    if (!q.done && game.day > q.deadline) { q.failed = true; for (const p of game.parties) if (p.id === q.party) p.quest = false; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }
   }
   game.quests = game.quests.filter(q => !q.failed);
   msgs.forEach(m => note(m[0], m[1]));

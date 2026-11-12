@@ -187,8 +187,8 @@ export function prisonersSection() {
   let rows = '';
   for (const t in game.prisoners) {
     const c = game.prisoners[t];
-    const can = !TROOPS[t].orc && troopCount() < partyLimit();
-    rows += '<tr><td>' + c + ' ' + troopName(t, c) + '</td><td>' + (TROOPS[t].orc ? '<span class="small">Orcs will not serve you</span>' : '<button class="mini" data-act="convert" data-arg="' + t + '"' + (can ? '' : ' disabled') + '>Persuade one to join</button>') + '</td></tr>';
+    const can = troopCount() < partyLimit();
+    rows += '<tr><td>' + c + ' ' + troopName(t, c) + '</td><td>' + (false ? '' : '<button class="mini" data-act="convert" data-arg="' + t + '"' + (can ? '' : ' disabled') + '>Persuade one to join</button>') + '</td></tr>';
   }
   for (const id of game.lordCaptives) rows += '<tr><td>' + lord(id).name + '</td><td class="small">Ransom in a town tavern</td></tr>';
   return '<p>Prisoners ' + n + '/' + prisonerLimit() + '. They eat your food and slow you down.</p><table>' + rows + '</table>';

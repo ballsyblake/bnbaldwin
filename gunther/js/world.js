@@ -1,11 +1,12 @@
-// The world map: Gunther's warband travels the island while orc warbands, the kingdoms' lords and
+// The world map: Gunther's warband travels the island while outlaw bands, the realms' lords and
 // merchant caravans go about their own business, whether or not Gunther is watching. Time only passes while you are moving or
 // camping, so you can always stop and think.
 
-import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
+import { uiMin, ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
 import { year, lordDies } from './dynasty.js';
-import { siegeTarget, isHeld, besiegers } from './sieges.js';
+import { siegeTarget, isHeld, besiegers, peopleOf } from './sieges.js';
+import { storyTick, storyPlaces } from './story.js';
 import { WORLD_W, WORLD_H, DAY_SECONDS, YEAR_DAYS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
@@ -16,11 +17,39 @@ const SIGHT = 360;
 // ---------------------------------------------------------------- parties
 export function partyById(id) { return game.parties.find(p => p.id === id); }
 
+export function spawnParty(faction, kind, name, troops, x, y, extra) { return makeParty(faction, kind, name, troops, x, y, extra); }
 function makeParty(faction, kind, name, troops, x, y, extra) {
   const pos = nearestLand(x, y);
   const p = Object.assign({ id: game.nextId++, faction, kind, name, troops, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, gold: 0, think: 0, mode: 'idle', flip: false, time: Math.random() * 3 }, extra || {});
   game.parties.push(p);
   return p;
+}
+
+// Outlaws: deserters and cutthroats of every people, who rob caravans and burn villages. They
+// make camp in the wilds, away from the towns.
+const OUTLAW_TAGS = ['the Red', 'Half-Ear', 'the Hound', 'Blackhand', 'the Tanner', 'Crowfoot', 'the Deserter', 'Ninefingers', 'the Grey', 'Nail'];
+export function outlawName() {
+  const race = RACES[pick(Object.keys(RACES))], sex = Math.random() < 0.7 ? 'm' : 'f';
+  return pick(race.names[sex]) + ' ' + pick(OUTLAW_TAGS);
+}
+export function spawnOutlaws(x, y, extra) {
+  const d = game.day;
+  // A bit of everyone: human deserters, elf and dwarf exiles, orcs cast out of their clans.
+  const raw = ['recruit', 'grunt', 'elfscout', 'dwarfminer'].filter(t => TROOPS[t]);
+  const troops = {};
+  const add = (t, n) => { if (n > 0 && TROOPS[t]) troops[t] = (troops[t] || 0) + n; };
+  add(pick(raw), randInt(3, 5) + Math.floor(d / 5)); add(pick(raw), randInt(1, 3));
+  add('bowman', randInt(1, 2) + Math.floor(d / 10)); add(pick(['spearman', 'brute', 'dwarfaxe']), Math.floor(d / 8));
+  for (const t in troops) troops[t] = Math.min(troops[t], 18);
+  const boss = outlawName();
+  if (x === undefined) {
+    const towns = SETTLEMENTS.filter(s => s.kind === 'town');
+    for (let k = 0; k < 30; k++) {
+      x = rand(200, WORLD_W - 200); y = rand(200, WORLD_H - 200);
+      if (isLand(x, y) && towns.every(t => dist(t.x, t.y, x, y) > 420) && dist(x, y, mapScene.pos.x, mapScene.pos.y) > 500) break;
+    }
+  }
+  return makeParty('outlaws', 'outlaws', boss + "'s outlaws", troops, x, y, Object.assign({ anchor: { x, y }, gold: randInt(40, 120), desc: 'Deserters and cutthroats of every people, with a price on their heads.' }, extra || {}));
 }
 
 export function spawnWarband(home, bonus, extra) {
@@ -55,6 +84,7 @@ function spawnLordHost(l) {
   add(t1[0], n(randInt(3, 5) + d / 8)); add(t1[1], n(randInt(2, 4) + d / 10));
   if (d > 5) add(t2[0], n(1 + d / 9));
   if (d > 9) add(t2[1], n(d / 12));
+  if (l.guard) for (const t in l.guard) add(t, l.guard[t]);
   return makeParty(l.faction, 'lord', l.name, troops, home.x + rand(-80, 80), home.y + rand(60, 120), { home: home.id, lord: l.id, gold: randInt(60, 140) });
 }
 
@@ -75,10 +105,10 @@ function caravanGuard(faction) {
 
 // Keeps the island busy: tops up warbands, patrols and caravans each day.
 export function populate() {
-  const camps = SETTLEMENTS.filter(s => (s.kind === 'camp' || s.kind === 'stronghold') && !game.sites[s.id].burned);
-  const warbands = game.parties.filter(p => p.kind === 'warband').length;
-  const wantWarbands = game.hordeBroken ? 0 : Math.min(3 + Math.floor(game.day / 8), 7);
-  for (let i = warbands; i < wantWarbands && camps.length; i++) spawnWarband(pick(camps));
+  // The old orc raiders are gone: the clans field lords like everyone else.
+  game.parties = game.parties.filter(p => p.kind !== 'warband' || p.story);
+  const bands = game.parties.filter(p => p.kind === 'outlaws' && !p.quest).length;
+  for (let i = bands; i < Math.min(2 + Math.floor(game.day / 10), 5); i++) spawnOutlaws();
   // Old saves had faceless patrols; lords lead the armies now.
   game.parties = game.parties.filter(p => p.kind !== 'patrol');
   for (const l of LORDS) {
@@ -118,6 +148,8 @@ function think(p) {
   const bold = p.lord && hasTrait(p.lord, 'bold'), cautious = p.lord && hasTrait(p.lord, 'cautious');
   const attackOdds = p.kind === 'warband' ? 0.9 : bold ? 0.95 : cautious ? 1.5 : 1.2;
   const fleeOdds = bold ? 1.4 : 1.15;
+  // A party sent to hunt Gunther down does nothing else.
+  if (p.hunt) { p.mode = 'chase'; p.chase = 'player'; p.tx = player.x; p.ty = player.y; return; }
   let threat = null, prey = null, threatD = Infinity, preyD = Infinity;
   for (const o of game.parties.concat([player])) {
     if (o === p || !enemies(p, o)) continue;
@@ -125,7 +157,7 @@ function think(p) {
     if (d > SIGHT) continue;
     const them = partyStrength(o);
     // Greedy lords go out of their way for caravans; honourable ones for orcs.
-    const want = p.lord && ((hasTrait(p.lord, 'greedy') && o.kind === 'caravan') || (hasTrait(p.lord, 'honourable') && o.faction === 'horde')) ? 0.6 : 1;
+    const want = p.lord && ((hasTrait(p.lord, 'greedy') && o.kind === 'caravan') || (hasTrait(p.lord, 'honourable') && o.faction === 'outlaws')) ? 0.6 : 1;
     if (them > me * fleeOdds && d < threatD) { threat = o; threatD = d; }
     else if (me > them * attackOdds && p.kind !== 'caravan' && d * want < preyD) { prey = o; preyD = d * want; }
   }
@@ -173,7 +205,7 @@ function think(p) {
   }
   if (p.mode === 'besiege') return;
   if (!arrived && p.mode !== 'idle') return;
-  if (p.kind === 'warband' && !p.quest && Math.random() < 0.25) {
+  if ((p.kind === 'warband' || p.kind === 'outlaws') && !p.quest && Math.random() < 0.25) {
     const villages = SETTLEMENTS.filter(s => s.kind === 'village' && !game.sites[s.id].raided && dist(s.x, s.y, p.x, p.y) < 1100);
     if (villages.length) { const v = pick(villages); p.mode = 'raid'; p.raid = v.id; p.tx = v.x; p.ty = v.y; return; }
   }
@@ -185,19 +217,19 @@ function think(p) {
     }
     // A cruel lord at war goes burning the enemy's villages.
     if (hasTrait(p.lord, 'cruel') && Math.random() < 0.5) {
-      const targets = SETTLEMENTS.filter(s => s.kind === 'village' && hostile(p.faction, s.faction) && s.faction !== 'horde' && !game.sites[s.id].raided);
+      const targets = SETTLEMENTS.filter(s => s.kind === 'village' && hostile(p.faction, s.faction) && !game.sites[s.id].raided);
       if (targets.length) { const v = targets.sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0]; p.mode = 'raid'; p.raid = v.id; p.tx = v.x; p.ty = v.y; return; }
     }
-    // An honourable lord rides out after orc raiders, wherever they are.
+    // An honourable lord rides out after outlaws, wherever they are.
     if (hasTrait(p.lord, 'honourable') && Math.random() < 0.5) {
-      const orcs = game.parties.filter(o => o.faction === 'horde' && dist(o.x, o.y, p.x, p.y) < 1300);
+      const orcs = game.parties.filter(o => o.faction === 'outlaws' && dist(o.x, o.y, p.x, p.y) < 1300);
       if (orcs.length) { const o = pick(orcs); const spot = landNear(o.x, o.y, 40); p.tx = spot.x; p.ty = spot.y; p.mode = 'wander'; return; }
     }
   }
   // A lord wanders their own lands; a kingdom that has lost them all hangs about its old seat.
   const own = p.lord ? SETTLEMENTS.filter(s => s.faction === p.faction) : [];
   const home = p.lord ? (own.length ? pick(own) : site(lord(p.lord).home)) : (p.anchor || site(p.home));
-  const spot = landNear(home.x, home.y, p.kind === 'warband' ? 520 : 420);
+  const spot = landNear(home.x, home.y, p.kind === 'warband' || p.kind === 'outlaws' ? 520 : 420);
   p.tx = spot.x; p.ty = spot.y; p.mode = 'wander';
 }
 
@@ -273,7 +305,7 @@ export const mapScene = {
     const sp = (v, label, hk) => '<button data-act="speed" data-arg="' + v + '" class="' + (this.speed === v ? 'primary' : '') + '" title="' + hk + '">' + label + '</button>';
     const act = (a, label, hk, cls) => '<button data-act="' + a + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<small>' + hk + '</small></button>';
     setHud(
-      '<div class="box abs mstats" data-k="stats">' +
+      '<div class="box abs mstats" data-k="stats" data-min="stats"><div class="mini" data-k="statsmini"></div>' +
         '<div class="top"><b class="px" data-k="day"></b><span data-k="season"></span></div>' +
         '<div class="tiles">' +
           '<div class="tile"><span class="lbl">Gold</span><b class="px gold" data-k="gold"></b></div>' +
@@ -286,10 +318,11 @@ export const mapScene = {
           '<div><div class="meterhead"><span class="lbl" data-k="lvl"></span><span data-k="lvp"></span></div><div class="meter"><i data-k="lvbar" style="background:var(--gold)"></i></div></div>' +
         '</div>' +
       '</div>' +
+      '<div class="abs mapmm" data-min="minimap" data-k="mapmm" style="left:' + u(mm.x - 3) + ';top:' + u(mm.y - 3) + ';width:' + u(mm.w + 6) + ';height:' + u(mm.h + 6) + '"><div class="mini box">Minimap</div></div>' +
       '<div class="box abs legend" data-k="legend" style="left:' + u(mm.x - 3) + ';top:' + u(mm.y + mm.h + 6) + ';width:' + u(mm.w + 6) + '"></div>' +
       '<div class="box abs place" data-k="place" style="display:none"></div>' +
       '<div class="box abs speed">' + sp(0, 'II', 'Pause (Space)') + sp(1, '&gt;', 'Normal speed') + sp(3, '&gt;&gt;', 'Fast') + '</div>' +
-      '<div class="box abs actions">' + act('party', 'Party', 'P', 'primary') + act('quests', 'Quests', 'J') + act('map', 'Map', 'M', this.bigMap ? 'sel' : '') +
+      '<div class="box abs actions" data-min="actions">' + act('party', 'Party', 'P', 'primary') + act('quests', 'Quests', 'J') + act('map', 'Map', 'M', this.bigMap ? 'sel' : '') +
         act('camp', this.camping ? 'Break camp' : 'Camp', 'C', this.camping ? 'sel' : '') + '</div>',
       {
         party: () => openParty(),
@@ -297,6 +330,7 @@ export const mapScene = {
         map: () => { this.bigMap = !this.bigMap; this.hud(); },
         camp: () => this.toggleCamp(),
         speed: v => { this.speed = +v; this.hud(); },
+        minChanged: () => this.refreshHud(),
         enter: () => this.enterNear()
       });
     this.hudTimer = 0;
@@ -330,8 +364,10 @@ export const mapScene = {
     // Legend under the minimap.
     const leg = [['var(--gold)', 'You'], ['var(--blue)', game.contract ? FACTIONS[game.contract.faction].short.replace(/^the /, '') + ' (your lord)' : 'Friendly'], ['var(--danger)', 'Hostile'], ['#9a917f', 'Neutral']];
     uiSet('legend', leg.map(([c, l]) => '<span><i class="sw" style="background:' + c + '"></i>' + esc(l) + '</span>').join(''));
-    uiShow('legend', !view.portrait && !this.bigMap);
+    uiShow('legend', !view.portrait && !this.bigMap && !uiMin('minimap'));
     uiShow('stats', !this.bigMap);
+    uiShow('mapmm', !this.bigMap);
+    uiSet('statsmini', '<b class="px gold">Day <span class="num">' + game.day + '</span></b> <span class="num gold">' + game.gold.toLocaleString('en-AU') + 'g</span> &middot; <span class="num">' + troopCount() + '/' + partyLimit() + '</span> men &middot; <span class="num ' + (days < 2 ? 'dangerc' : '') + '">' + days + '</span>d food &middot; HP <span class="num">' + Math.round(hp * 100) + '%</span>');
     // The card for the place Gunther stands beside.
     const s = this.bigMap ? null : this.nearSite();
     uiShow('place', !!s);
@@ -346,7 +382,7 @@ export const mapScene = {
       const cam = this.camera();
       const pos = view.portrait ? 'left:calc(var(--u) * 120);top:calc(var(--u) * ' + (view.H - 380) + ')'
         : (() => { const mm = this.minimap(), x = clamp(s.x - cam.x + 70, 10, view.W - 200);
-            const minTop = x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
+            const minTop = uiMin('minimap') ? 60 : x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
             return 'left:calc(var(--u) * ' + x + ');top:calc(var(--u) * ' + clamp(s.y - cam.y - 100, minTop, view.H - 220) + ')'; })();
       if (el && el.dataset.pos !== pos) { el.dataset.pos = pos; el.style.cssText = pos; }
     }
@@ -373,6 +409,8 @@ export const mapScene = {
     if (panelOpen()) return;
     // Gunther died (of old age, in the night): the heir takes over before anything else.
     if (game.pendingDeath) { openSuccession(game.pendingDeath); return; }
+    storyTick();
+    if (panelOpen()) return;
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer = 0.15; this.refreshHud(); }
     const P = this.pos;
@@ -396,7 +434,7 @@ export const mapScene = {
     if (pointer.clicked || (pointer.down && !pointer.touch && !this.target?.party && !this.target?.site)) {
       const mm = this.minimap();
       const cam = this.camera();
-      if (pointer.x > mm.x && pointer.y < mm.y + mm.h && pointer.y > mm.y && pointer.x < mm.x + mm.w) {
+      if (!uiMin('minimap') && pointer.x > mm.x && pointer.y < mm.y + mm.h && pointer.y > mm.y && pointer.x < mm.x + mm.w) {
         const spot = nearestLand((pointer.x - mm.x) / mm.w * WORLD_W, (pointer.y - mm.y) / mm.h * WORLD_H);
         this.target = spot;
       } else if (pointer.clicked) {
@@ -459,7 +497,7 @@ export const mapScene = {
         const prey = p.chase === 'player' ? this.pos : partyById(p.chase);
         if (prey) { p.tx = prey.x; p.ty = prey.y; }
       }
-      const base = p.kind === 'caravan' ? 105 : (p.kind === 'warband' ? 150 : 140);
+      const base = p.kind === 'caravan' ? 105 : (p.kind === 'warband' || p.kind === 'outlaws' ? 150 : 140);
       moveParty(p, base * (1 - Math.min(0.35, partySize(p) * 0.008)), wdt);
     }
     // Meetings between parties.
@@ -468,7 +506,7 @@ export const mapScene = {
       if (a.gone) continue;
       for (let j = i + 1; j < game.parties.length; j++) {
         const b = game.parties[j];
-        if (b.gone || !hostile(a.faction, b.faction)) continue;   // grudges against Gunther don't count here
+        if (b.gone || !hostile(a.faction, b.faction) || a.story || b.story) continue;   // story foes wait for Gunther   // grudges against Gunther don't count here
         if (dist(a.x, a.y, b.x, b.y) < 24) aiClash(a, b);
       }
     }
@@ -543,6 +581,11 @@ export const mapScene = {
       text(label, s.x - cam.x, s.y - cam.y + (s.kind === 'town' ? 54 : 40), 16, s.kind === 'camp' || s.kind === 'stronghold' ? '#ffb0a0' : '#fff', 'center');
     }
 
+    // Where the story wants Gunther to go.
+    for (const id of storyPlaces()) {
+      const s = SETTLEMENTS.find(x => x.id === id);
+      if (onScreen(s.x, s.y, 140)) text('!', s.x - cam.x + 34, s.y - cam.y - (s.kind === 'town' ? 70 : 44) + Math.sin(this.time * 4) * 3, 30, '#ffd34a', 'center');
+    }
     // Where Gunther is going.
     if (this.target && !this.target.party) {
       const tx = (this.target.site ? this.target.site.x : this.target.x) - cam.x;
@@ -575,6 +618,7 @@ export const mapScene = {
       ctx.fillStyle = siteColour(s); ctx.fillRect(x - (big ? 4 : 3), y - (big ? 4 : 3), big ? 8 : 6, big ? 8 : 6);
       text(s.name, x, y - 9, big ? 12 : 10, '#f4ead2', 'center');
     }
+    for (const id of storyPlaces()) { const s = SETTLEMENTS.find(x => x.id === id); text('!', r.x + s.x * sx + 10, r.y + s.y * sy + 4, 18, '#ffd34a', 'center'); }
     for (const p of game.parties) {
       if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
       ctx.fillStyle = partyColour(p); ctx.fillRect(r.x + p.x * sx - 2, r.y + p.y * sy - 2, 4, 4);
@@ -586,7 +630,13 @@ export const mapScene = {
   drawSite(s, x, y) {
     const st = game.sites[s.id];
     const f = FACTIONS[s.faction];
-    if (s.kind === 'town') ctx.drawImage(img.keep, s.art * 32, 0, 32, 32, x - 56, y - 76, 112, 112);
+    const orc = peopleOf(s) === 'orc';
+    if (orc && (s.kind === 'town' || s.kind === 'village')) {
+      // Orc places are hide tents round a fire, whoever holds them now.
+      const big = s.kind === 'town';
+      if (big) { ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - 100, y - 50, 72, 72); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x + 28, y - 50, 72, 72); }
+      ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - (big ? 52 : 40), y - (big ? 86 : 52), big ? 104 : 80, big ? 104 : 80);
+    } else if (s.kind === 'town') ctx.drawImage(img.keep, s.art * 32, 0, 32, 32, x - 56, y - 76, 112, 112);
     else if (s.kind === 'village') { ctx.drawImage(img.houses, 0, 32, 16, 16, x - 24, y - 34, 48, 48); }
     else if (s.kind === 'camp' || s.kind === 'stronghold') {
       const big = s.kind === 'stronghold';
@@ -606,13 +656,13 @@ export const mapScene = {
     shadow(x, y + 4, 16, hostileToMe ? 'rgba(220, 60, 50, 0.45)' : 'rgba(20, 40, 20, 0.3)');
     const anim = p.moving ? 'walk' : 'idle';
     if (p.kind === 'caravan') drawWagon(x, y, f.colour, p.flip);
-    else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'brute' : 'grunt', '', '', x, y, 2, anim, p.time, p.flip);
+    else if (p.faction === 'horde' || (p.troops.grunt || 0) + (p.troops.brute || 0) > partySize(p) / 2) drawUnit(p.troops.brute ? 'brute' : 'grunt', '', '', x, y, 2, anim, p.time, p.flip);
     else drawUnit('soldier', p.lord || p.troops.knight ? 'sword' : 'spear', f.colour, x, y, 2, anim, p.time, p.flip);
     if (p.lord) text(lord(p.lord).name, x, y + 22, 13, '#fff', 'center');
     if (p.mode === 'besiege') { this.drawSiegeCamp(x, y); text('Besieging', x, y + 38, 12, '#ffd27a', 'center'); }
     drawBanner(x + 10, y - 66, f.colour);
     text(String(partySize(p)), x + 14, y - 72, 14, '#fff', 'center');
-    if (p.quest) text('!', x - 14, y - 60, 22, '#ffd34a', 'center');
+    if (p.quest || (p.lord && game.quests.some(q => q.lord === p.lord))) text('!', x - 14, y - 60, 22, '#ffd34a', 'center');
   },
   // A ladder and a little tent beside a besieging host.
   drawSiegeCamp(x, y) {
@@ -631,7 +681,7 @@ export const mapScene = {
       lines = [p.name + ' (' + partySize(p) + ')', FACTIONS[p.faction].name + (enemies(p, { faction: 'player' }) ? ', hostile' : '') + mood, 'Looks ' + cmp];
     } else {
       const s = h.site;
-      const kind = { town: 'Town', village: 'Village', camp: 'Orc camp', stronghold: 'Orc stronghold' }[s.kind];
+      const kind = siteKind(s);
       lines = [s.name, s.faction === 'player' ? kind + ', yours' : kind + ' of ' + FACTIONS[s.faction].short + (isHeld(s) ? ', held by you' : '')];
       if (s.kind === 'town' && besiegers(s).length) lines.push('Besieged by ' + besiegers(s).map(b => b.lord ? lord(b.lord).name : b.name).join(', '));
     }
@@ -641,23 +691,26 @@ export const mapScene = {
   },
   drawHud() {
     // Minimap (the stats and buttons are HTML, see hud()).
-    const mm = this.minimap();
-    frame(mm.x, mm.y, mm.w, mm.h);
-    ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
-    const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
-    for (const s of SETTLEMENTS) {
-      ctx.fillStyle = siteColour(s);
-      ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
+    if (!uiMin('minimap')) {
+      const mm = this.minimap();
+      frame(mm.x, mm.y, mm.w, mm.h);
+      ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
+      const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
+      for (const s of SETTLEMENTS) {
+        ctx.fillStyle = siteColour(s);
+        ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
+      }
+      for (const id of storyPlaces()) { const s = SETTLEMENTS.find(x => x.id === id); ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 2; ctx.strokeRect(mm.x + s.x * sx - 5, mm.y + s.y * sy - 5, 10, 10); }
+      for (const p of game.parties) {
+        if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
+        ctx.fillStyle = partyColour(p);
+        ctx.fillRect(mm.x + p.x * sx - 1, mm.y + p.y * sy - 1, 3, 3);
+      }
+      const cam = this.camera();
+      ctx.strokeStyle = '#f4ead2'; ctx.lineWidth = 1;
+      ctx.strokeRect(mm.x + cam.x * sx, mm.y + cam.y * sy, view.W * sx, view.H * sy);
+      ctx.fillStyle = '#f2c14e'; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
     }
-    for (const p of game.parties) {
-      if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
-      ctx.fillStyle = partyColour(p);
-      ctx.fillRect(mm.x + p.x * sx - 1, mm.y + p.y * sy - 1, 3, 3);
-    }
-    const cam = this.camera();
-    ctx.strokeStyle = '#f4ead2'; ctx.lineWidth = 1;
-    ctx.strokeRect(mm.x + cam.x * sx, mm.y + cam.y * sy, view.W * sx, view.H * sy);
-    ctx.fillStyle = '#f2c14e'; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
     // Event feed, above the speed controls.
     const base = view.H - (view.portrait ? 150 : 66);
     const feed = log.filter(m => m.age < 9);
@@ -711,9 +764,13 @@ export function renownLevel() {
   return { lv, frac: (r - lo) / (hi - lo) };
 }
 
+function siteKind(s) {
+  if (peopleOf(s) === 'orc' && (s.kind === 'town' || s.kind === 'village')) return s.kind === 'town' ? 'Orc stronghold' : 'Orc camp';
+  return { town: 'Town', village: 'Village', camp: 'Orc camp', stronghold: 'Orc stronghold' }[s.kind];
+}
 function placeCard(s) {
   const st = game.sites[s.id], f = FACTIONS[s.faction];
-  const kind = { town: 'Town', village: 'Village', camp: 'Orc camp', stronghold: 'Orc stronghold' }[s.kind];
+  const kind = siteKind(s);
   const col = siteColour(s) === '#9a917f' ? 'var(--muted)' : siteColour(s);
   let rows = '';
   const row = (a, b) => '<div class="row"><span>' + a + '</span><b>' + b + '</b></div>';

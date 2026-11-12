@@ -38,3 +38,24 @@ See `../mods/example-highlands.json` for a small example.
 - **For everyone playing this copy of the game:** put the file in `gunther/mods/` and add its file name to the `mods` list in `gunther/mods/mods.json`.
 
 Start a new campaign after changing mods: an old save may refer to things a mod removed.
+
+## story.json
+
+Gunther's storyline, The Wall Tithe. `prologue` is shown on `startDay`; the player can accept or put it off.
+Each entry in `chapters` has:
+
+- `id`, `title`, `goal` (shown in the journal).
+- `step`: what finishes the chapter. One of:
+  - `{"type": "visit", "place": "<settlement id>", "button": "...", "needs": {"renown": 30, "gold": 250}}`: a story button in that place. `needs` is optional.
+  - `{"type": "visits", "places": [...], "count": 3, "button": "...", "each": "text", "eachReward": {...}}`: the button in `count` of those places.
+  - `{"type": "defeat", "near": "<settlement id>" or "at": "player", "dx", "dy", "spread", "party": {"name", "faction", "troops", "desc"}}`: an enemy the story puts on the map, marked with !. `"at": "player"` is an ambush that hunts Gunther down.
+  - A list of steps, each with `if` or `unless`: the first that fits is used.
+- `scene`: paragraphs shown when the step is done. A paragraph can be `{"if": "flag", "text": "..."}` or use `unless`.
+- `choices` (optional): `{"label", "flag", "text", "reward"}`. Picking one sets its flag for later `if`/`unless`.
+- `reward` (optional): any of `gold`, `spend` (gold paid), `renown`, `troops` ({type: n}), `recruits` (local recruits, `visits` only), `relations` ({faction: n}), `say`, `chronicle`.
+
+A mod changes the story with `"story": {"chapters": [...]}`; chapters merge by `id` like lords and places, and `"remove": true` drops one.
+
+## Realms and diplomacy
+
+Any faction with `"kingdom": true` is a realm: it has lords, holds towns, and makes war, peace and alliances with every other realm (js/diplomacy.js). The orc clans (`horde`) are a realm like the others, with race `orc`. A ruler's traits decide how warlike (bold, cruel; cautious holds back) and how faithless (cruel, greedy; honourable holds back) the realm is. `outlaws` fight everyone; `compact` fights only Gunther and is used by the story.
