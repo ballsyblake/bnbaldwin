@@ -3,7 +3,9 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
+import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
+import { applyOwners, townGarrison, siegeTick, holdingsRent, garrisonWages, heldSites, peopleOf, originalFaction } from './sieges.js';
 
 const SAVE_KEY = 'gunther-save-v2';
 const OLD_SAVE_KEY = 'gunther-save-v1';
@@ -15,7 +17,7 @@ export function newGame(migrate) {
   Object.assign(game, {
     version: 2,
     day: 1, dayTime: 0,
-    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1,
+    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
@@ -29,10 +31,8 @@ export function newGame(migrate) {
     seenIntro: false,
     nextId: 1
   });
+  for (const s of SETTLEMENTS) game.sites[s.id] = newSite(s);
   ensureFields();
-  for (const s of SETTLEMENTS) {
-    game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
-  }
   // Carry over gold and gear from the old one-camp version of the game.
   if (migrate) try {
     const old = JSON.parse(localStorage.getItem(OLD_SAVE_KEY));
@@ -46,6 +46,8 @@ export function newGame(migrate) {
     }
   } catch (e) { /* ignore */ }
 }
+
+function newSite(s) { return { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) || (s.kind === 'town' ? townGarrison(originalFaction(s)) : null) }; }
 
 export function campGarrison(s) {
   if (s.kind === 'camp') return { grunt: 10, brute: 3, shaman: 2 };
@@ -69,13 +71,16 @@ export function loadSave() {
 
 // Fills in anything a save from an older build doesn't have yet.
 function ensureFields() {
-  if (!game.skills) { game.skills = {}; for (const k in SKILLS) game.skills[k] = 0; }
+  if (!game.skills) game.skills = {};
+  for (const k in SKILLS) if (game.skills[k] === undefined) game.skills[k] = 0;
+  if (!game.swordLevel) game.swordLevel = 1;
+  if (!game.weapon) game.weapon = 'bow';
   if (!game.prisoners) game.prisoners = {};
   if (!game.lordCaptives) game.lordCaptives = [];
   if (!game.chronicle) game.chronicle = [];
   if (game.contract === undefined) game.contract = null;
   for (const k of KINGDOMS) if (!(k in game.relations)) game.relations[k] = 0;
-  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = { recruits: s.kind === 'town' ? 4 : 6, glut: {}, raided: 0, burned: 0, garrison: campGarrison(s) };
+  for (const s of SETTLEMENTS) if (!game.sites[s.id]) game.sites[s.id] = newSite(s);
   // War and peace between each pair of kingdoms. Older saves only tracked the Vale and the March.
   if (!game.wars) {
     game.wars = {};
@@ -83,9 +88,21 @@ function ensureFields() {
     if (game.atWar !== undefined) { game.wars['vale|march'] = { on: game.atWar, timer: game.warTimer || 10 }; delete game.atWar; delete game.warTimer; }
   }
   if (!game.lords) game.lords = {};
-  for (const l of LORDS) if (!game.lords[l.id]) {
-    game.lords[l.id] = { status: 'free', back: 0, opinion: 0, memories: [] };
+  for (const l of LORDS) {
+    if (!game.lords[l.id]) game.lords[l.id] = newLordState(l);
+    if (game.lords[l.id].born === undefined) game.lords[l.id].born = 1 - (l.age || 40) * YEAR_DAYS;
   }
+  // Ageing, death and heirs.
+  if (!game.hero) game.hero = newHero();
+  if (game.spouse === undefined) game.spouse = null;
+  if (!game.children) game.children = [];
+  if (!game.dynasty) game.dynasty = [];
+  if (game.battleDeath === undefined) game.battleDeath = true;
+  applyLords();
+  // Town ownership and sieges. Older saves kept the vassal's village on the contract.
+  for (const s of SETTLEMENTS) if (s.kind === 'town' && !game.sites[s.id].garrison) game.sites[s.id].garrison = townGarrison(game.sites[s.id].owner || originalFaction(s));
+  if (game.contract && game.contract.fief) { game.sites[game.contract.fief].holder = 'player'; delete game.contract.fief; }
+  applyOwners();
 }
 
 // ---------------------------------------------------------------- chronicle
@@ -134,11 +151,7 @@ export function contractPay() {
   if (!c) return 0;
   return c.kind === 'merc' ? 6 + Math.floor(game.renown / 8) : 0;
 }
-export function fiefRent() {
-  const c = game.contract;
-  if (!c || c.kind !== 'vassal' || !c.fief) return 0;
-  return game.sites[c.fief].raided ? 0 : 40;
-}
+export function fiefRent() { return holdingsRent(); }
 export function employer() { return game.contract ? game.contract.faction : null; }
 
 // ---------------------------------------------------------------- messages
@@ -169,7 +182,7 @@ export function removeTroops(type, n, wounded) {
   st.wounded = Math.min(st.wounded + (wounded || 0), st.n);
   if (st.n === 0) delete game.troops[type];
 }
-export function guntherPower() { return 5 + game.bowLevel * 1.5 + game.armourLevel; }
+export function guntherPower() { return 5 + Math.max(game.bowLevel * 1.5, (game.swordLevel || 1) * 1.5) + game.armourLevel; }
 export function strength(troops) {
   let s = 0;
   for (const t in troops) s += TROOPS[t].power * troops[t];
@@ -184,7 +197,7 @@ export function playerStrength() { return strength(playerFit()) + (game.health >
 export function wages() {
   let w = 0;
   for (const t in game.troops) w += (TROOPS[t].wage || 0) * game.troops[t].n;
-  return w;
+  return w + garrisonWages();
 }
 export function foodStock() { let n = 0; for (const g in game.goods) if (GOODS[g].food) n += game.goods[g]; return n; }
 export function foodPerDay() { return Math.ceil((troopCount() + 1 + prisonerCount()) / 6); }
@@ -213,7 +226,7 @@ export function warsText() {
   return w.map(([a, b]) => cap(FACTIONS[a].short) + ' and ' + FACTIONS[b].short + ' are at war.').join(' ');
 }
 // What people a faction's volunteers are.
-export function raceOfSite(s) { return s.race || (FACTIONS[s.faction] && FACTIONS[s.faction].race) || 'human'; }
+export function raceOfSite(s) { return peopleOf(s); }
 export function recruitType(s) { return RACES[raceOfSite(s)].recruit; }
 
 export function hostile(a, b) {
@@ -289,7 +302,7 @@ export function dailyTick() {
   // Pay from your employer, and rent from your village.
   const pay = contractPay() + fiefRent();
   if (pay) game.gold += pay;
-  if (game.contract && game.contract.kind === 'vassal' && game.contract.fief && game.sites[game.contract.fief].raided && game.day % 3 === 0) msgs.push([site(game.contract.fief).name + ' lies raided and pays no rent.', '#ff9a8a']);
+  if (game.day % 3 === 0) for (const h of heldSites()) if (game.sites[h.id].raided) msgs.push([h.name + ' lies raided and pays no rent.', '#ff9a8a']);
   if (game.contract && (game.relations[game.contract.faction] || 0) < -5) {
     msgs.push([FACTIONS[game.contract.faction].name + ' has dismissed you from its service.', '#ff9a8a']);
     chronicle(FACTIONS[game.contract.faction].short + ' cast Gunther out of its service.');
@@ -327,6 +340,8 @@ export function dailyTick() {
     if (st.burned > 0 && !game.hordeBroken) { st.burned--; if (st.burned === 0) { st.garrison = campGarrison(s); msgs.push(['The orcs have rebuilt ' + s.name + '.', '#ff9a8a']); } }
     if (st.garrison && st.burned === 0 && s.kind === 'camp' && game.day % 4 === 0) st.garrison.grunt = Math.min(st.garrison.grunt + 2, 10 + Math.floor(game.day / 6));
   }
+  // Garrisons, and lords storming the towns they besiege.
+  siegeTick();
   // War and peace between each pair of kingdoms. A kingdom with most of its lords beaten or
   // captured sues for peace sooner, and no kingdom picks a second war while it is fighting one.
   const beaten = k => { const ls = LORDS.filter(l => l.faction === k); return ls.filter(l => game.lords[l.id].status !== 'free').length >= Math.ceil(ls.length * 0.6); };
@@ -342,6 +357,8 @@ export function dailyTick() {
     msgs.push([w.on ? 'War! ' + A + ' and ' + B + ' are fighting.' : A + ' and ' + B + ' have made peace.', '#ffd27a']);
     chronicle(w.on ? 'War broke out between ' + FACTIONS[a].short + ' and ' + B + '.' : cap(FACTIONS[a].short) + ' and ' + B + ' made peace.');
   }
+  // Birthdays, old age and heirs. Gunther dying is handled by the map, which shows the succession.
+  if (dynastyTick() === 'hero' && !game.pendingDeath) game.pendingDeath = 'died of old age';
   // Quests that ran out of time.
   for (const q of game.quests) {
     if (!q.done && game.day > q.deadline) { q.failed = true; msgs.push(['Quest failed: ' + q.title, '#ff9a8a']); changeRelation(site(q.giver).faction, -4); }

@@ -213,7 +213,7 @@ export function spriteFor(kind, team) {
   const look = LOOKS[kind] || LOOKS.recruit;
   let t = team;
   if (look.body === 'orc' || look.body === 'brute') t = ORC_RED;
-  if (kind === 'gunther') t = '#f2c14e';
+  if (kind === 'gunther' || kind === 'gunthersword') t = '#f2c14e';
   const sheet = characterSheet(look, t);
   return (cache[key] = sheet);
 }
@@ -221,6 +221,7 @@ export function spriteFor(kind, team) {
 // Gunther's hair is auburn; the painter reads it from here.
 BODY.gunther = Object.assign({}, BODY.human, { hair: C('#9a3a1e') });
 LOOKS.gunther.body = 'gunther';
+LOOKS.gunthersword = Object.assign({}, LOOKS.gunther, { weapon: 'sword', shield: 'heater', cloak: null });
 LEGS.gunther = C('#4a3a2c');
 
 function sheetFor(sprite, kind, team) {

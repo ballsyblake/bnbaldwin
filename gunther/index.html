@@ -105,11 +105,16 @@
     .orders div { display: flex; gap: calc(var(--u) * 4); }
     .orders button { width: calc(var(--u) * 66); height: calc(var(--u) * 34); }
     .portrait .btop { left: calc(var(--u) * 6); right: calc(var(--u) * 6); top: calc(var(--u) * 6); gap: calc(var(--u) * 8); padding: calc(var(--u) * 6) calc(var(--u) * 8); }
+    .portrait .btop .name { font-size: calc(var(--u) * 18); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: calc(var(--u) * 150); display: inline-block; }
     .portrait .groups { left: calc(var(--u) * 6); right: calc(var(--u) * 6); bottom: calc(var(--u) * 82); }
     .portrait .groups button { flex: 1; width: auto; height: calc(var(--u) * 50); }
     .portrait .orders { left: calc(var(--u) * 6); right: calc(var(--u) * 6); bottom: calc(var(--u) * 6); }
     .portrait .orders div button { flex: 1; width: auto; height: calc(var(--u) * 44); }
     .portrait .orders .lbl { display: none; }
+    .herobox { left: 50%; transform: translateX(-50%); bottom: calc(var(--u) * 8); padding: calc(var(--u) * 5); display: flex; gap: calc(var(--u) * 4); }
+    .herobox button { width: calc(var(--u) * 74); height: calc(var(--u) * 46); }
+    .portrait .herobox { left: auto; right: calc(var(--u) * 6); transform: none; bottom: calc(var(--u) * 146); }
+    .portrait .herobox button { width: calc(var(--u) * 110); height: calc(var(--u) * 50); }
     .finish { left: 50%; transform: translateX(-50%); bottom: calc(var(--u) * 14); padding: calc(var(--u) * 5); }
     .finish button { padding: 0 calc(var(--u) * 16); height: calc(var(--u) * 36); }
 
@@ -126,6 +131,9 @@
     .panel .stats { color: var(--text); font-weight: 600; }
     .panel button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; margin-top: 8px; padding: 8px 14px; font: 700 1rem var(--pixel); color: var(--text); background: var(--tile); border: 2px solid var(--outline); box-shadow: inset 0 0 0 1px var(--bevel); cursor: pointer; text-align: left; }
     .panel button:hover:not(:disabled) { background: var(--tile-sel); }
+    .panel .filebtn { display: flex; align-items: center; width: 100%; min-height: 44px; margin-top: 8px; padding: 8px 14px; font: 700 1rem var(--pixel); color: var(--text); background: var(--tile); border: 2px dashed var(--bevel); cursor: pointer; box-sizing: border-box; }
+    .panel .filebtn:hover { background: var(--tile-sel); }
+    .panel a { color: var(--gold); }
     .panel button.primary { background: var(--gold); color: var(--outline); box-shadow: none; }
     .panel button.primary:hover:not(:disabled) { background: #f7cf6b; }
     .panel button:disabled { background: #221d18; color: #6d6252; cursor: default; box-shadow: none; }

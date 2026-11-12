@@ -1,0 +1,12 @@
+[
+  {"id": "isolde", "name": "Queen Isolde", "faction": "vale", "ruler": true, "traits": ["honourable", "cautious"], "sex": "f", "age": 52, "home": "brightwater"},
+  {"id": "aldric", "name": "Sir Aldric Fenn", "faction": "vale", "traits": ["bold", "honourable"], "sex": "m", "age": 34, "house": "Fenn", "home": "oakhollow"},
+  {"id": "maren", "name": "Lady Maren Holt", "faction": "vale", "traits": ["greedy", "cautious"], "sex": "f", "age": 41, "house": "Holt", "home": "millford"},
+  {"id": "brannoc", "name": "Lord Brannoc", "faction": "march", "ruler": true, "traits": ["cruel", "bold"], "sex": "m", "age": 61, "home": "redcliff"},
+  {"id": "corwen", "name": "Sir Corwen Ashe", "faction": "march", "traits": ["honourable", "cautious"], "sex": "m", "age": 47, "house": "Ashe", "home": "stonefold"},
+  {"id": "tamsin", "name": "Lady Tamsin Vey", "faction": "march", "traits": ["greedy", "bold"], "sex": "f", "age": 29, "house": "Vey", "home": "ashby"},
+  {"id": "ilyra", "name": "Queen Ilyra", "faction": "elves", "ruler": true, "traits": ["honourable", "cautious"], "sex": "f", "age": 190, "home": "elthir"},
+  {"id": "faelan", "name": "Lord Faelan", "faction": "elves", "traits": ["bold", "cruel"], "sex": "m", "age": 95, "home": "silverbrook"},
+  {"id": "borga", "name": "High Thane Borga", "faction": "dwarves", "ruler": true, "traits": ["greedy", "bold"], "sex": "f", "age": 126, "home": "dunmar"},
+  {"id": "halvar", "name": "Thane Halvar", "faction": "dwarves", "traits": ["honourable", "cautious"], "sex": "m", "age": 66, "home": "irondeep"}
+]

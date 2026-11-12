@@ -29,7 +29,7 @@ window.addEventListener('resize', resize);
 
 // ---------------------------------------------------------------- input
 export const keys = {};
-export const pointer = { x: 480, y: 270, down: false, startX: 0, startY: 0, clicked: false, moved: false,
+export const pointer = { x: 480, y: 270, down: false, rdown: false, mvx: 0, mvy: 0, startX: 0, startY: 0, clicked: false, moved: false,
   // Phones and tablets start in touch mode, so hints and auto-aim are right before the first tap.
   touch: !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) };
 const keyPressListeners = [];
@@ -42,7 +42,7 @@ window.addEventListener('keydown', e => {
   if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'f1', 'f2', 'f3', 'f4'].includes(k) && !overlay.classList.contains('show')) e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; pointer.down = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; pointer.down = false; pointer.rdown = false; });
 
 function pointerPos(e) {
   const r = canvas.getBoundingClientRect();
@@ -51,6 +51,8 @@ function pointerPos(e) {
 }
 canvas.addEventListener('pointerdown', e => {
   pointerPos(e);
+  // Right mouse button: held for blocking in battle, never a click.
+  if (e.button === 2) { pointer.rdown = true; e.preventDefault(); return; }
   pointer.touch = e.pointerType === 'touch';
   pointer.down = true;
   pointer.clicked = true;
@@ -61,12 +63,17 @@ canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
 });
 canvas.addEventListener('pointermove', e => {
-  if (e.pointerType === 'mouse') pointer.touch = false;
+  if (e.pointerType === 'mouse') { pointer.touch = false; pointer.mvx += e.movementX || 0; pointer.mvy += e.movementY || 0; }
   pointerPos(e);
   if (pointer.down && Math.hypot(pointer.x - pointer.startX, pointer.y - pointer.startY) > 12) pointer.moved = true;
 });
-canvas.addEventListener('pointerup', () => { pointer.down = false; });
-canvas.addEventListener('pointercancel', () => { pointer.down = false; });
+canvas.addEventListener('pointerup', e => {
+  if (e.button === 2) { pointer.rdown = false; return; }
+  // A touch that let go without dragging is a tap; scenes that care read and clear pointer.tap.
+  if (pointer.down && pointer.touch && !pointer.moved) pointer.tap = { x: pointer.x, y: pointer.y };
+  pointer.down = false;
+});
+canvas.addEventListener('pointercancel', () => { pointer.down = false; pointer.rdown = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 // ---------------------------------------------------------------- maths helpers

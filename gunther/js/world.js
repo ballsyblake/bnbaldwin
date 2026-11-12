@@ -4,10 +4,12 @@
 
 import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
-import { WORLD_W, WORLD_H, DAY_SECONDS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
+import { year, lordDies } from './dynasty.js';
+import { siegeTarget, isHeld, besiegers } from './sieges.js';
+import { WORLD_W, WORLD_H, DAY_SECONDS, YEAR_DAYS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
 import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
-import { openSettlement, openEncounter, openParty, autoResolve } from './menus.js';
+import { openSettlement, openEncounter, openParty, autoResolve, openSuccession } from './menus.js';
 
 const SIGHT = 360;
 
@@ -39,7 +41,8 @@ export function spawnWarband(home, bonus, extra) {
 // A lord takes the field with an army raised from their lands. A kingdom that has lost lords
 // (beaten or captured) sends the rest out stronger, so one side can't snowball forever.
 function spawnLordHost(l) {
-  const home = site(l.home);
+  // Home is their own seat if the kingdom still holds it, otherwise anywhere it still holds.
+  const home = [site(l.home)].concat(SETTLEMENTS.filter(s => s.faction === l.faction && s.kind === 'town'), SETTLEMENTS.filter(s => s.faction === l.faction)).find(s => s.faction === l.faction) || site(l.home);
   const d = game.day;
   const down = LORDS.filter(o => o.faction === l.faction && lordState(o.id).status !== 'free').length;
   const m = 1 + down * 0.25 + (l.ruler ? 0.3 : 0);
@@ -130,11 +133,11 @@ function think(p) {
     // Run away.
     const a = Math.atan2(p.y - threat.y, p.x - threat.x);
     const spot = landNear(p.x + Math.cos(a) * 240, p.y + Math.sin(a) * 240, 60);
-    p.tx = spot.x; p.ty = spot.y; p.mode = 'flee'; p.chase = null;
+    p.tx = spot.x; p.ty = spot.y; p.mode = 'flee'; p.chase = null; p.siege = null;
     return;
   }
   // A party on its way to raid sticks to the plan unless something worth chasing is very close.
-  if (prey && (p.mode !== 'raid' || preyD < 120)) { p.mode = 'chase'; p.chase = prey.id; p.tx = prey.x; p.ty = prey.y; return; }
+  if (prey && (!['raid', 'siege', 'besiege'].includes(p.mode) || preyD < 120)) { p.mode = 'chase'; p.chase = prey.id; p.tx = prey.x; p.ty = prey.y; return; }
   p.chase = null;
   const arrived = dist(p.x, p.y, p.tx, p.ty) < 12;
   if (p.kind === 'caravan') {
@@ -151,17 +154,35 @@ function think(p) {
       const who = p.lord ? lord(p.lord).name : p.name;
       if (dist(v.x, v.y, mapScene.pos.x, mapScene.pos.y) < 1400 || p.lord) note(who + (p.lord ? ' has' : ' have') + ' raided ' + v.name + '!', '#ff9a8a');
       chronicle(who + ' burned the village of ' + v.name + '.');
-      if (game.contract && game.contract.fief === v.id) note('Your village ' + v.name + ' has been burned!', '#ff6a5a');
+      if (isHeld(v)) note('Your village ' + v.name + ' has been burned!', '#ff6a5a');
       p.mode = 'idle'; p.raid = null; p.tx = p.x; p.ty = p.y;
     }
     return;
   }
+  // Marching on a town, then camped outside its walls (the storming happens in the daily tick).
+  if (p.mode === 'siege') {
+    const v = site(p.siege);
+    if (!v || !hostile(p.faction, v.faction)) { p.mode = 'idle'; p.siege = null; return; }
+    if (dist(p.x, p.y, v.x, v.y + 40) < 40) {
+      p.mode = 'besiege'; p.siegeDay = game.day; p.tx = p.x; p.ty = p.y;
+      const who = p.lord ? lord(p.lord).name : p.name;
+      note(who + ' has laid siege to ' + v.name + '!', isHeld(v) ? '#ff6a5a' : '#ffd27a');
+      chronicle(who + ' laid siege to ' + v.name + '.');
+    } else { p.tx = v.x; p.ty = v.y + 40; }
+    return;
+  }
+  if (p.mode === 'besiege') return;
   if (!arrived && p.mode !== 'idle') return;
   if (p.kind === 'warband' && !p.quest && Math.random() < 0.25) {
     const villages = SETTLEMENTS.filter(s => s.kind === 'village' && !game.sites[s.id].raided && dist(s.x, s.y, p.x, p.y) < 1100);
     if (villages.length) { const v = pick(villages); p.mode = 'raid'; p.raid = v.id; p.tx = v.x; p.ty = v.y; return; }
   }
   if (p.lord) {
+    // A strong host at war marches on an enemy town.
+    if (Math.random() < 0.2) {
+      const t = siegeTarget(p);
+      if (t) { p.mode = 'siege'; p.siege = t.id; p.tx = t.x; p.ty = t.y + 40; return; }
+    }
     // A cruel lord at war goes burning the enemy's villages.
     if (hasTrait(p.lord, 'cruel') && Math.random() < 0.5) {
       const targets = SETTLEMENTS.filter(s => s.kind === 'village' && hostile(p.faction, s.faction) && s.faction !== 'horde' && !game.sites[s.id].raided);
@@ -173,7 +194,9 @@ function think(p) {
       if (orcs.length) { const o = pick(orcs); const spot = landNear(o.x, o.y, 40); p.tx = spot.x; p.ty = spot.y; p.mode = 'wander'; return; }
     }
   }
-  const home = p.lord ? pick(SETTLEMENTS.filter(s => s.faction === p.faction)) : (p.anchor || site(p.home));
+  // A lord wanders their own lands; a kingdom that has lost them all hangs about its old seat.
+  const own = p.lord ? SETTLEMENTS.filter(s => s.faction === p.faction) : [];
+  const home = p.lord ? (own.length ? pick(own) : site(lord(p.lord).home)) : (p.anchor || site(p.home));
   const spot = landNear(home.x, home.y, p.kind === 'warband' ? 520 : 420);
   p.tx = spot.x; p.ty = spot.y; p.mode = 'wander';
 }
@@ -204,7 +227,8 @@ function aiClash(a, b) {
   if (lose.lord) {
     // A beaten lord either escapes or is taken prisoner by a rival kingdom.
     const st = lordState(lose.lord);
-    if (KINGDOMS.includes(win.faction) && Math.random() < 0.5) {
+    if (Math.random() < 0.05) lordDies(lose.lord, 'fell in battle near ' + near);
+    else if (KINGDOMS.includes(win.faction) && Math.random() < 0.5) {
       st.status = 'held-' + win.faction; st.back = game.day + randInt(8, 14);
       chronicle((win.lord ? lord(win.lord).name : win.name) + ' defeated and captured ' + lord(lose.lord).name + ' near ' + near + '.');
     } else {
@@ -347,6 +371,8 @@ export const mapScene = {
     this.time += dt;
     for (const m of log) m.age += dt;
     if (panelOpen()) return;
+    // Gunther died (of old age, in the night): the heir takes over before anything else.
+    if (game.pendingDeath) { openSuccession(game.pendingDeath); return; }
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) { this.hudTimer = 0.15; this.refreshHud(); }
     const P = this.pos;
@@ -512,7 +538,8 @@ export const mapScene = {
       let label = s.name;
       if (st.raided) label += ' (raided)';
       if (st.burned) label += ' (burned)';
-      if (game.contract && game.contract.fief === s.id) label += ' (yours)';
+      if (isHeld(s)) label += ' (yours)';
+      if (s.kind === 'town' && besiegers(s).length) label += ' (besieged)';
       text(label, s.x - cam.x, s.y - cam.y + (s.kind === 'town' ? 54 : 40), 16, s.kind === 'camp' || s.kind === 'stronghold' ? '#ffb0a0' : '#fff', 'center');
     }
 
@@ -582,9 +609,18 @@ export const mapScene = {
     else if (p.faction === 'horde') drawUnit(p.troops.brute ? 'brute' : 'grunt', '', '', x, y, 2, anim, p.time, p.flip);
     else drawUnit('soldier', p.lord || p.troops.knight ? 'sword' : 'spear', f.colour, x, y, 2, anim, p.time, p.flip);
     if (p.lord) text(lord(p.lord).name, x, y + 22, 13, '#fff', 'center');
+    if (p.mode === 'besiege') { this.drawSiegeCamp(x, y); text('Besieging', x, y + 38, 12, '#ffd27a', 'center'); }
     drawBanner(x + 10, y - 66, f.colour);
     text(String(partySize(p)), x + 14, y - 72, 14, '#fff', 'center');
     if (p.quest) text('!', x - 14, y - 60, 22, '#ffd34a', 'center');
+  },
+  // A ladder and a little tent beside a besieging host.
+  drawSiegeCamp(x, y) {
+    ctx.fillStyle = '#0d0b09'; ctx.fillRect(x - 40, y - 30, 14, 30);
+    ctx.fillStyle = '#8a6a3e'; ctx.fillRect(x - 38, y - 28, 3, 26); ctx.fillRect(x - 31, y - 28, 3, 26);
+    for (let k = 0; k < 4; k++) ctx.fillRect(x - 35, y - 24 + k * 7, 4, 2);
+    ctx.fillStyle = '#0d0b09'; ctx.beginPath(); ctx.moveTo(x + 24, y + 2); ctx.lineTo(x + 36, y - 18); ctx.lineTo(x + 48, y + 2); ctx.fill();
+    ctx.fillStyle = '#c9bb9c'; ctx.beginPath(); ctx.moveTo(x + 27, y); ctx.lineTo(x + 36, y - 14); ctx.lineTo(x + 45, y); ctx.fill();
   },
   drawTooltip(h, cam) {
     let lines;
@@ -596,7 +632,8 @@ export const mapScene = {
     } else {
       const s = h.site;
       const kind = { town: 'Town', village: 'Village', camp: 'Orc camp', stronghold: 'Orc stronghold' }[s.kind];
-      lines = [s.name, kind + ' of ' + FACTIONS[s.faction].short];
+      lines = [s.name, s.faction === 'player' ? kind + ', yours' : kind + ' of ' + FACTIONS[s.faction].short + (isHeld(s) ? ', held by you' : '')];
+      if (s.kind === 'town' && besiegers(s).length) lines.push('Besieged by ' + besiegers(s).map(b => b.lord ? lord(b.lord).name : b.name).join(', '));
     }
     const x = clamp(pointer.x + 16, 8, view.W - 230), y = clamp(pointer.y + 12, 8, view.H - 80);
     frame(x, y, 220, 14 + lines.length * 18);
@@ -649,7 +686,7 @@ function plain(str, x, y, size, colour, weight) {
 function friendly(f) { return (game.contract && game.contract.faction === f) || (game.relations[f] !== undefined && game.relations[f] >= 15); }
 function siteColour(s) {
   if (game.sites[s.id].burned) return '#4a4036';
-  if (game.contract && game.contract.fief === s.id) return '#f2c14e';
+  if (isHeld(s) || s.faction === 'player') return '#f2c14e';
   if (hostile('player', s.faction)) return '#e0533d';
   return friendly(s.faction) ? '#3b7dd8' : '#9a917f';
 }
@@ -661,9 +698,9 @@ function partyColour(p) {
 const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
 const WEATHER = ['Clear skies', 'Clear skies', 'Overcast', 'Light rain', 'Windy', 'Morning fog'];
 function seasonText() {
-  const season = SEASONS[Math.floor((game.day - 1) / 30) % 4];
+  const season = SEASONS[Math.floor((game.day - 1) / (YEAR_DAYS / 4)) % 4] + ', year ' + year();
   let w = WEATHER[Math.floor(seeded(game.day * 7919 + 13)() * WEATHER.length)];
-  if (season === 'Winter' && w === 'Light rain') w = 'Light snow';
+  if (season.startsWith('Winter') && w === 'Light rain') w = 'Light snow';
   return season + ' &middot; ' + w;
 }
 // Renown turned into a level, so the HUD can show progress towards the next one.
@@ -686,11 +723,14 @@ function placeCard(s) {
   } else {
     rows += row('Recruits', st.recruits);
     if (s.kind === 'town' && f.ruler) rows += row('Ruler', esc(f.ruler));
+    if (s.kind === 'town') { let n = 0; for (const t in st.garrison || {}) n += st.garrison[t]; rows += row('Garrison', n); }
+    if (isHeld(s)) rows += row('Held by', 'You');
+    if (s.kind === 'town' && besiegers(s).length) rows += row('State', '<span class="dangerc">Besieged</span>');
     if (game.relations[s.faction] !== undefined) rows += row('Standing', relationWord(game.relations[s.faction]));
     if (st.raided) rows += row('State', '<span class="dangerc">Raided</span>');
   }
   const verb = s.kind === 'camp' || s.kind === 'stronghold' ? (st.burned ? 'Search the ruins' : 'Approach the camp') : 'Enter ' + s.kind;
-  return '<div class="kind" style="color:' + col + '">' + kind + ' &middot; ' + esc(f.short.replace(/^the /, '')) + '</div><h3>' + esc(s.name) + '</h3>' + rows +
+  return '<div class="kind" style="color:' + col + '">' + kind + ' &middot; ' + esc(s.faction === 'player' ? 'Yours' : f.short.replace(/^the /, '')) + '</div><h3>' + esc(s.name) + '</h3>' + rows +
     '<button class="primary">' + verb + ' <small>(E)</small></button>';
 }
 
