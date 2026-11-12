@@ -143,8 +143,8 @@ export const battleScene = {
     const hero = '<div class="box abs herobox"><button data-act="weapon">' + (sw ? 'Sword' : 'Bow') + '<small>' + (touch ? 'tap to swap' : 'Q to swap') + '</small></button>' +
       (sw ? '<button data-act="block">Block<small>' + (touch ? 'hold' : 'hold right click') + '</small></button>' : '') + '</div>';
     setHud(this.topBar() + hero +
-      '<div class="box abs groups">' + groups + '</div>' +
-      '<div class="box abs orders"><span class="lbl">Order for: <b>' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</b></span><div>' + orders + '</div></div>',
+      '<div class="box abs groups" data-min="groups"><div class="mini">' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</div>' + groups + '</div>' +
+      '<div class="box abs orders" data-min="orders"><span class="lbl">Order for: <b>' + { all: 'All', foot: 'Foot', bows: 'Bows' }[this.group] + '</b></span><div>' + orders + '</div></div>',
       { order: o => this.setOrder(o), group: g => this.setGroup(g), weapon: () => this.swapWeapon(), block: () => {} });
     // The Block button works while held, so it listens for press and release itself.
     const bb = document.querySelector('#ui [data-act="block"]');
@@ -156,7 +156,7 @@ export const battleScene = {
   },
   topBar() {
     const foe = this.opts.enemy, fc = this.enemyFaction === 'horde' ? 'var(--danger)' : FACTIONS[this.enemyFaction].colour;
-    return '<div class="box abs btop">' +
+    return '<div class="box abs btop" data-min="btop"><div class="mini" data-k="bmini"></div>' +
       '<div class="side"><div class="meterhead"><b class="px name gold">Gunther</b><span data-k="hp"></span></div><div class="meter"><i data-k="hpbar"></i></div>' +
         '<div class="meterhead"><span class="lbl">Men standing</span><b class="px" data-k="mine"></b></div><div class="meter"><i data-k="minebar" style="background:var(--gold)"></i></div></div>' +
       '<div class="odds"><span class="lbl">Odds</span><b class="px" data-k="odds"></b><span data-k="oddsw"></span></div>' +
@@ -201,6 +201,7 @@ export const battleScene = {
     }
     uiSet('odds', odds);
     uiSet('oddsw', '<span class="' + cls + '">' + word + '</span>');
+    uiSet('bmini', '<b class="gold">You</b> <span class="num">' + nm + '</span> &middot; HP <span class="num">' + (this.hero.dead ? 'down' : Math.round(hp * 100) + '%') + '</span> &middot; <span class="' + cls + '">' + odds + '</span> &middot; <span class="num">' + nt + '</span> <b class="dangerc">Enemy</b>');
     const foot = n(count(0, u => !(u.def && u.def.ranged))), bows = n(count(0, u => u.def && u.def.ranged));
     uiSet('gn-all', nm + ' men'); uiSet('gn-foot', foot + ' men'); uiSet('gn-bows', bows + ' men');
   },

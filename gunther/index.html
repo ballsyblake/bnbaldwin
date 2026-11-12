@@ -111,6 +111,33 @@
     .portrait .orders { left: calc(var(--u) * 6); right: calc(var(--u) * 6); bottom: calc(var(--u) * 6); }
     .portrait .orders div button { flex: 1; width: auto; height: calc(var(--u) * 44); }
     .portrait .orders .lbl { display: none; }
+    /* Shrinkable panels: a small button in the corner toggles a compact form. */
+    #ui .mm { position: absolute; top: 0; right: 0; width: calc(var(--u) * 16); height: calc(var(--u) * 16); min-width: 0; padding: 0; font: 700 calc(var(--u) * 14) var(--sans); line-height: 1; z-index: 2; color: var(--muted); }
+    .portrait #ui .mm { width: calc(var(--u) * 26); height: calc(var(--u) * 26); font-size: calc(var(--u) * 20); }
+    [data-min] > .mini { display: none; }
+    #ui [data-min].min > :not(.mini):not(.mm) { display: none; }
+    #ui [data-min].min > .mini { display: block; white-space: nowrap; }
+    .mstats.min, .btop.min { width: auto; right: auto; padding: calc(var(--u) * 5) calc(var(--u) * 26) calc(var(--u) * 5) calc(var(--u) * 9); }
+    .portrait .mstats.min, .portrait .btop.min { padding-right: calc(var(--u) * 34); }
+    .btop.min { display: block; }
+    .mapmm { pointer-events: none; }
+    .mapmm.min { width: auto !important; height: auto !important; left: auto !important; right: calc(var(--u) * 10); }
+    .mapmm .mini { pointer-events: auto; padding: calc(var(--u) * 5) calc(var(--u) * 26) calc(var(--u) * 5) calc(var(--u) * 9); color: var(--muted); }
+    .portrait .mapmm .mini { padding-right: calc(var(--u) * 34); }
+    /* Compact action and order bars keep their buttons, just smaller. */
+    #ui [data-min].box.actions.min > button, #ui [data-min].box.orders.min > div { display: flex; }
+    #ui .actions.min, #ui .orders.min { padding-right: calc(var(--u) * 20); }
+    .portrait #ui .actions.min, .portrait #ui .orders.min { padding-right: calc(var(--u) * 30); }
+    .actions.min button { height: calc(var(--u) * 22) !important; min-width: calc(var(--u) * 44); }
+    .actions.min button small, .orders.min button small { display: none; }
+    .orders.min button { height: calc(var(--u) * 24) !important; }
+    .portrait .actions.min { left: auto; }
+    .portrait .actions.min button { height: calc(var(--u) * 34) !important; min-width: calc(var(--u) * 70); flex: none; }
+    .portrait .orders.min div button { height: calc(var(--u) * 32) !important; }
+    .groups:not(.min) { padding-right: calc(var(--u) * 19); }
+    .portrait .groups:not(.min) { padding-right: calc(var(--u) * 29); }
+    .groups.min { padding: calc(var(--u) * 5) calc(var(--u) * 26) calc(var(--u) * 5) calc(var(--u) * 9); right: auto !important; }
+    .portrait .groups.min { padding-right: calc(var(--u) * 34); }
     .herobox { left: 50%; transform: translateX(-50%); bottom: calc(var(--u) * 8); padding: calc(var(--u) * 5); display: flex; gap: calc(var(--u) * 4); }
     .herobox button { width: calc(var(--u) * 74); height: calc(var(--u) * 46); }
     .portrait .herobox { left: auto; right: calc(var(--u) * 6); transform: none; bottom: calc(var(--u) * 146); }

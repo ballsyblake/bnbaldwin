@@ -171,7 +171,32 @@ export function setHud(html, handlers) {
     b.addEventListener('pointerdown', e => e.stopPropagation());
     b.addEventListener('click', e => { e.stopPropagation(); handlers[b.dataset.act](b.dataset.arg); });
   });
+  // Panels marked data-min="key" get a small button that shrinks them to a compact form.
+  // Which panels are shrunk is remembered in this browser.
+  ui.querySelectorAll('[data-min]').forEach(box => {
+    const key = box.dataset.min;
+    box.classList.toggle('min', uiMin(key));
+    const b = document.createElement('button');
+    b.className = 'mm';
+    b.title = 'Shrink or expand this panel';
+    b.textContent = uiMin(key) ? '+' : '\u2212';
+    b.addEventListener('pointerdown', e => e.stopPropagation());
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      minState[key] = !uiMin(key);
+      try { localStorage.setItem('gunther-ui-min', JSON.stringify(minState)); } catch (err) { /* not saved: fine */ }
+      box.classList.toggle('min', minState[key]);
+      b.textContent = minState[key] ? '+' : '\u2212';
+      if (handlers.minChanged) handlers.minChanged(key, minState[key]);
+    });
+    box.appendChild(b);
+    const mini = box.querySelector(':scope > .mini');
+    if (mini) { mini.style.cursor = 'pointer'; mini.addEventListener('pointerdown', e => e.stopPropagation()); mini.addEventListener('click', e => { e.stopPropagation(); if (box.classList.contains('min')) b.click(); }); }
+  });
 }
+let minState = {};
+try { minState = JSON.parse(localStorage.getItem('gunther-ui-min') || '{}') || {}; } catch (e) { /* storage blocked */ }
+export function uiMin(key) { return !!minState[key]; }
 // Updates one marked piece of the HUD (data-k="key"), only touching the page when it changed.
 export function uiSet(key, html) {
   if (uiCache[key] === html) return;

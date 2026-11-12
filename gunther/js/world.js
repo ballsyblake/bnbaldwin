@@ -2,7 +2,7 @@
 // merchant caravans go about their own business, whether or not Gunther is watching. Time only passes while you are moving or
 // camping, so you can always stop and think.
 
-import { ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
+import { uiMin, ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
 import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
 import { year, lordDies } from './dynasty.js';
 import { siegeTarget, isHeld, besiegers } from './sieges.js';
@@ -273,7 +273,7 @@ export const mapScene = {
     const sp = (v, label, hk) => '<button data-act="speed" data-arg="' + v + '" class="' + (this.speed === v ? 'primary' : '') + '" title="' + hk + '">' + label + '</button>';
     const act = (a, label, hk, cls) => '<button data-act="' + a + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<small>' + hk + '</small></button>';
     setHud(
-      '<div class="box abs mstats" data-k="stats">' +
+      '<div class="box abs mstats" data-k="stats" data-min="stats"><div class="mini" data-k="statsmini"></div>' +
         '<div class="top"><b class="px" data-k="day"></b><span data-k="season"></span></div>' +
         '<div class="tiles">' +
           '<div class="tile"><span class="lbl">Gold</span><b class="px gold" data-k="gold"></b></div>' +
@@ -286,10 +286,11 @@ export const mapScene = {
           '<div><div class="meterhead"><span class="lbl" data-k="lvl"></span><span data-k="lvp"></span></div><div class="meter"><i data-k="lvbar" style="background:var(--gold)"></i></div></div>' +
         '</div>' +
       '</div>' +
+      '<div class="abs mapmm" data-min="minimap" data-k="mapmm" style="left:' + u(mm.x - 3) + ';top:' + u(mm.y - 3) + ';width:' + u(mm.w + 6) + ';height:' + u(mm.h + 6) + '"><div class="mini box">Minimap</div></div>' +
       '<div class="box abs legend" data-k="legend" style="left:' + u(mm.x - 3) + ';top:' + u(mm.y + mm.h + 6) + ';width:' + u(mm.w + 6) + '"></div>' +
       '<div class="box abs place" data-k="place" style="display:none"></div>' +
       '<div class="box abs speed">' + sp(0, 'II', 'Pause (Space)') + sp(1, '&gt;', 'Normal speed') + sp(3, '&gt;&gt;', 'Fast') + '</div>' +
-      '<div class="box abs actions">' + act('party', 'Party', 'P', 'primary') + act('quests', 'Quests', 'J') + act('map', 'Map', 'M', this.bigMap ? 'sel' : '') +
+      '<div class="box abs actions" data-min="actions">' + act('party', 'Party', 'P', 'primary') + act('quests', 'Quests', 'J') + act('map', 'Map', 'M', this.bigMap ? 'sel' : '') +
         act('camp', this.camping ? 'Break camp' : 'Camp', 'C', this.camping ? 'sel' : '') + '</div>',
       {
         party: () => openParty(),
@@ -297,6 +298,7 @@ export const mapScene = {
         map: () => { this.bigMap = !this.bigMap; this.hud(); },
         camp: () => this.toggleCamp(),
         speed: v => { this.speed = +v; this.hud(); },
+        minChanged: () => this.refreshHud(),
         enter: () => this.enterNear()
       });
     this.hudTimer = 0;
@@ -330,8 +332,10 @@ export const mapScene = {
     // Legend under the minimap.
     const leg = [['var(--gold)', 'You'], ['var(--blue)', game.contract ? FACTIONS[game.contract.faction].short.replace(/^the /, '') + ' (your lord)' : 'Friendly'], ['var(--danger)', 'Hostile'], ['#9a917f', 'Neutral']];
     uiSet('legend', leg.map(([c, l]) => '<span><i class="sw" style="background:' + c + '"></i>' + esc(l) + '</span>').join(''));
-    uiShow('legend', !view.portrait && !this.bigMap);
+    uiShow('legend', !view.portrait && !this.bigMap && !uiMin('minimap'));
     uiShow('stats', !this.bigMap);
+    uiShow('mapmm', !this.bigMap);
+    uiSet('statsmini', '<b class="px gold">Day <span class="num">' + game.day + '</span></b> <span class="num gold">' + game.gold.toLocaleString('en-AU') + 'g</span> &middot; <span class="num">' + troopCount() + '/' + partyLimit() + '</span> men &middot; <span class="num ' + (days < 2 ? 'dangerc' : '') + '">' + days + '</span>d food &middot; HP <span class="num">' + Math.round(hp * 100) + '%</span>');
     // The card for the place Gunther stands beside.
     const s = this.bigMap ? null : this.nearSite();
     uiShow('place', !!s);
@@ -346,7 +350,7 @@ export const mapScene = {
       const cam = this.camera();
       const pos = view.portrait ? 'left:calc(var(--u) * 120);top:calc(var(--u) * ' + (view.H - 380) + ')'
         : (() => { const mm = this.minimap(), x = clamp(s.x - cam.x + 70, 10, view.W - 200);
-            const minTop = x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
+            const minTop = uiMin('minimap') ? 60 : x + 190 > mm.x ? mm.y + mm.h + 60 : 140;   // keep clear of the minimap and its legend
             return 'left:calc(var(--u) * ' + x + ');top:calc(var(--u) * ' + clamp(s.y - cam.y - 100, minTop, view.H - 220) + ')'; })();
       if (el && el.dataset.pos !== pos) { el.dataset.pos = pos; el.style.cssText = pos; }
     }
@@ -396,7 +400,7 @@ export const mapScene = {
     if (pointer.clicked || (pointer.down && !pointer.touch && !this.target?.party && !this.target?.site)) {
       const mm = this.minimap();
       const cam = this.camera();
-      if (pointer.x > mm.x && pointer.y < mm.y + mm.h && pointer.y > mm.y && pointer.x < mm.x + mm.w) {
+      if (!uiMin('minimap') && pointer.x > mm.x && pointer.y < mm.y + mm.h && pointer.y > mm.y && pointer.x < mm.x + mm.w) {
         const spot = nearestLand((pointer.x - mm.x) / mm.w * WORLD_W, (pointer.y - mm.y) / mm.h * WORLD_H);
         this.target = spot;
       } else if (pointer.clicked) {
@@ -641,23 +645,25 @@ export const mapScene = {
   },
   drawHud() {
     // Minimap (the stats and buttons are HTML, see hud()).
-    const mm = this.minimap();
-    frame(mm.x, mm.y, mm.w, mm.h);
-    ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
-    const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
-    for (const s of SETTLEMENTS) {
-      ctx.fillStyle = siteColour(s);
-      ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
+    if (!uiMin('minimap')) {
+      const mm = this.minimap();
+      frame(mm.x, mm.y, mm.w, mm.h);
+      ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
+      const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
+      for (const s of SETTLEMENTS) {
+        ctx.fillStyle = siteColour(s);
+        ctx.fillRect(mm.x + s.x * sx - 3, mm.y + s.y * sy - 3, 6, 6);
+      }
+      for (const p of game.parties) {
+        if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
+        ctx.fillStyle = partyColour(p);
+        ctx.fillRect(mm.x + p.x * sx - 1, mm.y + p.y * sy - 1, 3, 3);
+      }
+      const cam = this.camera();
+      ctx.strokeStyle = '#f4ead2'; ctx.lineWidth = 1;
+      ctx.strokeRect(mm.x + cam.x * sx, mm.y + cam.y * sy, view.W * sx, view.H * sy);
+      ctx.fillStyle = '#f2c14e'; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
     }
-    for (const p of game.parties) {
-      if (dist(p.x, p.y, this.pos.x, this.pos.y) > SIGHT * 2.2 && !p.quest && !p.lord) continue;
-      ctx.fillStyle = partyColour(p);
-      ctx.fillRect(mm.x + p.x * sx - 1, mm.y + p.y * sy - 1, 3, 3);
-    }
-    const cam = this.camera();
-    ctx.strokeStyle = '#f4ead2'; ctx.lineWidth = 1;
-    ctx.strokeRect(mm.x + cam.x * sx, mm.y + cam.y * sy, view.W * sx, view.H * sy);
-    ctx.fillStyle = '#f2c14e'; ctx.fillRect(mm.x + this.pos.x * sx - 2, mm.y + this.pos.y * sy - 2, 5, 5);
     // Event feed, above the speed controls.
     const base = view.H - (view.portrait ? 150 : 66);
     const feed = log.filter(m => m.age < 9);
