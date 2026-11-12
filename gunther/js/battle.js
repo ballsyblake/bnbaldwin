@@ -2,6 +2,7 @@
 // simple orders: Charge, Hold or Follow. Each soldier is a small "agent" that picks a target,
 // walks to it and attacks, which is enough to give the feel of two lines crashing together.
 
+import { tutorialStart, tutorialTick, tutorialDraw } from './tutorial.js';
 import { ctx, view, keys, pointer, clamp, dist, rand, pick, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
 import { img, drawUnit } from './sprites.js';
 import { TROOPS, FACTIONS } from './data.js';
@@ -122,6 +123,8 @@ export const battleScene = {
     this.hero = this.addUnit(0, null, view.portrait ? view.W / 2 : b.x0 + 80, view.portrait ? b.y1 - 60 : view.H * 0.6);
     for (let s = 0; s < 2; s++) this.reinforce(s, true);
     this.routing = false;
+    this.tut = null; this.tutBlocks = 0;
+    if (opts.tutorial) tutorialStart(this);
     this.hud();
   },
   bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 210 : 76) }; },
@@ -389,7 +392,7 @@ export const battleScene = {
       if (u.retarget <= 0 || !u.target || u.target.dead || u.target.fled) {
         u.retarget = rand(0.3, 0.6);
         let reach = Infinity;
-        const order = u.side === 0 ? this.orders[groupOf(u)] : (this.siege ? 'hold' : 'charge');
+        const order = u.side === 0 ? this.orders[groupOf(u)] : (this.siege || u.tutHold ? 'hold' : 'charge');
         if (order === 'hold') reach = def.ranged ? def.range : 90;
         if (order === 'follow') reach = def.ranged ? def.range : 110;
         if (order === 'fallback') reach = dist(u.x, u.y, u.holdX, u.holdY) > 20 ? 30 : (def.ranged ? def.range : 60);
@@ -403,7 +406,7 @@ export const battleScene = {
         // Mid-swing: the blow lands part way through.
         if (!def.ranged && !u.struck && u.at > wind && T && !T.dead && dist(u.x, u.y, T.x, T.y) < def.range + 14) {
           u.struck = true;
-          const dmg = def.dmg * rand(0.8, 1.2);
+          const dmg = def.dmg * rand(0.8, 1.2) * (u.dmgScale || 1);
           if (T.isHero) this.strikeHero(u, dmg);
           else if (Math.random() < (T.def.guard || 0) * 0.3) { if (Math.random() < 0.3) this.effects.push({ x: (u.x + T.x) / 2, y: (u.y + T.y) / 2 - 26, t: 0, kind: 'block' }); }
           else this.hurt(T, dmg * (1 - (T.def && T.def.block || 0) * 0.15) * (1 - (T.def && T.def.armour || 0) * 0.2), 'melee');
@@ -422,7 +425,7 @@ export const battleScene = {
             const lead = d / speed2;
             const tx = T.x + (T.vx || 0) * lead, ty = T.y - 16 + (T.vy || 0) * lead;
             const a = Math.atan2(ty - (u.y - 26), tx - u.x) + rand(-0.07, 0.07);
-            this.shoot(u, a, def.dmg, def.javelin ? 'javelin' : def.bolt ? 'bolt' : 'arrow', u.side, speed2);
+            this.shoot(u, a, def.dmg * (u.dmgScale || 1), def.javelin ? 'javelin' : def.bolt ? 'bolt' : 'arrow', u.side, speed2);
           }
         } else if (d <= def.range + (def.scale ? 14 : 0)) {
           u.anim = 'idle';
@@ -501,7 +504,8 @@ export const battleScene = {
     this.units = this.units.filter(u => u.isHero || !(u.dead && u.deadT > 6) && !u.fled);
     if (!this.over) { this.reinforce(0); this.reinforce(1); }
 
-    // ---- How the battle ends
+    // ---- How the battle ends (the opening fight runs until its last lesson is done)
+    if (this.tut && tutorialTick(this, dt)) return;
     if (!this.over) {
       const foes = this.alive(1).filter(u => !u.fleeing).length + this.reserve[1].length;
       const friends = this.alive(0).filter(u => !u.isHero).length + this.reserve[0].length + (H.dead ? 0 : 1);
@@ -608,9 +612,12 @@ export const battleScene = {
         u.stun = 0.9;
         this.effects.push({ x: (u.x + H.x) / 2, y: (u.y + H.y) / 2 - 30, t: 0, kind: 'parry' });
         this.float(H.x, H.y - 76, 'Parry!', '#f2c14e');
+        this.tutBlocks++;
         trainSkill('blade', 2);
       } else {
         this.effects.push({ x: (u.x + H.x) / 2, y: (u.y + H.y) / 2 - 30, t: 0, kind: 'block' });
+        this.float(H.x, H.y - 76, 'Blocked', '#c9bb9c');
+        this.tutBlocks++;
         trainSkill('blade', 0.5);
       }
       return;
@@ -757,7 +764,8 @@ export const battleScene = {
     const top = this.bounds().y0, bot = this.bounds().y1;
     if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, top + 24, 20, '#e0533d', 'center');
     if (this.banner && this.banner.t < (this.banner.msg.length > 24 ? 4 : 2.5)) text(this.banner.msg, W / 2, Hh / 2 - 40, this.banner.msg.length > 24 ? (view.portrait ? 18 : 24) : 34, '#f2c14e', 'center');
-    if (this.time < 6 && !this.over) {
+    if (this.tut && !this.over) tutorialDraw(this, ctx);
+    else if (this.time < 6 && !this.over) {
       const msg = pointer.touch ? (game.weapon === 'sword' ? 'Drag to move. Tap left, right or above Gunther to swing. Hold Block.' : view.portrait ? 'Drag to move. Buttons pick a group and give orders.' : 'Drag to move. Gunther shoots by himself. Buttons give orders.')
         : (game.weapon === 'sword' ? 'Move the mouse to pick a side, hold click to wind up. Right click blocks. Q: bow.' : 'WASD move, hold click to draw, release to shoot. Q: sword. 1 2 3 groups, F1 to F4 orders.');
       text(msg, W / 2, bot - (view.portrait ? 12 : -2), 14, '#f4ead2', 'center');

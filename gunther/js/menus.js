@@ -13,7 +13,7 @@ import {
   enemiesOf, alliesOf, anyWar, warsText, recruitType
 } from './state.js';
 import { outlawName, spawnOutlaws } from './world.js';
-import { storyButton, storyAt, storyBeaten, journalHtml, openPrologue } from './story.js';
+import { storyButton, storyAt, storyBeaten, journalHtml, openPrologue, startOpening } from './story.js';
 import { mapScene, populate, spawnWarband, spawnParty, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { battleScene } from './battle.js';
 import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
@@ -77,7 +77,7 @@ export function openTitle() {
   showPanel(
     '<div class="eyebrow">A warband tale</div>' +
     '<h1>Gunther</h1>' +
-    '<p>The Gorrak Horde has landed on Aldmoor while its four kingdoms quarrel. Raise a band of sellswords, earn a lord\'s favour, and break the Horde at Skullrock.</p>' +
+    '<p>Men, elves, dwarves and orcs scheme and fight over the island of Aldmoor, and every village pays the Wall Tithe to keep them safe. Raise a warband, play the realms against each other, and find out where the silver really goes.</p>' +
     (saved ? '<button data-act="continue" class="primary">Continue <span class="hk">Day ' + game.day + '</span></button>' : '') +
     '<button data-act="new"' + (saved ? '' : ' class="primary"') + '>New campaign</button>' +
     '<button data-act="help">How to play</button>' +
@@ -86,7 +86,7 @@ export function openTitle() {
       (MODS.some(m => m.on && !m.error) ? '<span>' + MODS.filter(m => m.on && !m.error).length + ' mod(s) on</span>' : '') + '</div>',
     {
       continue: () => { loadSave(); populate(); setScene(mapScene); },
-      new: () => { newGame(true); populate(); save(); setScene(mapScene); openIntro(); },
+      new: () => { newGame(true); populate(); save(); setScene(mapScene); startOpening(); },
       help: () => openHelp(openTitle),
       mods: () => openMods()
     }, 'title');
@@ -146,14 +146,6 @@ function openHelp(back) {
     '<p><b>Realms.</b> Help a realm and its people warm to you. Attack its lords or caravans and it will turn on you. The five realms (men, elves, dwarves and orcs alike) make war and peace on their own. Realms with a common enemy swear alliances and call each other to arms, an ally may refuse the call, and a faithless ruler may turn on an ally. Nobody is the villain: whoever you fight, someone else will thank you for it. Outlaws of every people rob the roads and are fair game for all. The island carries on without you: check the Chronicle on the Party screen.</p>' +
     '<p><b>Goal.</b> There is no single enemy. Pick a side, or several in turn, take towns, found a dynasty, and follow the story of the Wall Tithe.</p>' +
     '</div><button data-act="back">Back</button>', { back });
-}
-
-function openIntro() {
-  showPanel('<h2>A warband of your own</h2>' +
-    '<p>You start near Fairmeet with a handful of recruits, a couple of bowmen and 6 sacks of grain. Visit the town to buy food and hire more men, then hunt outlaws for gold and renown. The realms of men, elves, dwarves and orcs are rivals, not friends: watch who is at war with whom.</p>' +
-    '<p>Hover over or tap parties on the map to see how strong they look before you pick a fight.</p>' +
-    '<button data-act="ok">To the road</button><button data-act="help" class="secondary">How to play</button>',
-    { ok: () => hidePanel(), help: () => openHelp(openIntro) });
 }
 
 // ---------------------------------------------------------------- settlements
