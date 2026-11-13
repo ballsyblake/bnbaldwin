@@ -19,7 +19,7 @@ export function newGame(migrate) {
   Object.assign(game, {
     version: 2,
     day: 1, dayTime: 0,
-    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
+    blades: [], gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
@@ -76,6 +76,7 @@ function ensureFields() {
   if (!game.skills) game.skills = {};
   for (const k in SKILLS) if (game.skills[k] === undefined) game.skills[k] = 0;
   if (!game.swordLevel) game.swordLevel = 1;
+  if (!game.blades) game.blades = [];
   if (!game.weapon) game.weapon = 'bow';
   if (!game.prisoners) game.prisoners = {};
   if (!game.lordCaptives) game.lordCaptives = [];
@@ -373,4 +374,9 @@ export { KINGDOMS };
 // What the smith charges for the next level of a piece of kit, and how well known Gunther must be
 // before the smith will make it. Prices climb steeply, so the best gear is a long campaign's work.
 export function smithCost(kind, level) { return RULES.smithBase[kind] * level * (level + 1); }
-export function smithRenown(level) { return RULES.smithRenownPerLevel * (level - 1); }
+// Past what a town smith can make, bows are elf work (for their timber) and armour is dwarf work
+// (for iron), and only for a captain they think well of. Returns what the next level asks for.
+export function craftNeeds(kind, level) {
+  const over = level - RULES.smithLocalMax + 1;
+  return { good: kind === 'bow' ? 'timber' : 'iron', amount: level, faction: kind === 'bow' ? 'elves' : 'dwarves', relation: over * RULES.craftRelationPerLevel, gold: Math.round(smithCost(kind, level) / 2) };
+}

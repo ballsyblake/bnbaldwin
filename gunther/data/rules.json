@@ -1,1 +1,1 @@
-{"daySeconds": 10, "yearDays": 40, "lootPerPower": [1.5, 2.5], "siteLootPerPower": 2, "renownPerPower": 0.1, "wageScale": 2, "ransomPerPower": 7, "smithBase": {"bow": 40, "sword": 45, "armour": 50}, "smithRenownPerLevel": 20}
+{"daySeconds": 10, "yearDays": 40, "lootPerPower": [1.5, 2.5], "siteLootPerPower": 2, "renownPerPower": 0.1, "wageScale": 2, "ransomPerPower": 7, "smithBase": {"bow": 40, "sword": 45, "armour": 50}, "smithLocalMax": 3, "craftRelationPerLevel": 5}

@@ -8,7 +8,7 @@ import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RAC
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
-  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName, smithCost, smithRenown,
+  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName, smithCost, craftNeeds,
   skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
   enemiesOf, alliesOf, anyWar, warsText, recruitType
 } from './state.js';
@@ -18,7 +18,7 @@ import { mapScene, populate, spawnWarband, spawnParty, partyById, terrainAt, T, 
 import { updateLife } from './ambient.js';
 import { tile, stat } from './icons.js';
 import { battleScene } from './battle.js';
-import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
+import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction, peopleOf } from './sieges.js';
 import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
 import { standing } from './diplomacy.js';
 import { openHall, openRansom, openCapturedLord, lordBlurb, lordGreeting, skillsTable, prisonersSection, convertPrisoner, contractLine, lordsTable } from './court.js';
@@ -146,6 +146,7 @@ function openHelp(back) {
     '<p><b>Towns and sieges.</b> Towns have walls and a garrison, and a town\'s villages belong to whoever holds the town. Lords at war march on enemy towns, camp outside for a few days and then storm them, so towns change hands. You can besiege any town you are not sworn to (that means war with its owner): build ladders for two days, then fight your way in through the breaches while their archers shoot from behind the wall. As a vassal your lord grants you the towns you take; as a mercenary you are paid a bounty; on your own you hold them yourself. Leave men in a town\'s garrison to keep it, and collect its rent.</p>' +
     '<p><b>Family.</b> Years pass (one every 40 days) and everyone ages. Lords die of old age or in battle, and their son or daughter takes over, remembering half of what their parent felt about you. Marry into a lord\'s house through their kingdom\'s hall and you may have children. When your captain dies, of old age or struck down in battle, a grown child (or a cousin) takes over with the gear, some gold and renown, and a little of the skill. Death in battle can be turned off on the Party screen.</p>' +
     '<p><b>Lords.</b> Each realm is led by lords with their own temper. They remember what you do: spare one and they may become a friend, rob or ransom them and they may hunt you. Sign on as a mercenary in a kingdom hall, and with enough renown you can swear fealty and hold a village.</p>' +
+    '<p><b>Kit.</b> Any town smith makes plain kit (to level 3). Better bows are made by the elves of Elthir for their timber, and better armour by the dwarves of Dunmar for iron, if they think well of you. A better sword is taken from a lord you beat in the field, one from each lord.</p>' +
     '<p><b>Peoples.</b> Men hold the Vale and the March. The orc clans hold Skullrock and its camps in the north under Warlord Gorrak: tough, hard-hitting and quick to sell their axes. Elves of the Elthir Wood in the south west are fast and deadly with bows but lightly armoured. Dwarves of the Dunmar Holds in the north east are slow, tough and carry crossbows. Volunteers from each place are of its people. None of them use magic.</p>' +
     '<p><b>Trade.</b> Each place makes some goods cheaply and pays well for others. Buy low, carry it across the island, sell high.</p>' +
     '<p><b>Realms.</b> Help a realm and its people warm to you. Attack its lords or caravans and it will turn on you. The five realms (men, elves, dwarves and orcs alike) make war and peace on their own. Realms with a common enemy swear alliances and call each other to arms, an ally may refuse the call, and a faithless ruler may turn on an ally. Nobody is the villain: whoever you fight, someone else will thank you for it. Outlaws of every people rob the roads and are fair game for all. The island carries on without you: check the Chronicle on the Party screen.</p>' +
@@ -436,26 +437,44 @@ function completeQuest(q) {
 
 // ---------------------------------------------------------------- smith
 function openSmith(s, msg) {
-  // One row per piece of kit: its level, then the price and the renown the smith asks for.
+  // Any smith makes plain kit. Past that: elves make bows for their timber, dwarves make armour
+  // for iron (both only for a captain they think well of), and a better sword is taken from a lord.
+  const people = peopleOf(s), local = RULES.smithLocalMax;
   const row = (kind, name, key, max) => {
     const lv = game[key];
-    if (max && lv >= max) return '<button disabled>' + name + ' <span class="num">' + lv + '</span> <span class="hk">finest on the island</span></button>';
-    const cost = smithCost(kind, lv), need = smithRenown(lv), ok = game.gold >= cost && game.renown >= need;
-    return '<button data-act="buy" data-arg="' + kind + '"' + (ok ? '' : ' disabled') + '>' + name + ' <span class="num">' + lv + ' &rarr; ' + (lv + 1) + '</span><span class="hk">' +
-      stat('gold', cost, 'Price', game.gold < cost ? 'bad' : 'gold') + (need ? stat('renown', need, 'Renown needed', game.renown < need ? 'bad' : '') : '') + '</span></button>';
+    const head = name + ' <span class="num">' + lv + (lv >= max ? '' : ' &rarr; ' + (lv + 1)) + '</span><span class="hk">';
+    if (lv >= max) return '<button disabled>' + head + 'finest on the island</span></button>';
+    if (lv < local) {
+      const cost = smithCost(kind, lv);
+      return '<button class="secondary" data-act="buy" data-arg="' + kind + '"' + (game.gold >= cost ? '' : ' disabled') + '>' + head + stat('gold', cost, 'Price', game.gold < cost ? 'bad' : 'gold') + '</span></button>';
+    }
+    if (kind === 'sword') return '<button disabled>' + head + stat('blade', 'Beat a lord', 'Take a better sword from a lord you defeat') + '</span></button>';
+    const n = craftNeeds(kind, lv), maker = n.faction === 'elves' ? 'elf' : 'dwarf';
+    if (people !== maker) return '<button disabled>' + head + (maker === 'elf' ? 'Elf bowyers: ' : 'Dwarf smiths: ') + SETTLEMENTS.filter(t => t.kind === 'town' && peopleOf(t) === maker).map(t => t.name).join(', ') + '</span></button>';
+    const have = game.goods[n.good] || 0, rel = game.relations[n.faction] || 0;
+    const ok = game.gold >= n.gold && have >= n.amount && rel >= n.relation;
+    return '<button class="secondary" data-act="craft" data-arg="' + kind + '"' + (ok ? '' : ' disabled') + '>' + head + stat('gold', n.gold, 'Price', game.gold < n.gold ? 'bad' : 'gold') +
+      '<span class="st"><b class="' + (have < n.amount ? 'bad' : '') + '">' + have + '/' + n.amount + '</b> ' + GOODS[n.good].name.toLowerCase() + '</span>' +
+      '<span class="st"><b class="' + (rel < n.relation ? 'bad' : 'good') + '">' + rel + '/' + n.relation + '</b> standing</span></span></button>';
   };
   showPanel('<h2>Smith</h2>' + statusLine() + (msg ? '<p class="msg">' + msg + '</p>' : '') +
     row('bow', 'Bow', 'bowLevel', 8) + row('sword', 'Sword', 'swordLevel', 8) + row('armour', 'Armour', 'armourLevel', 10) +
     '<button data-act="back" class="secondary">Back</button>', {
-    buy: kind => {
-      const key = kind + 'Level';
-      game.gold -= smithCost(kind, game[key]); game[key]++;
-      if (kind === 'armour') { game.maxHealth += 25; game.health = game.maxHealth; }
-      save();
-      openSmith(s, { bow: 'A stronger bow.', sword: 'A better blade.', armour: 'New plates: +25 health.' }[kind]);
+    buy: kind => { game.gold -= smithCost(kind, game[kind + 'Level']); gain(kind); },
+    craft: kind => {
+      const n = craftNeeds(kind, game[kind + 'Level']);
+      game.gold -= n.gold; game.goods[n.good] -= n.amount;
+      if (!game.goods[n.good]) delete game.goods[n.good];
+      gain(kind);
     },
     back: () => openSettlement(s)
   });
+  function gain(kind) {
+    game[kind + 'Level']++;
+    if (kind === 'armour') { game.maxHealth += 25; game.health = game.maxHealth; }
+    save();
+    openSmith(s, { bow: 'A stronger bow.', sword: 'A better blade.', armour: 'New plates: +25 health.' }[kind]);
+  }
 }
 
 // ---------------------------------------------------------------- orc camps and Skullrock
@@ -671,6 +690,12 @@ function afterBattle(foe, res) {
     if (foe.party.story) storyBeaten(foe.party);
     const wq = foe.party.lord && game.quests.find(q => q.kind === 'war' && q.lord === foe.party.lord);
     if (wq) completeQuest(wq), tiles.push(tile('quest', '+' + wq.reward, 'Quest done', 'gold'));
+    // A beaten lord's sword is better than anything a town smith makes: one blade from each lord,
+    // and only when he was beaten at the head of a real host.
+    if (foe.party.lord && game.swordLevel < 8 && !game.blades.includes(foe.party.lord) && enemyPower >= 25) {
+      game.blades.push(foe.party.lord); game.swordLevel++;
+      tiles.push(tile('blade', '+1', 'Sword taken', 'good'));
+    }
     if (foe.party.lord) { capturedLord = foe.party.lord; chronicle('Gunther defeated ' + lord(capturedLord).name + ' near ' + nearestPlace(foe.party.x, foe.party.y) + '.'); }
   } else if (foe.site && !foe.siege) chronicle('Gunther stormed ' + foe.site.name + '.');
   let title = 'Victory';
@@ -858,7 +883,7 @@ function rosterHtml() {
     det = '<div class="kind">Captain &middot; Level ' + lv + ' &middot; Age ' + heroAge() + '</div><h3>' + esc(game.hero.name) + '</h3>' +
       '<div class="sg">' + stat('Health', Math.ceil(game.health) + '/' + game.maxHealth) + stat('Bow', game.bowLevel) + stat('Armour', game.armourLevel) + stat('Archery', skill('archery')) +
       stat('Bladework', skill('blade')) + stat('Sword', game.swordLevel) + stat('Leadership', skill('leadership')) + '</div>' +
-      '<p class="small">Upgrade kit at a town smith.</p>';
+      '<p class="small">Smiths make plain kit. Elves make bows, dwarves armour. Take swords from lords.</p>';
   } else {
     const t = rosterSel, st = game.troops[t], d = TROOPS[t];
     let ups = '';

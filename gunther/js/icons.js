@@ -17,6 +17,7 @@ const ART = {
   health: ['..rr...rr..', '.rrrr.rrrr.', 'rrprrrrrrrR', 'rrrrrrrrrRR', '.rrrrrrrRR.', '..rrrrrRR..', '...rrrRR...', '....rRR....', '.....R.....'],
   train: ['.....n.....', '....nnn....', '...nnnnn...', '..nnnnnnn..', '.nnnnnnnnn.', '....nnN....', '....nnN....', '....nnN....', '....nnN....'],
   quest: ['WwwwwwwwwW.', '.wwwwwwwww.', '.wBBBBBBww.', '.wwwwwwwww.', '.wBBBBBwww.', '.wwwwwwwww.', '.wBBBBBBww.', '.wwwwwwwww.', 'WwwwwwwwwW.'],
+  blade: ['.........ss', '........sss', '.......sss.', '......sss..', '.....sss...', '.b..sss....', '.bbsss.....', '..bbs......', '.bbbb......', 'bb..bb.....'],
   morale: ['B..........', 'Bnnnnnnn...', 'BnnnnnnnnN.', 'BnnnnnnnNN.', 'BnnnnnnNN..', 'B..........', 'B..........', 'B..........', 'B..........']
 };
 const urls = {};
