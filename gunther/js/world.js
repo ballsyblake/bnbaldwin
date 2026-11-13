@@ -390,7 +390,8 @@ export const mapScene = {
     }
   },
   camera() {
-    return { x: clamp(this.pos.x - view.W / 2, 0, WORLD_W - view.W), y: clamp(this.pos.y - view.H / 2, 0, WORLD_H - view.H) };
+    // Whole pixels, so everything fixed to the ground moves together with it.
+    return { x: Math.round(clamp(this.pos.x - view.W / 2, 0, WORLD_W - view.W)), y: Math.round(clamp(this.pos.y - view.H / 2, 0, WORLD_H - view.H)) };
   },
   minimap() {
     const w = view.portrait ? 150 : 180, h = w * WORLD_H / WORLD_W;
@@ -541,7 +542,7 @@ export const mapScene = {
       const a = Math.sin(this.time * 1.6 + w.phase);
       if (a < 0.3) continue;
       ctx.globalAlpha = (a - 0.3) * 1.2;
-      ctx.fillRect(Math.round(sx / 3) * 3, Math.round(sy / 3) * 3, 9 + Math.round(a * 3) * 3, 3);
+      ctx.fillRect(Math.round(sx), Math.round(sy), 9 + Math.round(a * 3) * 3, 3);
     }
     ctx.globalAlpha = 1;
     const onScreen = (x, y, m) => x - cam.x > -m && x - cam.x < W + m && y - cam.y > -m && y - cam.y < H + m;

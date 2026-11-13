@@ -387,7 +387,7 @@ export function drawMillSails(x, y, t) {
 const FIELD = [['#8a6a42', '#6fae4a'], ['#7aa844', '#9cc85a'], ['#d9a94a', '#f0cc66'], ['#b9a890', '#eef2f4']];
 export function drawField(x, y, w, h, t, hsh) {
   const s = seasonFor(hsh), cols = FIELD[s];
-  x = Math.round(x / 3) * 3; y = Math.round(y / 3) * 3;
+  x = Math.round(x); y = Math.round(y);   // whole pixels only: snapping to the art grid made it judder against the ground
   ctx.fillStyle = 'rgba(60, 44, 24, 0.55)'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
   ctx.fillStyle = cols[0]; ctx.fillRect(x, y, w, h);
   ctx.fillStyle = cols[1];
@@ -482,7 +482,7 @@ export function drawCampfire(x, y, t) {
   glow.addColorStop(1, 'rgba(255, 190, 90, 0)');
   ctx.fillStyle = glow; ctx.fillRect(x - 70, y - 78, 140, 140);
   ctx.fillStyle = '#7a8088';
-  for (let a = 0; a < 8; a++) ctx.fillRect(Math.round((x + Math.cos(a * 0.785) * 18) / 3) * 3 - 3, Math.round((y + Math.sin(a * 0.785) * 9) / 3) * 3 - 3, 6, 6);
+  for (let a = 0; a < 8; a++) ctx.fillRect(Math.round(x) + Math.round(Math.cos(a * 0.785) * 6) * 3 - 3, Math.round(y) + Math.round(Math.sin(a * 0.785) * 3) * 3 - 3, 6, 6);
   ctx.fillStyle = '#6b4424'; ctx.fillRect(x - 15, y - 3, 30, 6);
   ctx.fillStyle = '#58371d'; ctx.fillRect(x - 3, y - 9, 6, 15);
   [['#e8572a', 12, 18], ['#f39a2b', 9, 13], ['#ffe08a', 5, 8]].forEach(([col, wdt, ht], k) => {
