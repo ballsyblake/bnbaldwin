@@ -89,7 +89,7 @@ function afterOpening(start) {
   const c = chapter();
   talk('Three years later', say(P.after), { done: () =>
     showPanel('<h2>' + esc(c.title) + '</h2><p>' + esc(c.short || c.goal) + '</p>' +
-      '<p class="small">A gold ! on the map marks where the story wants you. Feed and pay your men. Quests: J. How to play: Party screen.</p>' +
+      '<p class="small">A gold ! on the map marks where the story wants you. Feed and pay your men. Quests: J.</p>' +
       '<button data-act="ok">To the road</button>', { ok: () => hidePanel() }) });
 }
 

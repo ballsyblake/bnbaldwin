@@ -145,7 +145,7 @@ export function showPanel(html, handlers, kind) {
   overlay.className = 'show' + (kind === 'title' ? ' left' : '');
   // The style guide allows one gold button per screen: the first real choice, unless a panel picks its own.
   const panel = overlay.firstChild;
-  if (!panel.querySelector('button.primary')) {
+  if (!panel.querySelector('button.primary, button.x')) {
     const b = [...panel.querySelectorAll('button')].find(b => !b.disabled && !b.classList.contains('secondary') && !b.classList.contains('mini') && !b.closest('.tabs') && !b.classList.contains('card'));
     if (b) b.classList.add('primary');
   }
@@ -155,7 +155,7 @@ export function showPanel(html, handlers, kind) {
       if (fn) fn(b.dataset.arg);
     });
   });
-  const first = overlay.querySelector('button:not(:disabled)');
+  const first = overlay.querySelector('button:not(:disabled):not(.x)');
   if (first && !pointer.touch) first.focus({ preventScroll: true });
 }
 export function hidePanel() { overlay.className = ''; overlay.innerHTML = ''; }
