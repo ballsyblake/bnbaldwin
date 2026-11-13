@@ -30,7 +30,7 @@ const BODY = {
   brute: { hx: 11, hw: 10, tx: 9, tw: 14, oy: 0, skin: C('#6e9440'), skinD: C('#4f6e2a'), hair: C('#1f1a14'), tusks: true }
 };
 
-function paintCharacter(look, team, pose) {
+function paintCharacter(look, team, pose, bare) {
   const R = BODY[look.body || 'human'];
   const T = team ? hex(team) : C('#8e3a2a'), TD = shade(T, 0.68), TL = shade(T, 1.18);
   const [M, MD] = MATERIAL[look.mat || 'cloth'];
@@ -86,8 +86,9 @@ function paintCharacter(look, team, pose) {
   if (R.beard) { rect(hx + 1, 9, hw - 1, 4, R.hair); rect(hx + 2, 13, hw - 3, 3, R.hair); rect(hx + hw - 5, 8, 4, 1, R.hair); }
   // Near arm and weapon.
   const ax = tx + tw;           // the arm hangs just past the torso
-  const w = look.weapon;
-  if (w === 'bow' || w === 'crossbow' || w === 'javelin' && pose !== 'windup' && pose !== 'strike') {
+  const w = bare ? 'none' : look.weapon;
+  if (bare) { /* the arm and weapon are drawn separately, turned to face the blow */ }
+  else if (w === 'bow' || w === 'crossbow' || w === 'javelin' && pose !== 'windup' && pose !== 'strike') {
     rect(ax, 13, 2, 4, MD); rect(ax + 1, 16, 2, 2, R.skin);
     if (w === 'bow') {
       const drawn = pose === 'windup';
@@ -149,13 +150,13 @@ function paintCharacter(look, team, pose) {
   return out;
 }
 
-function characterSheet(look, team) {
+function characterSheet(look, team, bare) {
   const c = document.createElement('canvas');
   c.width = 32 * 6; c.height = 32;
   const g = c.getContext('2d');
   const d = g.createImageData(c.width, c.height);
   ['idle', 'walkA', 'walkB', 'windup', 'strike'].forEach((pose, f) => {
-    const px = paintCharacter(look, team, pose);
+    const px = paintCharacter(look, team, pose, bare);
     for (let i = 0; i < 32 * 32; i++) {
       if (!px[i]) continue;
       const x = f * 32 + (i % 32), y = Math.floor(i / 32), k = (y * c.width + x) * 4;
@@ -194,14 +195,14 @@ const SPRITE_KIND = { gunther: 'gunther', archer: 'archer', grunt: 'grunt', brut
 const ORC_RED = '#8e3a2a';
 const cache = {};
 
-export function spriteFor(kind, team) {
-  const key = kind + team;
+export function spriteFor(kind, team, bare) {
+  const key = kind + team + (bare ? '~' : '');
   if (cache[key]) return cache[key];
   const look = LOOKS[kind] || LOOKS.recruit;
   let t = team;
   if (look.body === 'orc' || look.body === 'brute') t = ORC_RED;
   if (kind === 'gunther' || kind === 'gunthersword') t = '#f2c14e';
-  const sheet = characterSheet(look, t);
+  const sheet = characterSheet(look, t, bare);
   return (cache[key] = sheet);
 }
 
@@ -211,19 +212,78 @@ LOOKS.gunther.body = 'gunther';
 LOOKS.gunthersword = Object.assign({}, LOOKS.gunther, { weapon: 'sword', shield: 'heater', cloak: null });
 LEGS.gunther = C('#4a3a2c');
 
-function sheetFor(sprite, kind, team) {
-  if (sprite === 'soldier') return spriteFor(kind, team);
-  return spriteFor(SPRITE_KIND[sprite] || sprite, team);
+function kindOf(sprite, kind) { return sprite === 'soldier' ? kind : SPRITE_KIND[sprite] || sprite; }
+function sheetFor(sprite, kind, team, bare) { return spriteFor(kindOf(sprite, kind), team, bare); }
+
+// ---------------------------------------------------------------- weapons that turn
+// In battle the near arm and weapon are a separate little picture, painted pointing right and
+// turned to face wherever the blow or the shot is going.
+const SWUNG = { sword: 1, axe: 1, pick: 1, cleaver: 1, club: 1, greataxe: 1 };
+const WW = 46, WH = 25, WPX = 14, WPY = 12;
+const weaponCache = {};
+function weaponSprite(kind, drawn) {
+  const key = kind + (drawn ? '+' : '');
+  if (weaponCache[key]) return weaponCache[key];
+  const look = LOOKS[kind] || LOOKS.recruit, R = BODY[look.body || 'human'];
+  const MD = MATERIAL[look.mat || 'cloth'][1], w = look.weapon;
+  const px = new Array(WW * WH).fill(null);
+  const rect = (x, y, wd, h, c) => { for (let j = y + WPY; j < y + WPY + h; j++) for (let i = x + WPX; i < x + WPX + wd; i++) if (i >= 0 && j >= 0 && i < WW && j < WH) px[j * WW + i] = c; };
+  const line = (x0, y0, x1, y1, c) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let k = 0; k <= n; k++) rect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 1, 1, c); };
+  if (w === 'bow') {
+    line(5, -9, 7, -5, BOW); line(7, -5, 7, 5, BOW); line(7, 5, 5, 9, BOW);
+    const sx = drawn ? -2 : 5;
+    line(5, -9, sx, 0, STRING); line(sx, 0, 5, 9, STRING);
+    if (drawn) { rect(-2, 0, 12, 1, WOOD); rect(10, -1, 2, 3, METAL); }
+  } else if (w === 'crossbow') {
+    rect(0, -1, 13, 2, WOOD_D); rect(10, -5, 2, 10, METAL_D);
+    if (drawn) { line(10, -5, 3, 0, STRING); line(3, 0, 10, 4, STRING); rect(3, -1, 9, 1, METAL); }
+  } else if (w === 'sword') { rect(5, -2, 1, 4, WOOD_D); rect(6, -1, 11, 2, METAL); rect(17, -1, 1, 1, METAL); }
+  else if (w === 'axe' || w === 'greataxe') { rect(3, 0, w === 'axe' ? 12 : 15, 1, WOOD); rect(w === 'axe' ? 11 : 13, w === 'axe' ? -4 : -5, w === 'axe' ? 3 : 4, w === 'axe' ? 5 : 9, METAL); }
+  else if (w === 'pick') { rect(3, 0, 12, 1, WOOD); rect(13, -4, 1, 9, METAL); }
+  else if (w === 'cleaver') { rect(4, 0, 4, 1, WOOD); rect(8, -3, 6, 4, METAL_D); }
+  else if (w === 'club') { rect(3, 0, 7, 1, WOOD); rect(9, -2, 6, 4, WOOD_D); }
+  else if (w === 'javelin') { rect(-5, 0, 18, 1, WOOD); rect(13, -1, 2, 3, METAL); }
+  else if (w === 'fork') { rect(-8, 0, 24, 1, WOOD); rect(16, -2, 1, 5, WOOD); rect(17, -2, 3, 1, WOOD); rect(17, 2, 3, 1, WOOD); rect(17, 0, 3, 1, WOOD); }
+  else { rect(-9, 0, 27, 1, WOOD); rect(18, -1, 3, 3, METAL); rect(21, 0, 1, 1, METAL); }
+  // The arm: sleeve from the shoulder, then the hand on the grip.
+  rect(0, -1, 4, 2, MD); rect(3, -1, 2, 2, R.skin);
+  const c = document.createElement('canvas');
+  c.width = WW; c.height = WH;
+  const g = c.getContext('2d'), d = g.createImageData(WW, WH);
+  for (let y = 0; y < WH; y++) for (let x = 0; x < WW; x++) {
+    let v = px[y * WW + x];
+    if (!v && ((x > 0 && px[y * WW + x - 1]) || (x < WW - 1 && px[y * WW + x + 1]) || (y > 0 && px[(y - 1) * WW + x]) || (y < WH - 1 && px[(y + 1) * WW + x]))) v = OUTLINE;
+    if (!v) continue;
+    const k = (y * WW + x) * 4;
+    d.data[k] = v[0]; d.data[k + 1] = v[1]; d.data[k + 2] = v[2]; d.data[k + 3] = 255;
+  }
+  g.putImageData(d, 0, 0);
+  return (weaponCache[key] = c);
 }
+// Does this unit swing its weapon in an arc (true) or thrust or shoot it (false)?
+export function swings(sprite, kind) { return !!SWUNG[(LOOKS[kindOf(sprite, kind)] || LOOKS.recruit).weapon]; }
 
 // Draws any unit sprite. anim is idle / walk / attack / dead; t is time in that anim.
-export function drawUnit(sprite, kind, team, x, y, scale, anim, t, flip) {
-  const sheet = sheetFor(sprite, kind, team);
+// hold (battle only) = { a: angle the weapon points, push: pixels along it, drawn: bow at full draw }.
+export function drawUnit(sprite, kind, team, x, y, scale, anim, t, flip, hold) {
+  if (anim === 'dead') hold = null;
+  const sheet = sheetFor(sprite, kind, team, !!hold);
   let col = 0;
   if (anim === 'walk') col = 1 + Math.floor(t * 6) % 2;
-  else if (anim === 'attack' || anim === 'cast') col = t < 0.18 ? 3 : 4;
   else if (anim === 'dead') col = 5;
+  else if (!hold && (anim === 'attack' || anim === 'cast')) col = t < 0.18 ? 3 : 4;
   drawFrame(sheet, 32, 32, col, 0, x, y - 14 * scale, scale, flip);
+  if (!hold) return;
+  const k = kindOf(sprite, kind), look = LOOKS[k] || LOOKS.recruit, R = BODY[look.body || 'human'];
+  const left = Math.cos(hold.a) < 0;
+  // The shoulder sits at the front edge of the chest.
+  const sx = (R.tx + R.tw - 2 - 16) * (flip ? -1 : 1), sy = 14 + R.oy + (col ? 1 : 0) - 16;
+  ctx.save();
+  ctx.translate(Math.round(x + sx * scale), Math.round(y - 14 * scale + sy * scale));
+  ctx.rotate(hold.a);
+  if (left) ctx.scale(1, -1);
+  ctx.drawImage(weaponSprite(k, hold.drawn), (-WPX + (hold.push || 0)) * scale, -WPY * scale, WW * scale, WH * scale);
+  ctx.restore();
 }
 
 // A little covered wagon for merchant caravans on the world map.

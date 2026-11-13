@@ -4,7 +4,7 @@
 
 import { tutorialStart, tutorialTick, tutorialDraw } from './tutorial.js';
 import { ctx, view, keys, pointer, clamp, dist, rand, pick, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
-import { drawUnit } from './sprites.js';
+import { drawUnit, swings } from './sprites.js';
 import { drawTree, drawRock, drawHouse, drawTent, drawCampfire, drawWeather, season, seasonBlend } from './scenery.js';
 import { TROOPS, FACTIONS } from './data.js';
 import { game, playerFit, skill, trainSkill, strength } from './state.js';
@@ -425,6 +425,7 @@ export const battleScene = {
       if (T) {
         const d = dist(u.x, u.y, T.x, T.y);
         u.flip = T.x < u.x;
+        u.aimA = Math.atan2(T.y - u.y, T.x - u.x);
         if (def.ranged && d < def.range && d > 50) {
           u.anim = 'idle';
           if (u.cd <= 0) {
@@ -434,6 +435,7 @@ export const battleScene = {
             const lead = d / speed2;
             const tx = T.x + (T.vx || 0) * lead, ty = T.y - 16 + (T.vy || 0) * lead;
             const a = Math.atan2(ty - (u.y - 26), tx - u.x) + rand(-0.07, 0.07);
+            u.aimA = a;
             this.shoot(u, a, def.dmg * (u.dmgScale || 1), def.javelin ? 'javelin' : def.bolt ? 'bolt' : 'arrow', u.side, speed2);
           }
         } else if (d <= def.range + (def.scale ? 14 : 0)) {
@@ -477,30 +479,40 @@ export const battleScene = {
     }
     // ---- Arrows and fireballs
     for (const s of this.shots) {
+      // Walk the arrowhead along its path in short steps, so a fast arrow can't skip over a man
+      // between frames, and test it against the whole figure, head to boots.
+      const px = s.x, py = s.y;
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
       if (s.life <= 0 || s.x < -40 || s.x > view.W + 40 || s.y < -40 || s.y > view.H + 40) { s.gone = true; continue; }
-      for (const p of ground.props) if (p.kind !== 'fire' && dist(s.x, s.y, p.x, p.y - 14) < p.r) { s.gone = true; break; }
-      if (s.gone) continue;
-      for (const u of this.units) {
-        if (u.side === s.side || u.dead || u.fled) continue;
-        const big = u.def && u.def.scale ? 2.2 : 1;
-        if (dist(s.x, s.y, u.x, u.y - 18 * big) < 16 * big) {
-          s.gone = true;
-          if (s.hero) trainSkill('archery', 1);
-          // A shield catches arrows that come at its bearer from the front.
-          if (u.def && u.def.shield && this.facesShot(u, s) && Math.random() < u.def.shield) {
-            this.effects.push({ x: u.x, y: u.y - 26, t: 0, kind: 'block' });
-            if (s.hero) this.armourHint(u, 'Shield');
-            break;
-          }
-          // Armour turns arrows aside. Crossbow bolts and javelins punch through more of it.
-          const armour = (u.def ? u.def.armour || 0 : 0) * (s.kind === 'bolt' ? 0.5 : s.kind === 'javelin' ? 0.7 : 1);
-          // Defenders standing just behind the wall are hard to hit.
-          const cover = ground.wall && u.side === 1 && behindWall(u) ? 0.5 : 1;
-          this.hurt(u, s.dmg * (1 - armour) * cover, s.hero ? 'hero' : 'shot');
-          if (s.hero && armour >= 0.45) this.armourHint(u, 'Armour');
+      const tipX = Math.cos(s.a) * 10, tipY = Math.sin(s.a) * 10;
+      const steps = Math.max(1, Math.ceil(Math.hypot(s.x - px, s.y - py) / 5));
+      for (let k = 1; k <= steps && !s.gone; k++) {
+        const x = px + (s.x - px) * k / steps + tipX, y = py + (s.y - py) * k / steps + tipY;
+        for (const p of ground.props) if (p.kind !== 'fire' && dist(x, y, p.x, p.y - 14) < p.r) { s.gone = true; break; }
+        if (s.gone) break;
+        let hit = null, best = Infinity;
+        for (const u of this.units) {
+          if (u.side === s.side || u.dead || u.fled) continue;
+          const big = u.def && u.def.scale ? 1.5 : 1;
+          const dx = Math.abs(x - u.x), top = u.y - (u.def && u.def.short ? 46 : 54) * big;
+          if (dx < 12 * big && y > top && y < u.y - 2 && dx < best) { best = dx; hit = u; }
+        }
+        if (!hit) continue;
+        const u = hit;
+        s.gone = true;
+        if (s.hero) trainSkill('archery', 1);
+        // A shield catches arrows that come at its bearer from the front.
+        if (u.def && u.def.shield && this.facesShot(u, s) && Math.random() < u.def.shield) {
+          this.effects.push({ x: u.x, y: u.y - 26, t: 0, kind: 'block' });
+          if (s.hero) this.armourHint(u, 'Shield');
           break;
         }
+        // Armour turns arrows aside. Crossbow bolts and javelins punch through more of it.
+        const armour = (u.def ? u.def.armour || 0 : 0) * (s.kind === 'bolt' ? 0.5 : s.kind === 'javelin' ? 0.7 : 1);
+        // Defenders standing just behind the wall are hard to hit.
+        const cover = ground.wall && u.side === 1 && behindWall(u) ? 0.5 : 1;
+        this.hurt(u, s.dmg * (1 - armour) * cover, s.hero ? 'hero' : 'shot');
+        if (s.hero && armour >= 0.45) this.armourHint(u, 'Armour');
       }
     }
     this.shots = this.shots.filter(s => !s.gone);
@@ -600,6 +612,36 @@ export const battleScene = {
       this.shoot(H, this.aim + rand(-spread, spread), (15 + 2 * (game.bowLevel - 1)) * (1 + skill('archery') * 0.04) * (0.3 + 0.7 * p), 'arrow', 0, 480 + 340 * p);
     }
     this.drawT = 0;
+  },
+  // Where a unit's weapon points right now: at rest it is carried up and forward; in a fight it
+  // turns to the target, cocks back and sweeps (or thrusts) through the line of the blow.
+  holdFor(u) {
+    const f = u.flip ? -1 : 1, face = u.flip ? Math.PI : 0;
+    if (u.isHero) {
+      if (game.weapon !== 'sword') return { a: this.aim, drawn: u.drawing && this.drawT > 0.12 };
+      const s = u.swing, A = this.aim;
+      if (u.blocking) return { a: face - f * (u.stance === 'over' ? 1.5 : 0.5), push: 1 };
+      if (!s) return { a: face - f * 0.9 };
+      if (s.dir === 'over') return { a: A, push: s.released ? Math.min(6, s.rt * 90) - 2 : -1 - 3 * s.charge };
+      // A cut from the left starts with the blade out to the left of the line, and the same for right.
+      let sg = Math.cos(A - 1) < Math.cos(A + 1) ? -1 : 1;
+      if (Math.abs(Math.cos(A - 1) - Math.cos(A + 1)) < 0.2) sg = -f;
+      if (s.dir === 'right') sg = -sg;
+      const back = 1 + 0.9 * s.charge;
+      if (!s.released) return { a: A + sg * back };
+      const p = Math.min(1, s.rt / 0.12);
+      return { a: A + sg * (back * (1 - p) - 0.8 * p) };
+    }
+    const def = u.def, A = u.target && u.aimA != null ? u.aimA : face;
+    if (def.ranged) {
+      const ready = u.target && u.anim !== 'walk';
+      return { a: ready ? A : face - f * 0.5, drawn: ready && u.cd < 0.45 && u.anim !== 'attack', push: def.javelin && ready && u.cd < 0.3 ? -3 : 0 };
+    }
+    const swing = swings(def.sprite, def.kind || '');
+    if (u.anim !== 'attack') return { a: face - f * (swing ? 0.9 : 1.15) };
+    const wind = u.windT || 0.16, p = clamp((u.at - wind) / 0.14, 0, 1), w = clamp(u.at / Math.min(wind, 0.2), 0, 1);
+    if (!swing) return { a: A, push: u.at < wind ? -4 * w : -4 + 10 * p };
+    return { a: A - f * 1.7 * w + f * 2.4 * p };
   },
   drawTime() { return 0.8 * Math.pow(0.9, game.bowLevel - 1) * (1 - skill('archery') * 0.03); },
   // How an enemy guards against Gunther's sword: skilled troops read his swing and turn their
@@ -725,12 +767,12 @@ export const battleScene = {
           if (sw && u.swing) { anim = 'attack'; at = u.swing.released && u.swing.rt > 0.05 ? 0.25 : 0; }
           else if (!sw && u.drawing) { anim = 'attack'; at = 0; }
           else if (!sw && u.shootT < 0.2) { anim = 'attack'; at = 0.25; }
-          drawUnit('soldier', sw ? 'gunthersword' : 'gunther', '#f2c14e', u.x, u.y, 2, u.dead ? 'dead' : anim, u.dead ? u.deadT : at, u.flip);
+          drawUnit('soldier', sw ? 'gunthersword' : 'gunther', '#f2c14e', u.x, u.y, 2, u.dead ? 'dead' : anim, u.dead ? u.deadT : at, u.flip, this.holdFor(u));
         } else {
           const def = u.def;
           const anim = u.dead ? 'dead' : u.anim;
           const at = anim === 'attack' ? (u.at < (u.windT || 0.16) ? 0 : 0.25) : u.t;
-          drawUnit(def.sprite, def.kind || '', teamColour[u.side], u.x, u.y, scale, anim, u.dead ? u.deadT : at, u.flip);
+          drawUnit(def.sprite, def.kind || '', teamColour[u.side], u.x, u.y, scale, anim, u.dead ? u.deadT : at, u.flip, this.holdFor(u));
         }
         if (u.flash > 0 && !u.dead) { ctx.globalAlpha = 0.5; shadow(u.x, u.y - 18, 10, '#fff'); }
         ctx.globalAlpha = 1;
