@@ -3,7 +3,7 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS, RULES } from './data.js';
 import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
 import { newStory } from './story.js';
 import { ensureDiplomacy, diplomacyTick, atWar } from './diplomacy.js';
@@ -19,7 +19,7 @@ export function newGame(migrate) {
   Object.assign(game, {
     version: 2,
     day: 1, dayTime: 0,
-    gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
+    blades: [], gold: 120, health: 100, maxHealth: 100, bowLevel: 1, armourLevel: 1, swordLevel: 1, weapon: 'bow',
     renown: 0, morale: 70,
     troops: { recruit: { n: 4, wounded: 0, xp: 0 }, bowman: { n: 2, wounded: 0, xp: 0 } },
     goods: { grain: 6 },
@@ -76,6 +76,7 @@ function ensureFields() {
   if (!game.skills) game.skills = {};
   for (const k in SKILLS) if (game.skills[k] === undefined) game.skills[k] = 0;
   if (!game.swordLevel) game.swordLevel = 1;
+  if (!game.blades) game.blades = [];
   if (!game.weapon) game.weapon = 'bow';
   if (!game.prisoners) game.prisoners = {};
   if (!game.lordCaptives) game.lordCaptives = [];
@@ -154,7 +155,7 @@ export function hasTrait(id, t) { return lord(id).traits.includes(t); }
 // ---------------------------------------------------------------- prisoners
 export function prisonerCount() { let n = 0; for (const t in game.prisoners) n += game.prisoners[t]; return n + game.lordCaptives.length; }
 export function prisonerLimit() { return 6 + Math.floor(troopCount() / 2) + skill('leadership') * 2; }
-export function ransomPrice(type) { return Math.round(TROOPS[type].power * (TROOPS[type].orc ? 9 : 13)); }
+export function ransomPrice(type) { return Math.round(TROOPS[type].power * RULES.ransomPerPower); }
 export function lordRansom(id) { return lord(id).ruler ? 900 : 450; }
 
 // ---------------------------------------------------------------- contracts
@@ -210,7 +211,7 @@ export function playerStrength() { return strength(playerFit()) + (game.health >
 export function wages() {
   let w = 0;
   for (const t in game.troops) w += (TROOPS[t].wage || 0) * game.troops[t].n;
-  return w + garrisonWages();
+  return Math.round((w + garrisonWages()) * RULES.wageScale);
 }
 export function foodStock() { let n = 0; for (const g in game.goods) if (GOODS[g].food) n += game.goods[g]; return n; }
 export function foodPerDay() { return Math.ceil((troopCount() + 1 + prisonerCount()) / 6); }
@@ -365,7 +366,17 @@ export function dailyTick() {
 // Rough loot for beating a party.
 export function lootFor(troops, kind) {
   const s = strength(troops);
-  return Math.round(s * rand(2.5, 4) + (kind === 'caravan' ? rand(80, 160) : 0));
+  return Math.round(s * rand(RULES.lootPerPower[0], RULES.lootPerPower[1]) + (kind === 'caravan' ? rand(60, 120) : 0));
 }
 
 export { KINGDOMS };
+
+// What the smith charges for the next level of a piece of kit, and how well known Gunther must be
+// before the smith will make it. Prices climb steeply, so the best gear is a long campaign's work.
+export function smithCost(kind, level) { return RULES.smithBase[kind] * level * (level + 1); }
+// Past what a town smith can make, bows are elf work (for their timber) and armour is dwarf work
+// (for iron), and only for a captain they think well of. Returns what the next level asks for.
+export function craftNeeds(kind, level) {
+  const over = level - RULES.smithLocalMax + 1;
+  return { good: kind === 'bow' ? 'timber' : 'iron', amount: level, faction: kind === 'bow' ? 'elves' : 'dwarves', relation: over * RULES.craftRelationPerLevel, gold: Math.round(smithCost(kind, level) / 2) };
+}

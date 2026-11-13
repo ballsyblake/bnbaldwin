@@ -126,6 +126,7 @@ for (const m of await modList()) {
 }
 
 // ---------------------------------------------------------------- the game's data
+export const RULES = data.rules;                      // the tuning numbers in rules.json
 export const DAY_SECONDS = data.rules.daySeconds;     // seconds of travel that make one in-game day
 export const YEAR_DAYS = data.rules.yearDays;         // days in a year; everyone ages one year per year
 export const FACTIONS = data.factions;

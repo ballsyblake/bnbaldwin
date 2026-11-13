@@ -1,8 +1,8 @@
-// Starts the game: loads pictures, builds the island, then runs the main loop.
+// Starts the game: builds the island, then runs the main loop.
 // The loop asks the current scene to update (move things) and draw, about 60 times a second.
 
 import { ctx, overlay, resize, setScene, getScene } from './core.js';
-import { loadAssets } from './sprites.js';
+import { buildLife } from './ambient.js';
 import { buildTerrain } from './terrain.js';
 import { game, newGame, loadSave, save } from './state.js';
 import { mapScene, populate } from './world.js';
@@ -23,9 +23,10 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-loadAssets().then(() => {
+Promise.resolve().then(() => {
   resize();
   buildTerrain();
+  buildLife();
   // Show the island behind the title screen: the saved game if there is one, otherwise a fresh one.
   if (!loadSave()) { newGame(false); populate(); }
   setScene(titleScene);

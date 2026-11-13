@@ -1,20 +1,7 @@
-// Loads the picture files (scenery only) and paints every character in code, pixel by pixel,
-// in any team colour. Painting them in code means they are original art and recolour for free.
+// Paints every character in code, pixel by pixel, in any team colour. Painting them in code means
+// they are original art and recolour for free. (Scenery is painted the same way in scenery.js.)
 
 import { ctx, drawFrame, shadow } from './core.js';
-
-const ASSET_NAMES = ['trees', 'rocks', 'keep', 'houses', 'orc-tent'];
-export const img = {};
-
-export function loadAssets() {
-  return Promise.all(ASSET_NAMES.map(name => new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = resolve;
-    i.onerror = () => reject(new Error('Could not load ' + name));
-    i.src = 'assets/' + name + '.png';
-    img[name] = i;
-  })));
-}
 
 // ---------------------------------------------------------------- colour helpers
 function hex(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
@@ -264,10 +251,16 @@ export function drawWagon(x, y, team, flip) {
 // A banner on a pole, used above parties and settlements on the map.
 export function drawBanner(x, y, colour) {
   x = Math.round(x); y = Math.round(y);
-  ctx.fillStyle = '#22180f'; ctx.fillRect(x - 1, y - 2, 4, 26); ctx.fillRect(x + 1, y - 1, 16, 14);
+  ctx.fillStyle = '#22180f'; ctx.fillRect(x - 1, y - 2, 4, 26);
   ctx.fillStyle = '#c8b48a'; ctx.fillRect(x, y, 2, 24);
-  ctx.fillStyle = colour; ctx.fillRect(x + 2, y, 14, 12);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 2, y + 8, 14, 4);
+  // The cloth ripples: each strip of it rides a wave that runs out from the pole.
+  const t = performance.now() / 1000;
+  for (let k = 0; k < 4; k++) {
+    const dy = k ? Math.round(Math.sin(t * 5 - k * 1.1 + x * 0.05) * (k * 0.6)) : 0, w = k === 3 ? 2 : 4;
+    ctx.fillStyle = '#22180f'; ctx.fillRect(x + 1 + k * 4, y - 1 + dy, w + 2, 14);
+    ctx.fillStyle = colour; ctx.fillRect(x + 2 + k * 4, y + dy, w, 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + 2 + k * 4, y + 8 + dy, w, 4);
+  }
 }
 
 // A still portrait of a unit as an image URL, for HTML menus such as the party roster.

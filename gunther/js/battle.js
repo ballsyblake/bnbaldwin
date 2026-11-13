@@ -4,7 +4,8 @@
 
 import { tutorialStart, tutorialTick, tutorialDraw } from './tutorial.js';
 import { ctx, view, keys, pointer, clamp, dist, rand, pick, text, shadow, bar, setHud, uiSet, uiBar, onKeyPress, getScene, noise, seeded, onResize, esc } from './core.js';
-import { img, drawUnit } from './sprites.js';
+import { drawUnit } from './sprites.js';
+import { drawTree, drawRock, drawHouse, drawTent, drawCampfire, drawWeather, season, seasonBlend } from './scenery.js';
 import { TROOPS, FACTIONS } from './data.js';
 import { game, playerFit, skill, trainSkill, strength } from './state.js';
 
@@ -15,8 +16,11 @@ const HERO_HURT = 1.25;      // Gunther takes this much more damage than the raw
 
 // ---------------------------------------------------------------- battlefield
 let ground = null;
-function buildGround(kind) {
+function buildGround(kind, people) {
   const W = view.W, H = view.H;
+  // The field wears the season: yellowing in autumn, under snow in winter.
+  const sn = seasonBlend() > 0.5 ? season() : (season() + 3) % 4;
+  const TINT = [null, null, [[206, 178, 84], 0.3], [[238, 243, 247], 0.72]][sn];
   const c = document.createElement('canvas');
   c.width = W / PX; c.height = H / PX;
   const g = c.getContext('2d');
@@ -52,6 +56,7 @@ function buildGround(kind) {
         else col = s < 0.25 ? GRASS[3] : (s < 0.4 ? GRASS[2] : (s < 0.62 ? GRASS[1] : GRASS[0]));
         if (rnd() < 0.012) col = TUFT;
       }
+      if (TINT) { const f = TINT[1] * (col === COBBLE[0] || col === COBBLE[1] || col === COBBLE[2] || col === DIRT[0] || col === DIRT[1] ? 0.45 : 1); col = col.map((v, q) => v + (TINT[0][q] - v) * f); }
       data.data[i] = col[0]; data.data[i + 1] = col[1]; data.data[i + 2] = col[2]; data.data[i + 3] = 255;
     }
   }
@@ -65,7 +70,7 @@ function buildGround(kind) {
       const jx = x + (tr() - 0.5) * 18, jy = y + (tr() - 0.5) * 18;
       const inside = jx > 40 && jx < W - 40 && jy > 80 && jy < H - 24;
       if (inside) continue;
-      if (tr() < thick) trees.push({ x: jx, y: jy, v: kind === 'hills' ? 0 : (tr() < 0.55 ? 2 : 1 + Math.floor(tr() * 3)), rock: kind === 'hills' && tr() < 0.5 });
+      if (tr() < thick) trees.push({ x: jx, y: jy, v: kind === 'hills' ? 0 : (tr() < 0.55 ? 2 : 1 + Math.floor(tr() * 3)), rock: kind === 'hills' && tr() < 0.5, h: tr() });
     }
   }
   // Things to fight around.
@@ -84,7 +89,7 @@ function buildGround(kind) {
     P(0.3, 0.3, 'rock', 20, 0); P(0.72, 0.74, 'rock', 20, 2);
     if (kind === 'forest') { P(0.5, 0.5, 'tree', 16, 2); P(0.2, 0.75, 'tree', 16, 1); }
   }
-  ground = { canvas: c, trees, props, kind, W, H, wall };
+  ground = { canvas: c, trees, props, kind, W, H, wall, season: sn, people: people || 'human' };
 }
 
 // ---------------------------------------------------------------- battle scene
@@ -96,7 +101,9 @@ export const battleScene = {
     this.opts = opts;
     this.siege = opts.kind === 'siege';
     this.enemyFaction = opts.enemy.faction;
-    if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H) buildGround(opts.kind);
+    const people = (FACTIONS[opts.enemy.faction] && FACTIONS[opts.enemy.faction].race) || 'human';
+    const sn = seasonBlend() > 0.5 ? season() : (season() + 3) % 4;
+    if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H || ground.season !== sn || ground.people !== people) buildGround(opts.kind, people);
     this.units = []; this.shots = []; this.effects = []; this.floats = [];
     this.drawT = 0; this.wasDown = false; this.blockHeld = false; pointer.tap = null;
     this.time = 0; this.over = false;
@@ -123,11 +130,11 @@ export const battleScene = {
     this.hero = this.addUnit(0, null, view.portrait ? view.W / 2 : b.x0 + 80, view.portrait ? b.y1 - 60 : view.H * 0.6);
     for (let s = 0; s < 2; s++) this.reinforce(s, true);
     this.routing = false;
-    this.tut = null; this.tutBlocks = 0;
+    this.tut = null; this.tutBlocks = 0; this.tutShield = false;
     if (opts.tutorial) tutorialStart(this);
     this.hud();
   },
-  bounds() { return { x0: 40, y0: view.portrait ? 120 : 100, x1: view.W - 40, y1: view.H - (view.portrait ? 210 : 76) }; },
+  bounds() { return { x0: 40, y0: view.portrait ? 100 : 80, x1: view.W - 40, y1: view.H - (view.portrait ? 175 : 60) }; },
   // Battle HUD: a top bar with both sides and the odds, group cards bottom left, orders bottom right.
   hud() {
     const ORD = { charge: 'Charge', hold: 'Hold', follow: 'Follow', fallback: 'Fall back' };
@@ -303,6 +310,8 @@ export const battleScene = {
     u.hp -= amount;
     u.flash = 0.12;
     if (u.isHero) game.health = Math.max(0, u.hp);
+    // In the training fight's blocking lesson the warden stays up until Gunther has blocked.
+    if (u.hp <= 0 && u.side === 1 && this.tutShield) { u.hp = 1; u.stun = 0; if (Math.random() < 0.3) this.float(u.x, u.y - 70, 'Block him first!', '#f2c14e'); }
     if (u.hp <= 0) {
       u.dead = true; u.deadT = 0; u.anim = 'dead';
       if (u.isHero) { this.hud(); return; }
@@ -694,14 +703,13 @@ export const battleScene = {
     if (ground.wall) { if (ground.wall.axis === 'x') drawWall(); else things.push({ y: ground.wall.pos + 12, draw: drawWall }); }
     for (const t of ground.trees) things.push({ y: t.y, draw: () => {
       shadow(t.x, t.y + 12, 16);
-      if (t.rock) ctx.drawImage(img.rocks, (t.v % 3) * 16, 0, 16, 16, t.x - 24, t.y - 30, 48, 48);
-      else ctx.drawImage(img.trees, t.v * 16, 0, 16, 16, t.x - 24, t.y - 34, 48, 48);
+      if (t.rock) drawRock(t.x, t.y, t.v, t.h); else drawTree(t.x, t.y, t.v % 3, this.time, t.h);
     } });
     for (const p of ground.props) things.push({ y: p.y, draw: () => {
-      if (p.kind === 'tent') { shadow(p.x, p.y + 20, 38); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, p.x - 48, p.y - 66, 96, 96); }
-      else if (p.kind === 'rock') { shadow(p.x, p.y + 8, 22); ctx.drawImage(img.rocks, p.v * 16, 0, 16, 16, p.x - 24, p.y - 34, 48, 48); }
-      else if (p.kind === 'house') { shadow(p.x, p.y + 12, 30); ctx.drawImage(img.houses, p.v * 16, 16, 16, 16, p.x - 30, p.y - 44, 60, 60); }
-      else if (p.kind === 'tree') { shadow(p.x, p.y + 10, 18); ctx.drawImage(img.trees, p.v * 16, 0, 16, 16, p.x - 24, p.y - 38, 48, 48); }
+      if (p.kind === 'tent') { shadow(p.x, p.y + 20, 38); drawTent(p.x, p.y + 28, true); }
+      else if (p.kind === 'rock') { shadow(p.x, p.y + 8, 22); drawRock(p.x, p.y - 4, p.v, 0.5); }
+      else if (p.kind === 'house') { shadow(p.x, p.y + 12, 30); drawHouse(p.x, p.y, ground.people, p.v, true, 0.5, false); }
+      else if (p.kind === 'tree') { shadow(p.x, p.y + 10, 18); drawTree(p.x, p.y - 4, p.v % 3, this.time, 0.5); }
       else drawCampfire(p.x, p.y, this.time);
     } });
     const teamColour = [FACTIONS.player.colour, FACTIONS[this.enemyFaction].colour];
@@ -730,6 +738,7 @@ export const battleScene = {
       } });
     }
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
+    drawWeather(this.time);
     for (const s of this.shots) {
       if (s.kind === 'javelin') drawJavelin(s.x, s.y, s.a);
       else if (s.kind === 'bolt') drawBolt(s.x, s.y, s.a);
@@ -887,23 +896,6 @@ function dirMark(x, y, dir, style, colour, big) {
 // Foot soldiers and bowmen take orders separately.
 function groupOf(u) { return u.def && u.def.ranged ? 'bows' : 'foot'; }
 
-function drawCampfire(x, y, t) {
-  const glow = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 70);
-  glow.addColorStop(0, 'rgba(255, 190, 90, 0.35)');
-  glow.addColorStop(1, 'rgba(255, 190, 90, 0)');
-  ctx.fillStyle = glow; ctx.fillRect(x - 70, y - 78, 140, 140);
-  ctx.fillStyle = '#7a8088';
-  for (let a = 0; a < 8; a++) ctx.fillRect(Math.round((x + Math.cos(a * 0.785) * 18) / 3) * 3 - 3, Math.round((y + Math.sin(a * 0.785) * 9) / 3) * 3 - 3, 6, 6);
-  ctx.fillStyle = '#6b4424'; ctx.fillRect(x - 15, y - 3, 30, 6);
-  ctx.fillStyle = '#58371d'; ctx.fillRect(x - 3, y - 9, 6, 15);
-  [['#e8572a', 12, 18], ['#f39a2b', 9, 13], ['#ffe08a', 5, 8]].forEach(([col, wdt, ht], k) => {
-    const flick = Math.round(Math.sin(t * 14 + k * 2) * 1.5) * 3;
-    ctx.fillStyle = col;
-    ctx.fillRect(x - wdt, y - ht - 3 + Math.abs(flick), wdt * 2, ht);
-    ctx.fillRect(x - wdt / 2 + flick, y - ht - 9, wdt, 6);
-  });
-}
-
 onKeyPress(k => {
   if (getScene() !== battleScene || battleScene.over) return;
   if (k === 'g' || k === 'tab') battleScene.nextGroup();
@@ -918,5 +910,5 @@ onKeyPress(k => {
 // Rotating the phone mid-battle: rebuild the ground and keep everyone on the field.
 onResize(() => {
   if (getScene() !== battleScene) return;
-  buildGround(battleScene.opts.kind);
+  buildGround(battleScene.opts.kind, ground && ground.people);
 });
