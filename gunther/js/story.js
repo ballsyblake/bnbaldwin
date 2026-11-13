@@ -14,6 +14,7 @@ import { game, note, chronicle, site, addTroops, changeRelation, save, troopCoun
 import { spawnParty, mapScene } from './world.js';
 import { battleScene } from './battle.js';
 import { peopleOf } from './sieges.js';
+import { talk, lineText } from './dialogue.js';
 
 export function newStory() { return { ch: 0, on: false, offered: false, flags: {}, visited: [], done: false }; }
 
@@ -21,8 +22,11 @@ const ok = c => (!c.if || game.story.flags[c.if]) && (!c.unless || !game.story.f
 // A step or line can come in versions; the first whose "if"/"unless" fits is used.
 function version(x) { return Array.isArray(x) ? x.find(ok) || x[x.length - 1] : x; }
 function lines(list) {
-  return (list || []).filter(l => typeof l === 'string' || ok(l)).map(l => '<p>' + esc(typeof l === 'string' ? l : l.text) + '</p>').join('');
+  return say(list).map(l => '<p>' + esc(lineText(l)) + '</p>').join('');
 }
+// The lines of a scene that apply to this playthrough, ready to be played as dialogue. A line is
+// a string (the narrator) or { who, text }; either kind can carry "if" or "unless".
+function say(list) { return [].concat(list || []).filter(l => typeof l === 'string' || ok(l)); }
 
 export function chapter() { return game.story && game.story.on && !game.story.done ? STORY.chapters[game.story.ch] || null : null; }
 export function step() { const c = chapter(); return c ? version(c.step) : null; }
@@ -66,13 +70,13 @@ export function startOpening() {
   const start = game.troops;
   game.troops = { recruit: { n: 3, wounded: 0, xp: 0 } };
   game.story.offered = true;
-  showPanel('<h2>' + esc(P.title) + '</h2><div class="story">' + lines(P.text) + '</div>' +
-    '<button data-act="fight">' + esc(P.fight || 'Fight') + '</button><button data-act="skip" class="secondary">' + esc(P.skip || 'Skip') + '</button>', {
-    fight: () => {
+  talk(P.title, say(P.text), {
+    choices: [P.fight || 'Fight', P.skip || 'Skip'],
+    pick: i => {
+      if (i) return afterOpening(start);
       hidePanel();
       setScene(battleScene, { enemy: { troops: {}, faction: P.foeFaction || 'march', name: P.foeName || 'The tithe-wardens\' men' }, kind: 'field', tutorial: true, onEnd: () => afterOpening(start) });
-    },
-    skip: () => afterOpening(start)
+    }
   });
 }
 function afterOpening(start) {
@@ -83,10 +87,10 @@ function afterOpening(start) {
   save();
   setScene(mapScene);
   const c = chapter();
-  showPanel('<h2>Three years later</h2><div class="story">' + lines(P.after) + '</div>' +
-    '<h3>' + esc(c.title) + '</h3><p>' + esc(c.goal) + '</p>' +
-    '<p class="small">A gold ! on the map marks where the story wants you. Buy food in towns, hire men, and keep your warband paid. Your story and quests are on the Quests screen (J); How to play is on the Party screen.</p>' +
-    '<button data-act="ok">To the road</button>', { ok: () => hidePanel() });
+  talk('Three years later', say(P.after), { done: () =>
+    showPanel('<h2>' + esc(c.title) + '</h2><p>' + esc(c.short || c.goal) + '</p>' +
+      '<p class="small">A gold ! on the map marks where the story wants you. Feed and pay your men. Quests: J. How to play: Party screen.</p>' +
+      '<button data-act="ok">To the road</button>', { ok: () => hidePanel() }) });
 }
 
 // ---------------------------------------------------------------- the prologue, for older saves
@@ -152,18 +156,17 @@ function openScene() {
   afterScene = game.story.after;
   const ch = (c.choices || []).filter(ok);
   const n = game.story.ch + 1;
-  let html = '<h2><span class="small">Chapter ' + n + '</span><br>' + esc(c.title) + '</h2><div class="story">' + lines(c.scene) + '</div>';
-  if (ch.length) html += ch.map((x, i) => '<button data-act="pick" data-arg="' + i + '"' + (i ? ' class="secondary"' : '') + '>' + esc(x.label) + '</button>').join('');
-  else html += '<button data-act="pick" data-arg="-1">Continue</button>';
-  showPanel(html, { pick: i => choose(c, ch[+i]) }, true);
+  talk('Chapter ' + n + ' · ' + c.title, say(c.scene), { choices: ch.map(x => x.label), pick: i => choose(c, ch[i]), done: () => choose(c, null) });
 }
 
+// What follows a choice is played out as dialogue too, then the rewards and the next goal are shown.
 function choose(c, pickd) {
-  let html = '';
-  if (pickd) {
-    game.story.flags[pickd.flag] = true;
-    html += '<p>' + esc(pickd.text) + '</p>' + give(pickd.reward || {});
-  }
+  if (pickd) game.story.flags[pickd.flag] = true;
+  const after = pickd ? say(pickd.text) : [];
+  if (after.length) talk(c.title, after, { done: () => wrapUp(c, pickd) }); else wrapUp(c, pickd);
+}
+function wrapUp(c, pickd) {
+  let html = pickd ? give(pickd.reward || {}) : '';
   html += give(c.reward || {});
   game.story.ch++;
   game.story.visited = [];
@@ -171,7 +174,7 @@ function choose(c, pickd) {
   if (!next) {
     game.story.done = true;
     html += '<p class="msg">' + esc(STORY.ending) + '</p>';
-  } else html += '<h3>Next: ' + esc(next.title) + '</h3><p>' + esc(next.goal) + '</p>';
+  } else html += '<h3>Next: ' + esc(next.title) + '</h3><p>' + esc(next.short || next.goal) + '</p>';
   save();
   const back = afterScene;
   showPanel('<h2>' + esc(c.title) + '</h2>' + html + '<button data-act="ok">Onward</button>', { ok: () => back ? back() : hidePanel() });

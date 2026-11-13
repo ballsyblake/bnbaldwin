@@ -59,3 +59,7 @@ A mod changes the story with `"story": {"chapters": [...]}`; chapters merge by `
 ## Realms and diplomacy
 
 Any faction with `"kingdom": true` is a realm: it has lords, holds towns, and makes war, peace and alliances with every other realm (js/diplomacy.js). The orc clans (`horde`) are a realm like the others, with race `orc`. A ruler's traits decide how warlike (bold, cruel; cautious holds back) and how faithless (cruel, greedy; honourable holds back) the realm is. `outlaws` fight everyone; `compact` fights only Gunther and is used by the story.
+
+## Story dialogue
+
+Scenes in `story.json` are played one line at a time. A line is a string (the narrator) or `{"who": "hob", "text": "..."}`, and either kind can carry `if` or `unless` with a story flag. `who` is an id in `cast`: `{"name": "Hob Carrow", "right": false, "face": {...}}`. The portrait is painted from `face`: `skin`, `hair`, `cloth`, `trim` and `hood` are colours; `style` is `short`, `long`, `bun`, `bald`, `hood`, `cap` or `helm`; `beard`, `old`, `smile`, `patch`, `tusks` are true or false; `circlet` is a colour; `{"paper": true, "seal": colour}` draws a letter. A choice's `text` can be a list of lines too.
