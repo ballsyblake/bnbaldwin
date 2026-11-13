@@ -110,7 +110,7 @@ export function populate() {
   // The old orc raiders are gone: the clans field lords like everyone else.
   game.parties = game.parties.filter(p => p.kind !== 'warband' || p.story);
   const bands = game.parties.filter(p => p.kind === 'outlaws' && !p.quest).length;
-  for (let i = bands; i < Math.min(2 + Math.floor(game.day / 10), 5); i++) spawnOutlaws();
+  for (let i = bands; i < Math.min(3 + Math.floor(game.day / 10), 7); i++) spawnOutlaws();
   // Old saves had faceless patrols; lords lead the armies now.
   game.parties = game.parties.filter(p => p.kind !== 'patrol');
   for (const l of LORDS) {
@@ -155,6 +155,7 @@ function think(p) {
   let threat = null, prey = null, threatD = Infinity, preyD = Infinity;
   for (const o of game.parties.concat([player])) {
     if (o === p || !enemies(p, o)) continue;
+    if (p.story && o.id === 'player') continue;   // story foes wait for Gunther to come to them
     const d = dist(p.x, p.y, o.x, o.y);
     if (d > SIGHT) continue;
     const them = partyStrength(o);

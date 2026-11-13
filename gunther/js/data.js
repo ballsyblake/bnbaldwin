@@ -3,8 +3,11 @@
 // This module loads them, applies any mods, checks the result, and exports it under the same
 // names the rest of the game has always used.
 
-export const WORLD_W = 3600;
-export const WORLD_H = 2400;
+// Places in the data files are written for a 3600 x 2400 island; the game stretches them by
+// WORLD_SCALE so there is more ground between everything.
+export const WORLD_SCALE = 1.5;
+export const WORLD_W = 3600 * WORLD_SCALE;
+export const WORLD_H = 2400 * WORLD_SCALE;
 
 const FILES = ['rules', 'factions', 'races', 'troops', 'goods', 'places', 'lords', 'skills', 'names', 'story'];
 const MOD_STORE = 'gunther-mods';
@@ -135,6 +138,7 @@ export const RACES = data.races;
 export function raceOf(faction) { return (FACTIONS[faction] && FACTIONS[faction].race) || 'human'; }
 export const TROOPS = data.troops;
 export const GOODS = data.goods;
+for (const s of data.places.settlements) { s.x = Math.round(s.x * WORLD_SCALE); s.y = Math.round(s.y * WORLD_SCALE); }
 export const SETTLEMENTS = data.places.settlements;
 export const ROADS = data.places.roads;
 export const ORC_CHIEFS = data.names.orcChiefs;

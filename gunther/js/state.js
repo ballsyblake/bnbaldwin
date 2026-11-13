@@ -3,7 +3,7 @@
 // party size, food, wages, prices, relations between realms and the daily tick.
 
 import { clamp, randInt, rand, pick } from './core.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS, RULES } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, LORDS, SKILLS, RACES, YEAR_DAYS, RULES, WORLD_SCALE } from './data.js';
 import { applyLords, newLordState, newHero, dynastyTick } from './dynasty.js';
 import { newStory } from './story.js';
 import { ensureDiplomacy, diplomacyTick, atWar } from './diplomacy.js';
@@ -26,7 +26,7 @@ export function newGame(migrate) {
     relations: { vale: 0, march: 0, free: 5, elves: 0, dwarves: 0, horde: -5 },
     sites: {},
     parties: [],
-    player: { x: 1640, y: 1500 },
+    player: { x: 1640 * WORLD_SCALE, y: 1500 * WORLD_SCALE }, worldScale: WORLD_SCALE,
     quests: [],
     stats: { won: 0, lost: 0, orcsSlain: 0, campsBurned: 0 },
     hordeBroken: false,
@@ -73,6 +73,14 @@ export function loadSave() {
 
 // Fills in anything a save from an older build doesn't have yet.
 function ensureFields() {
+  // The island grew: move a save made on the smaller one to the same places on the bigger one.
+  const f = WORLD_SCALE / (game.worldScale || 1);
+  if (f !== 1) {
+    const grow = o => { if (o) for (const k of ['x', 'y', 'tx', 'ty']) if (typeof o[k] === 'number') o[k] *= f; };
+    grow(game.player);
+    for (const p of game.parties || []) { grow(p); grow(p.anchor); }
+    game.worldScale = WORLD_SCALE;
+  }
   if (!game.skills) game.skills = {};
   for (const k in SKILLS) if (game.skills[k] === undefined) game.skills[k] = 0;
   if (!game.swordLevel) game.swordLevel = 1;

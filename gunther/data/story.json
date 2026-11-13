@@ -106,9 +106,9 @@
           "name": "Tithe-runners",
           "faction": "compact",
           "troops": {
-            "grunt": 10,
-            "brute": 3,
-            "shaman": 3
+            "grunt": 7,
+            "brute": 1,
+            "shaman": 1
           },
           "desc": "Clan orcs hauling an iron-bound chest north to Skullrock, with no banner. They do not want to be seen."
         }

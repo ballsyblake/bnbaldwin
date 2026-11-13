@@ -16,8 +16,14 @@ const HERO_HURT = 1.25;      // Gunther takes this much more damage than the raw
 
 // ---------------------------------------------------------------- battlefield
 let ground = null;
+// The battlefield is bigger than the screen; the camera follows Gunther across it.
+const F = { W: 960, H: 540 };
+function sizeField(opts) {
+  const kx = opts.tutorial ? 1 : view.portrait ? 1.4 : 1.8, ky = opts.tutorial ? 1 : view.portrait ? 1.7 : 1.5;
+  F.W = Math.round(view.W * kx / PX) * PX; F.H = Math.round(view.H * ky / PX) * PX;
+}
 function buildGround(kind, people) {
-  const W = view.W, H = view.H;
+  const W = F.W, H = F.H;
   // The field wears the season: yellowing in autumn, under snow in winter.
   const sn = seasonBlend() > 0.5 ? season() : (season() + 3) % 4;
   const TINT = [null, null, [[206, 178, 84], 0.3], [[238, 243, 247], 0.72]][sn];
@@ -87,13 +93,15 @@ function buildGround(kind, people) {
     if (kind === 'stronghold') { P(0.82, 0.62, 'tent', 30); P(0.18, 0.62, 'tent', 30); }
   } else {
     P(0.3, 0.3, 'rock', 20, 0); P(0.72, 0.74, 'rock', 20, 2);
+    // A big field has more to fight around: a few lone trees and boulders through the middle.
+    if (W > 1100 || H > 1100) { const pr = seeded(57); for (let k = 0; k < 7; k++) { const fx = 0.22 + pr() * 0.56, fy = 0.2 + pr() * 0.6, tree = pr() < (kind === 'hills' ? 0.2 : 0.6); P(fx, fy, tree ? 'tree' : 'rock', tree ? 16 : 20, Math.floor(pr() * 3)); } }
     if (kind === 'forest') { P(0.5, 0.5, 'tree', 16, 2); P(0.2, 0.75, 'tree', 16, 1); }
   }
   ground = { canvas: c, trees, props, kind, W, H, wall, season: sn, people: people || 'human' };
 }
 
 // ---------------------------------------------------------------- battle scene
-const FIELD_CAP = () => view.portrait ? 18 : 24;     // most soldiers per side on the field at once
+const FIELD_CAP = () => F.W === view.W ? (view.portrait ? 18 : 24) : (view.portrait ? 24 : 32);     // most soldiers per side on the field at once
 
 export const battleScene = {
   // opts: { enemy: { troops, faction, name }, kind: 'field' | 'forest' | 'hills' | 'camp' | 'stronghold', onEnd(result) }
@@ -103,7 +111,8 @@ export const battleScene = {
     this.enemyFaction = opts.enemy.faction;
     const people = (FACTIONS[opts.enemy.faction] && FACTIONS[opts.enemy.faction].race) || 'human';
     const sn = seasonBlend() > 0.5 ? season() : (season() + 3) % 4;
-    if (!ground || ground.kind !== opts.kind || ground.W !== view.W || ground.H !== view.H || ground.season !== sn || ground.people !== people) buildGround(opts.kind, people);
+    sizeField(opts);
+    if (!ground || ground.kind !== opts.kind || ground.W !== F.W || ground.H !== F.H || ground.season !== sn || ground.people !== people) buildGround(opts.kind, people);
     this.units = []; this.shots = []; this.effects = []; this.floats = [];
     this.drawT = 0; this.wasDown = false; this.blockHeld = false; pointer.tap = null;
     this.time = 0; this.over = false;
@@ -127,14 +136,16 @@ export const battleScene = {
     // A battle never starts with Gunther below half health.
     game.health = Math.max(game.health, game.maxHealth * 0.5);
     const b = this.bounds();
-    this.hero = this.addUnit(0, null, view.portrait ? view.W / 2 : b.x0 + 80, view.portrait ? b.y1 - 60 : view.H * 0.6);
+    this.hero = this.addUnit(0, null, view.portrait ? F.W / 2 : b.x0 + 80, view.portrait ? b.y1 - 60 : F.H * 0.6);
     for (let s = 0; s < 2; s++) this.reinforce(s, true);
     this.routing = false;
     this.tut = null; this.tutBlocks = 0; this.tutShield = false;
     if (opts.tutorial) tutorialStart(this);
+    this.cam = this.camTarget();
     this.hud();
   },
-  bounds() { return { x0: 40, y0: view.portrait ? 100 : 80, x1: view.W - 40, y1: view.H - (view.portrait ? 175 : 60) }; },
+  camTarget() { const H = this.hero; return { x: clamp(H.x - view.W / 2, 0, F.W - view.W), y: clamp(H.y - 26 - view.H / 2, 0, F.H - view.H) }; },
+  bounds() { return { x0: 40, y0: view.portrait ? 100 : 80, x1: F.W - 40, y1: F.H - (view.portrait ? 175 : 60) }; },
   // Battle HUD: a top bar with both sides and the odds, group cards bottom left, orders bottom right.
   hud() {
     const ORD = { charge: 'Charge', hold: 'Hold', follow: 'Follow', fallback: 'Fall back' };
@@ -275,13 +286,13 @@ export const battleScene = {
       if (view.portrait) {
         x = b.x0 + 20 + lane * (b.x1 - b.x0 - 40);
         y = side === 0 ? b.y1 - 20 - (1 - row) * 50 : b.y0 + 20 + (1 - row) * 50;
-        if (!initial) y = side === 0 ? view.H + 10 : 60;
+        if (!initial) y = side === 0 ? F.H + 10 : 60;
       } else {
         y = b.y0 + 20 + lane * (b.y1 - b.y0 - 40);
         x = side === 0 ? b.x0 + 30 + (1 - row) * 60 : b.x1 - 30 - (1 - row) * 60;
-        if (!initial) x = side === 0 ? -10 : view.W + 10;
+        if (!initial) x = side === 0 ? -10 : F.W + 10;
       }
-      if (type === 'warlord') { x = view.portrait ? view.W / 2 : b.x1 - 140; y = view.portrait ? b.y0 + 80 : view.H * 0.55; }
+      if (type === 'warlord') { x = view.portrait ? F.W / 2 : b.x1 - 140; y = view.portrait ? b.y0 + 80 : F.H * 0.55; }
       const u = this.addUnit(side, type, x, y);
       u.holdX = clamp(x, b.x0, b.x1); u.holdY = clamp(y, b.y0, b.y1);
       // Defenders of a town: foot men guard the breaches, archers stand behind the wall.
@@ -346,7 +357,11 @@ export const battleScene = {
     H.blocking = !H.dead && !this.over && sword && (pointer.rdown || this.blockHeld) && !(H.swing && H.swing.released);
     if (H.blocking && !wasBlocking) H.blockStart = this.time;
     // A short tap on a phone (no drag) is a sword stroke towards that spot.
-    this.tap = pointer.tap || null; pointer.tap = null;
+    // The camera eases after Gunther; the pointer is turned from screen to field coordinates.
+    const ct = this.camTarget(), ce = Math.min(1, dt * 6);
+    this.cam.x += (ct.x - this.cam.x) * ce; this.cam.y += (ct.y - this.cam.y) * ce;
+    const mx = pointer.x + this.cam.x, my = pointer.y + this.cam.y;
+    this.tap = pointer.tap ? { x: pointer.tap.x + this.cam.x, y: pointer.tap.y + this.cam.y } : null; pointer.tap = null;
     if (!H.dead && !this.over) {
       let mx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
       let my = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
@@ -364,7 +379,7 @@ export const battleScene = {
         const o = this.nearestFoe(H, sword ? 160 : 520);
         if (this.tap) this.aim = Math.atan2(this.tap.y - (H.y - 26), this.tap.x - H.x);
         else if (o) this.aim = Math.atan2(o.y - 16 - (H.y - 26), o.x - H.x);
-      } else this.aim = Math.atan2(pointer.y - (H.y - 26), pointer.x - H.x);
+      } else this.aim = Math.atan2(my - (H.y - 26), mx - H.x);
       H.flip = Math.cos(this.aim) < 0;
       if (sword) this.updateSword(dt); else this.updateBow(dt);
     }
@@ -391,10 +406,10 @@ export const battleScene = {
       if (u.side === 1 && !def.ranged) this.guardAI(u, dt);
       const speed = def.speed * (u.fleeing ? 1.25 : 1);
       if (u.fleeing) {
-        const ex = view.portrait ? u.x : (u.side === 1 ? view.W + 40 : -40);
-        const ey = view.portrait ? (u.side === 1 ? -40 : view.H + 40) : u.y;
+        const ex = view.portrait ? u.x : (u.side === 1 ? F.W + 40 : -40);
+        const ey = view.portrait ? (u.side === 1 ? -40 : F.H + 40) : u.y;
         this.walk(u, ex, ey, speed, dt);
-        if (u.x < -30 || u.x > view.W + 30 || u.y < -30 || u.y > view.H + 30) { u.fled = true; this.fled[u.side][u.type] = (this.fled[u.side][u.type] || 0) + 1; }
+        if (u.x < -30 || u.x > F.W + 30 || u.y < -30 || u.y > F.H + 30) { u.fled = true; this.fled[u.side][u.type] = (this.fled[u.side][u.type] || 0) + 1; }
         continue;
       }
       u.retarget -= dt;
@@ -471,7 +486,7 @@ export const battleScene = {
       }
       for (const p of ground.props) pushOut(a, p.x, p.y, p.r + 10);
       if (ground.wall) wallBlock(a);
-      if (!a.fleeing && (a.x > -5 && a.x < view.W + 5 && a.y > -5 && a.y < view.H + 5)) {
+      if (!a.fleeing && (a.x > -5 && a.x < F.W + 5 && a.y > -5 && a.y < F.H + 5)) {
         // Units walking in from the edge are allowed outside the bounds until they arrive.
         if (a.x > b.x0 - 1 && a.x < b.x1 + 1 && a.y > b.y0 - 1 && a.y < b.y1 + 1) a.inside = true;
         if (a.inside || a.isHero) { a.x = clamp(a.x, b.x0, b.x1); a.y = clamp(a.y, b.y0, b.y1); }
@@ -483,7 +498,7 @@ export const battleScene = {
       // between frames, and test it against the whole figure, head to boots.
       const px = s.x, py = s.y;
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-      if (s.life <= 0 || s.x < -40 || s.x > view.W + 40 || s.y < -40 || s.y > view.H + 40) { s.gone = true; continue; }
+      if (s.life <= 0 || s.x < -40 || s.x > F.W + 40 || s.y < -40 || s.y > F.H + 40) { s.gone = true; continue; }
       const tipX = Math.cos(s.a) * 10, tipY = Math.sin(s.a) * 10;
       const steps = Math.max(1, Math.ceil(Math.hypot(s.x - px, s.y - py) / 5));
       for (let k = 1; k <= steps && !s.gone; k++) {
@@ -740,7 +755,9 @@ export const battleScene = {
   },
   draw() {
     const W = view.W, Hh = view.H;
-    ctx.drawImage(ground.canvas, 0, 0, W, Hh);
+    const cx = Math.round(this.cam.x), cy = Math.round(this.cam.y);
+    ctx.save(); ctx.translate(-cx, -cy);
+    ctx.drawImage(ground.canvas, 0, 0, F.W, F.H);
     const things = [];
     if (ground.wall) { if (ground.wall.axis === 'x') drawWall(); else things.push({ y: ground.wall.pos + 12, draw: drawWall }); }
     for (const t of ground.trees) things.push({ y: t.y, draw: () => {
@@ -780,7 +797,6 @@ export const battleScene = {
       } });
     }
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
-    drawWeather(this.time);
     for (const s of this.shots) {
       if (s.kind === 'javelin') drawJavelin(s.x, s.y, s.a);
       else if (s.kind === 'bolt') drawBolt(s.x, s.y, s.a);
@@ -803,6 +819,22 @@ export const battleScene = {
     this.drawCombatMarks();
     for (const f of this.floats) { ctx.globalAlpha = clamp(1.4 - f.t * 1.6, 0, 1); text(f.msg, f.x, f.y - f.t * 26, 15, f.colour, 'center'); }
     ctx.globalAlpha = 1;
+    ctx.restore();
+    drawWeather(this.time);
+    // Red marks on the edge of the screen point at enemies that are out of view.
+    const marks = [];
+    if (!this.over) for (const u of this.units) {
+      if (u.side !== 1 || u.dead || u.fled) continue;
+      const ux = u.x - cx, uy = u.y - 26 - cy;
+      if (ux > 0 && ux < W && uy > 0 && uy < Hh) continue;
+      const ex = clamp(ux, 14, W - 14), ey = clamp(uy, view.portrait ? 96 : 76, Hh - (view.portrait ? 170 : 70)), a = Math.atan2(uy - ey, ux - ex);
+      if (marks.some(m => Math.abs(m[0] - ex) + Math.abs(m[1] - ey) < 44)) continue;   // one mark for a clump
+      marks.push([ex, ey]);
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+      ctx.fillStyle = '#0d0b09'; ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-7, -8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e0533d'; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-5, -5); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
     // Hero's health, top left, and the head count for both sides.
     const H = this.hero;
     if (!this.over) this.refreshHud();
@@ -812,7 +844,7 @@ export const battleScene = {
       ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 18, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
-    const top = this.bounds().y0, bot = this.bounds().y1;
+    const top = view.portrait ? 100 : 80, bot = Hh - (view.portrait ? 175 : 60);
     if (H.dead && !this.over) text('Gunther is down! Your men fight on.', W / 2, top + 24, 20, '#e0533d', 'center');
     if (this.banner && this.banner.t < (this.banner.msg.length > 24 ? 4 : 2.5)) text(this.banner.msg, W / 2, Hh / 2 - 40, this.banner.msg.length > 24 ? (view.portrait ? 18 : 24) : 34, '#f2c14e', 'center');
     if (this.tut && !this.over) tutorialDraw(this, ctx);
@@ -851,7 +883,7 @@ function routeAround(u, tx, ty) {
   return w.axis === 'x' ? { x: across, y: gc } : { x: gc, y: across };
 }
 function drawWall() {
-  const w = ground.wall, len = w.axis === 'x' ? view.H : view.W;
+  const w = ground.wall, len = w.axis === 'x' ? F.H : F.W;
   const segs = [];
   let from = -10;
   for (const [g0, g1] of w.gaps) { segs.push([from, g0]); from = g1; }
