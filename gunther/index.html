@@ -218,6 +218,16 @@
     .detail .sg div { background: var(--panel); padding: 4px 8px; display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--muted); }
     .detail .sg b { font: 700 0.9rem var(--pixel); color: var(--text); }
     .detail p { font-size: 0.82rem; margin: 6px 0; }
+    .ic { width: 26px; height: auto; image-rendering: pixelated; vertical-align: middle; flex: none; }
+    .resgrid { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .res { background: var(--tile); padding: 8px 6px 6px; min-width: 76px; flex: 1 0 76px; display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 2px 8px; }
+    .res b { font: 700 1.25rem var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+    .res span { grid-column: 1 / 3; text-align: center; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .strip { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 8px 0; }
+    .st { display: inline-flex; align-items: center; gap: 6px; }
+    .st .ic { width: 20px; }
+    .st b { font: 700 0.95rem var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+    .res b.gold, .st b.gold { color: var(--gold); } .res b.bad, .st b.bad { color: var(--danger); } .res b.good, .st b.good { color: var(--good); } .res b.warn { color: var(--gold); }
     .panel > .sg { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; margin: 8px 0; }
     .panel > .sg div { background: var(--tile); padding: 5px 9px; display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--muted); }
     .panel > .sg b { font: 700 0.9rem var(--sans); color: var(--text); }

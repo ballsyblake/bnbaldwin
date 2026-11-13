@@ -16,6 +16,7 @@ import { outlawName, spawnOutlaws } from './world.js';
 import { storyButton, storyAt, storyBeaten, journalHtml, openPrologue, startOpening } from './story.js';
 import { mapScene, populate, spawnWarband, spawnParty, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
 import { updateLife } from './ambient.js';
+import { tile, stat } from './icons.js';
 import { battleScene } from './battle.js';
 import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
 import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
@@ -44,7 +45,9 @@ function compare(theirs) {
   return '<span class="good">You should win this.</span>';
 }
 function statusLine() {
-  return '<p class="stats">Gold ' + game.gold + ' &middot; Men ' + troopCount() + '/' + partyLimit() + ' &middot; Food ' + foodStock() + ' (' + Math.floor(foodStock() / foodPerDay()) + ' days) &middot; Health ' + Math.ceil(game.health) + '/' + game.maxHealth + '</p>';
+  const days = Math.floor(foodStock() / foodPerDay());
+  return '<div class="strip">' + stat('gold', game.gold.toLocaleString('en-AU'), 'Gold', 'gold') + stat('men', troopCount() + '/' + partyLimit(), 'Men') +
+    stat('food', days + 'd', 'Days of food', days < 2 ? 'bad' : '') + stat('health', Math.ceil(game.health) + '/' + game.maxHealth, 'Health', game.health < game.maxHealth * 0.4 ? 'bad' : '') + '</div>';
 }
 const plural = (n, word) => n + ' ' + (n === 1 ? word : word.endsWith('man') ? word.slice(0, -3) + 'men' : /[^aeiou]y$/.test(word) ? word.slice(0, -1) + 'ies' : word + 's');
 
@@ -578,18 +581,20 @@ function sacrifice() {
 // ---------------------------------------------------------------- after a battle
 function afterBattle(foe, res) {
   // Your casualties.
-  const lines = [];
+  // The report is mostly symbols and numbers (tiles); lines are for the few things that need words.
+  const lines = [], tiles = [];
   for (const t in res.killed) { removeTroops(t, res.killed[t]); }
   for (const t in res.wounded) { const st = game.troops[t]; if (st) st.wounded = Math.min(st.n, st.wounded + res.wounded[t]); }
   const nk = count(res.killed), nw = count(res.wounded);
-  if (nk || nw) lines.push('Your losses: ' + plural(nk, 'man') + ' killed, ' + nw + ' wounded.');
+  if (nk) tiles.push(tile('killed', nk, 'Killed', 'bad'));
+  if (nw) tiles.push(tile('wounded', nw, 'Wounded', 'warn'));
   if (res.heroDown) {
     game.health = Math.max(game.health, game.maxHealth * 0.1);
     // Falling in battle can be the end of a captain. The heir takes over back on the map.
     if (Math.random() < deathChance(!res.won)) {
       game.pendingDeath = 'fell in battle near ' + nearestPlace(mapScene.pos.x, mapScene.pos.y);
       lines.push('<span class="bad">' + esc(game.hero.name) + ' was struck down and did not get up.</span>');
-    } else lines.push(esc(game.hero.name) + ' was knocked senseless but will recover.');
+    } else lines.push(esc(game.hero.name) + ' was knocked out, but will recover.');
   }
   const slain = count(res.enemyKilled);
   const orcs = (foe.site && !foe.siege) || (foe.party && foe.party.faction === 'outlaws');
@@ -599,7 +604,7 @@ function afterBattle(foe, res) {
     // The enemy keeps what is left of its army.
     if (foe.party) { foe.party.troops = res.enemyRemaining; if (!count(res.enemyRemaining)) foe.party.gone = true; }
     if (foe.site) game.sites[foe.site.id].garrison = Object.keys(res.enemyRemaining).length ? res.enemyRemaining : (foe.siege ? townGarrison(foe.site.faction) : campGarrison(foe.site));
-    return defeat(lines);
+    return defeat(lines, tiles);
   }
 
   game.stats.won++;
@@ -617,26 +622,26 @@ function afterBattle(foe, res) {
       game.prisoners[t] = (game.prisoners[t] || 0) + 1; took++;
     }
   }
-  if (took) lines.push('You took ' + plural(took, 'prisoner') + '. Sell them to a ransom broker in any town, or persuade them to join you.');
+  if (took) tiles.push(tile('prisoners', '+' + took, 'Prisoners'));
   // Lords nearby who were fighting the same enemy remember that you stood with them.
   if (foe.party) {
     for (const p of game.parties) {
       if (!p.lord || p === foe.party || dist(p.x, p.y, mapScene.pos.x, mapScene.pos.y) > 500) continue;
-      if (hostile(p.faction, foe.party.faction)) { remember(p.lord, 'Gunther fought ' + foe.party.name + ' near ' + nearestPlace(p.x, p.y), 8); lines.push(lord(p.lord).name + ' saw you fight and will remember it.'); }
+      if (hostile(p.faction, foe.party.faction)) { remember(p.lord, 'Gunther fought ' + foe.party.name + ' near ' + nearestPlace(p.x, p.y), 8); lines.push(lord(p.lord).name + ' saw you fight.'); }
     }
   }
   let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * 4 + (foe.siege ? 220 : 60));
   const renown = Math.max(1, Math.round(enemyPower / 5));
   game.gold += gold; game.renown += renown;
   game.morale = clamp(game.morale + 8, 0, 100);
-  lines.unshift('You won! ' + plural(slain, 'enemy') + ' fell. Loot: ' + gold + ' gold. Renown +' + renown + '.');
+  tiles.unshift(tile('slain', slain, 'Slain'), tile('gold', '+' + gold, 'Loot', 'gold'), tile('renown', '+' + renown, 'Renown'));
   // Experience for everyone who fought.
   const xp = Math.round(enemyPower * 3);
   for (const t in game.troops) if (TROOPS[t].upgrades && TROOPS[t].upgrades.length) game.troops[t].xp += xp;
   // Rescued captives and grateful kingdoms.
   if (orcs && Math.random() < 0.55) {
     const n = Math.min(randInt(1, 3), partyLimit() - troopCount());
-    if (n > 0) { addTroops('recruit', n); lines.push(plural(n, 'freed captive') + ' joined your warband.'); }
+    if (n > 0) { addTroops('recruit', n); tiles.push(tile('men', '+' + n, 'Freed captives', 'good')); }
   }
   if (orcs) {
     let near = null, nd = Infinity;
@@ -649,16 +654,16 @@ function afterBattle(foe, res) {
   if (foe.party && foe.party.kind === 'caravan') {
     const g = pick(Object.keys(GOODS)), n = randInt(3, 8);
     const room = cargoLimit() - cargo();
-    if (room > 0) { game.goods[g] = (game.goods[g] || 0) + Math.min(n, room); lines.push('You seized ' + Math.min(n, room) + ' ' + GOODS[g].name.toLowerCase() + '.'); }
+    if (room > 0) { game.goods[g] = (game.goods[g] || 0) + Math.min(n, room); lines.push('Seized ' + Math.min(n, room) + ' ' + GOODS[g].name.toLowerCase() + '.'); }
   }
   let capturedLord = null;
   if (foe.party) {
     foe.party.gone = true;
     const q = game.quests.find(q => q.party === foe.party.id);
-    if (q) completeQuest(q), lines.push('Quest complete! +' + q.reward + ' gold.');
+    if (q) completeQuest(q), tiles.push(tile('quest', '+' + q.reward, 'Quest done', 'gold'));
     if (foe.party.story) storyBeaten(foe.party);
     const wq = foe.party.lord && game.quests.find(q => q.kind === 'war' && q.lord === foe.party.lord);
-    if (wq) completeQuest(wq), lines.push('Quest complete! +' + wq.reward + ' gold.');
+    if (wq) completeQuest(wq), tiles.push(tile('quest', '+' + wq.reward, 'Quest done', 'gold'));
     if (foe.party.lord) { capturedLord = foe.party.lord; chronicle('Gunther defeated ' + lord(capturedLord).name + ' near ' + nearestPlace(foe.party.x, foe.party.y) + '.'); }
   } else if (foe.site && !foe.siege) chronicle('Gunther stormed ' + foe.site.name + '.');
   let title = 'Victory';
@@ -680,23 +685,23 @@ function afterBattle(foe, res) {
       st.burned = 25;
       game.stats.campsBurned++;
       const bq = game.quests.find(q => q.kind === 'burn' && q.camp === foe.site.id);
-      if (bq) completeQuest(bq), lines.push('Quest complete! +' + bq.reward + ' gold.');
+      if (bq) completeQuest(bq), tiles.push(tile('quest', '+' + bq.reward, 'Quest done', 'gold'));
       lines.push(foe.site.name + ' burns. No raiders will come from it for a while.');
     }
   }
   game.parties = game.parties.filter(p => !p.gone);
   const ups = upgradeable();
-  if (ups) lines.push('<span class="good">' + ups + ' of your men can be trained up. Open the Party screen.</span>');
+  if (ups) tiles.push(tile('train', ups, 'Can train', 'good'));
   save();
-  const report = extra => showPanel('<h2>' + title + '</h2>' + (extra ? '<p class="msg">' + extra + '</p>' : '') + lines.map(l => '<p>' + l + '</p>').join('') + statusLine() +
-    '<button data-act="map">Back to the map</button><button data-act="party" class="secondary">Party</button>', {
+  const report = extra => showPanel('<h2>' + title + '</h2>' + (extra ? '<p class="msg">' + extra + '</p>' : '') + '<div class="resgrid">' + tiles.join('') + '</div>' + lines.map(l => '<p>' + l + '</p>').join('') + statusLine() +
+    '<button data-act="map">Back to the map</button><button data-act="party" class="secondary">' + (ups ? 'Train men' : 'Party') + '</button>', {
     map: () => { setScene(mapScene); mapScene.grace = 1.5; },
     party: () => { setScene(mapScene); openParty(); }
   });
   if (capturedLord) openCapturedLord(capturedLord, report); else report();
 }
 
-function defeat(lines) {
+function defeat(lines, tiles) {
   game.stats.lost++;
   const lostGold = Math.floor(game.gold / 2);
   game.gold -= lostGold;
@@ -711,9 +716,10 @@ function defeat(lines) {
   if (best) { game.player.x = best.x; game.player.y = best.y + 60; }
   dailyTick(); dailyTick(); populate();
   save();
-  showPanel('<h2>Defeat</h2>' + lines.map(l => '<p>' + l + '</p>').join('') +
-    '<p>Your warband is routed. ' + (scattered ? plural(scattered, 'man') + ' scattered or were lost, and you' : 'You') + ' lost ' + lostGold + ' gold.' +
-    (best ? ' Two days later you limp into ' + best.name + '.' : '') + '</p>' + statusLine() +
+  if (scattered) tiles.push(tile('men', '-' + scattered, 'Scattered', 'bad'));
+  if (lostGold) tiles.push(tile('gold', '-' + lostGold, 'Lost', 'bad'));
+  showPanel('<h2>Defeat</h2><div class="resgrid">' + tiles.join('') + '</div>' + lines.map(l => '<p>' + l + '</p>').join('') +
+    (best ? '<p>Two days later you limp into ' + best.name + '.</p>' : '') + statusLine() +
     '<button data-act="map">Carry on</button>', { map: () => { setScene(mapScene); mapScene.grace = 2; } });
 }
 
@@ -895,8 +901,8 @@ export function openParty(msg, tab) {
   }
   const food = foodStock(), days = Math.floor(food / foodPerDay());
   const head = '<div class="rhead"><h2>Gunther\'s Warband</h2><span class="small">' + troopCount() + ' / ' + partyLimit() + ' men</span>' +
-    '<span class="chip">Gold<b class="gold">' + game.gold.toLocaleString('en-AU') + '</b></span><span class="chip">Food<b>' + days + ' days</b></span>' +
-    '<span class="chip">Morale<b class="good">' + Math.round(game.morale) + '</b></span><span class="chip">Wages<b class="bad">-' + wages() + ' / wk</b></span></div>';
+    stat('gold', game.gold.toLocaleString('en-AU'), 'Gold', 'gold') + stat('food', days + 'd', 'Days of food', days < 2 ? 'bad' : '') +
+    stat('morale', Math.round(game.morale), 'Morale', 'good') + stat('gold', '-' + wages() + '/wk', 'Wages each week', 'bad') + '</div>';
   const where = 'Near ' + nearestPlace(game.player.x, game.player.y);
   showPanel(head + '<div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
     '<div class="rfoot">' + where + '</div>' +
