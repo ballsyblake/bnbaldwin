@@ -15,6 +15,7 @@ import {
 import { outlawName, spawnOutlaws } from './world.js';
 import { storyButton, storyAt, storyBeaten, journalHtml, openPrologue, startOpening } from './story.js';
 import { mapScene, populate, spawnWarband, spawnParty, partyById, terrainAt, T, enemies, grudge, nearestPlace, renownLevel } from './world.js';
+import { updateLife } from './ambient.js';
 import { battleScene } from './battle.js';
 import { capture, isHeld, besiegers, WALL_BONUS, townGarrison, originalFaction } from './sieges.js';
 import { heroAge, lordAge, deathChance, heirChoices, succeed, adultHeirs, ageOf } from './dynasty.js';
@@ -940,7 +941,7 @@ function familySection() {
 // The title screen is the map in the background with the title menu on top.
 export const titleScene = {
   enter() { openTitle(); },
-  update() {},
+  update(dt) { mapScene.time += dt; updateLife(dt, mapScene.camera(), mapScene.pos, false); },
   draw() { if (game.player) mapScene.draw(); }
 };
 

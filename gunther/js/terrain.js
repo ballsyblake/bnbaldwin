@@ -3,11 +3,11 @@
 // is a quick lookup instead of maths every frame.
 
 import { noise, seeded, dist } from './core.js';
-import { WORLD_W, WORLD_H, SETTLEMENTS, ROADS } from './data.js';
+import { WORLD_W, WORLD_H, SETTLEMENTS, ROADS, FACTIONS } from './data.js';
 
 export const PX = 3;                       // one terrain pixel = 3 world pixels, same chunkiness as the sprites
 const GW = WORLD_W / PX, GH = WORLD_H / PX;
-const ISLAND = { x: 1800, y: 1250, rx: 1660, ry: 1060 };
+export const ISLAND = { x: 1800, y: 1250, rx: 1660, ry: 1060 };
 
 // Ground types stored in the grid.
 export const T = { SEA: 0, SHALLOW: 1, BEACH: 2, GRASS: 3, FOREST: 4, HILLS: 5, ROAD: 6 };
@@ -139,18 +139,50 @@ export function buildTerrain() {
       if (t < T.GRASS || t === T.ROAD) continue;
       if (terrainAt(jx, jy + 20) === T.ROAD || terrainAt(jx, jy - 20) === T.ROAD) continue;
       if (SETTLEMENTS.some(s => dist(jx, jy, s.x, s.y) < 130)) continue;
-      if (t === T.FOREST && r < 0.72) decor.push({ x: jx, y: jy, kind: 'tree', v: tr() < 0.6 ? 2 : 1 + Math.floor(tr() * 3) });
-      else if (t === T.GRASS && r < 0.02) decor.push({ x: jx, y: jy, kind: 'tree', v: 1 + Math.floor(tr() * 3) });
-      else if (t === T.HILLS && r < 0.07) decor.push({ x: jx, y: jy, kind: 'rock', v: Math.floor(tr() * 3) });
-      else if (t === T.HILLS && r < 0.1) decor.push({ x: jx, y: jy, kind: 'tree', v: 2 });
+      // Kinds of tree: 0 pine, 1 oak, 2 birch, 3 the silver trees of the elf woods. Pines keep to
+      // the north and the hills, and each wood is mostly one kind.
+      const elfWood = SETTLEMENTS.some(s => (s.race || FACTIONS[s.faction].race) === 'elf' && dist(jx, jy, s.x, s.y) < 520);
+      const mix = noise(jx / 420 + 60, jy / 420 + 12) + (900 - jy) / 2600;
+      const kind = elfWood && tr() < 0.7 ? 3 : (mix > 0.62 ? (tr() < 0.8 ? 0 : 2) : (mix > 0.4 ? (tr() < 0.75 ? 1 : 2) : (tr() < 0.6 ? 2 : 1)));
+      const h = tr();
+      if (t === T.FOREST && r < 0.72) decor.push({ x: jx, y: jy, kind: 'tree', v: kind, h });
+      else if (t === T.GRASS && r < 0.02) decor.push({ x: jx, y: jy, kind: 'tree', v: kind === 0 ? 1 : kind, h });
+      else if (t === T.HILLS && r < 0.07) decor.push({ x: jx, y: jy, kind: 'rock', v: Math.floor(tr() * 3), h });
+      else if (t === T.HILLS && r < 0.1) decor.push({ x: jx, y: jy, kind: 'tree', v: 0, h });
     }
   }
   for (const s of SETTLEMENTS) {
     if (s.kind !== 'town' && s.kind !== 'village') continue;
     const spots = s.kind === 'town' ? [[-104, 0], [104, -4], [-84, 66], [88, 64]] : [[-50, -8], [48, -12], [-40, 46], [44, 42]];
-    spots.forEach(([dx, dy], k) => decor.push({ x: s.x + dx, y: s.y + dy, kind: 'house', v: (k + s.x) % 3, row: s.kind === 'village' ? 1 : 0 }));
+    spots.forEach(([dx, dy], k) => decor.push({ x: s.x + dx, y: s.y + dy, kind: 'house', v: (k + s.x) % 3, row: s.kind === 'village' ? 1 : 0, site: s, h: ((k * 37 + s.x) % 100) / 100 }));
   }
   decor.sort((a, b) => a.y - b.y);
+}
+
+// The same island in each season. Summer is the picture painted above; the others are made from it
+// the first time they are needed: flowers in spring, yellowing grass in autumn, snow in winter.
+const looks = {};
+export function terrainLook(season) {
+  if (season === 1 || !terrainCanvas) return terrainCanvas;
+  if (looks[season]) return looks[season];
+  const c = document.createElement('canvas');
+  c.width = GW; c.height = GH;
+  const g = c.getContext('2d');
+  g.drawImage(terrainCanvas, 0, 0);
+  const img = g.getImageData(0, 0, GW, GH), d = img.data, rnd = seeded(90 + season);
+  const FLOWERS = [[250, 240, 250], [255, 214, 232], [250, 226, 120]];
+  for (let k = 0; k < GW * GH; k++) {
+    const t = grid[k], i = k * 4;
+    if (t < T.BEACH) continue;
+    let to = null, f = 0;
+    if (season === 0) { if (t !== T.ROAD && t !== T.BEACH && rnd() < 0.012) { to = FLOWERS[Math.floor(rnd() * 3)]; f = 1; } else if (t === T.GRASS || t === T.FOREST) { to = [200, 232, 110]; f = 0.18; } }
+    else if (season === 2) { if (t === T.GRASS || t === T.FOREST || t === T.HILLS) { to = [206, 178, 84]; f = t === T.FOREST ? 0.42 : 0.34; if (t === T.FOREST && rnd() < 0.03) { to = [214, 120, 48]; f = 0.8; } } }
+    else { to = [238, 243, 247]; f = t === T.ROAD ? 0.38 : (t === T.BEACH ? 0.3 : 0.74 + (rnd() < 0.04 ? 0.2 : 0)); if (t === T.FOREST) f -= 0.08; }
+    if (!to) continue;
+    d[i] += (to[0] - d[i]) * f; d[i + 1] += (to[1] - d[i + 1]) * f; d[i + 2] += (to[2] - d[i + 2]) * f;
+  }
+  g.putImageData(img, 0, 0);
+  return (looks[season] = c);
 }
 
 // Finds the nearest land spot to (x, y), searching outwards. Used to keep parties on the island.

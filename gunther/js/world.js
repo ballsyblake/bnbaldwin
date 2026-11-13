@@ -3,12 +3,14 @@
 // camping, so you can always stop and think.
 
 import { uiMin, ctx, view, pointer, clamp, dist, rand, randInt, pick, text, shadow, setHud, uiSet, uiBar, uiShow, setScene, panelOpen, onKeyPress, getScene, seeded, esc, FONT } from './core.js';
-import { img, drawUnit, drawWagon, drawBanner } from './sprites.js';
+import { drawUnit, drawWagon, drawBanner } from './sprites.js';
+import { drawTree, drawRock, drawHouse, drawKeep, drawTent, drawProp, drawSmoke, drawCampfire, season, seasonBlend, weatherName, SEASONS } from './scenery.js';
+import { updateLife, drawGroundLife, lifeThings, siteSmoke, drawSky, nightAmount } from './ambient.js';
 import { year, lordDies } from './dynasty.js';
 import { siegeTarget, isHeld, besiegers, peopleOf } from './sieges.js';
 import { storyTick, storyPlaces } from './story.js';
 import { WORLD_W, WORLD_H, DAY_SECONDS, YEAR_DAYS, SETTLEMENTS, FACTIONS, TROOPS, KINGDOMS, ORC_CHIEFS, LORDS, RACES, raceOf } from './data.js';
-import { terrainCanvas, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
+import { terrainLook, decor, waves, isLand, speedAt, nearestLand, terrainAt, T } from './terrain.js';
 import { relationWord, campGarrison, game, log, note, hostile, strength, playerStrength, troopCount, partyLimit, partySpeed, foodStock, foodPerDay, dailyTick, site, save, lord, lordState, hasTrait, chronicle, prisonerCount } from './state.js';
 import { openSettlement, openEncounter, openParty, autoResolve, openSuccession } from './menus.js';
 
@@ -405,6 +407,7 @@ export const mapScene = {
   },
   update(dt) {
     this.time += dt;
+    updateLife(dt, this.camera(), this.pos, this.camping);
     for (const m of log) m.age += dt;
     if (panelOpen()) return;
     // Gunther died (of old age, in the night): the heir takes over before anything else.
@@ -527,7 +530,10 @@ export const mapScene = {
     const W = view.W, H = view.H;
     ctx.fillStyle = '#2e80a0';
     ctx.fillRect(0, 0, W, H);
-    ctx.drawImage(terrainCanvas, Math.round(-cam.x), Math.round(-cam.y), WORLD_W, WORLD_H);
+    // The island as it looks this season; a new season fades in over its first two days.
+    const blend = seasonBlend();
+    ctx.drawImage(terrainLook(blend < 1 ? (season() + 3) % 4 : season()), Math.round(-cam.x), Math.round(-cam.y), WORLD_W, WORLD_H);
+    if (blend < 1) { ctx.globalAlpha = blend; ctx.drawImage(terrainLook(season()), Math.round(-cam.x), Math.round(-cam.y), WORLD_W, WORLD_H); ctx.globalAlpha = 1; }
     ctx.fillStyle = '#e4f4ee';
     for (const w of waves) {
       const sx = w.x - cam.x, sy = w.y - cam.y;
@@ -540,21 +546,29 @@ export const mapScene = {
     ctx.globalAlpha = 1;
     const onScreen = (x, y, m) => x - cam.x > -m && x - cam.x < W + m && y - cam.y > -m && y - cam.y < H + m;
 
+    drawGroundLife(cam, this.time, onScreen);
     // Everything standing on the map, drawn back to front.
-    const things = [];
+    const things = [], smokes = [];
+    const lit = nightAmount() > 0.5;
     for (const d of decor) {
       if (!onScreen(d.x, d.y, 60)) continue;
       things.push({ y: d.y, draw: () => {
         const x = d.x - cam.x, y = d.y - cam.y;
         shadow(x, y + 12, 16);
-        if (d.kind === 'tree') ctx.drawImage(img.trees, d.v * 16, 0, 16, 16, x - 24, y - 34, 48, 48);
-        else if (d.kind === 'rock') ctx.drawImage(img.rocks, d.v * 16, 0, 16, 16, x - 24, y - 30, 48, 48);
-        else ctx.drawImage(img.houses, d.v * 16, 16 + d.row * 16, 16, 16, x - 24, y - 30, 48, 48);
+        if (d.kind === 'tree') drawTree(x, y, d.v, this.time, d.h);
+        else if (d.kind === 'rock') drawRock(x, y, d.v, d.h);
+        else {
+          const st = game.sites[d.site.id], ruined = st.raided > 0 || st.burned > 0;
+          const chimney = drawHouse(x, y, peopleOf(d.site), d.v, d.row === 0, d.h, lit && !ruined);
+          if (chimney && !ruined && d.v !== 1) smokes.push(() => drawSmoke(chimney.x, chimney.y, this.time, d.h, false));
+        }
       } });
     }
+    lifeThings(things, cam, this.time, onScreen);
     for (const s of SETTLEMENTS) {
       if (!onScreen(s.x, s.y, 140)) continue;
-      things.push({ y: s.y, draw: () => this.drawSite(s, s.x - cam.x, s.y - cam.y) });
+      things.push({ y: s.y, draw: () => this.drawSite(s, s.x - cam.x, s.y - cam.y, lit) });
+      smokes.push(() => siteSmoke(s, s.x - cam.x, s.y - cam.y, this.time));
     }
     for (const p of game.parties) {
       if (!onScreen(p.x, p.y, 80)) continue;
@@ -568,7 +582,14 @@ export const mapScene = {
       drawBanner(x + 10, y - 66, FACTIONS.player.colour);
       text(String(troopCount() + 1), x + 14, y - 72, 14, '#fff', 'center');
     } });
+    // Camp: a tent and a fire beside him.
+    if (this.camping) {
+      things.push({ y: P.y - 6, draw: () => drawProp('campTent', P.x - cam.x - 40, P.y - cam.y + 2) });
+      things.push({ y: P.y + 8, draw: () => drawCampfire(P.x - cam.x + 34, P.y - cam.y + 8, this.time) });
+    }
     things.sort((a, b) => a.y - b.y).forEach(t => t.draw());
+    smokes.forEach(f => f());
+    drawSky(cam, P, this.time, onScreen);
     // Place names go on top of everything so trees and houses never hide them.
     for (const s of SETTLEMENTS) {
       if (!onScreen(s.x, s.y, 140)) continue;
@@ -595,7 +616,6 @@ export const mapScene = {
     }
     if (this.hover) this.drawTooltip(this.hover, cam);
     if (this.camping) {
-      ctx.fillStyle = 'rgba(10, 20, 40, 0.25)'; ctx.fillRect(0, 0, W, H);
       text('Camping... time passes', W / 2, H / 2 - 80, 22, '#ffe08a', 'center');
     }
     this.drawHud();
@@ -610,7 +630,7 @@ export const mapScene = {
     const r = this.bigMapRect();
     ctx.fillStyle = 'rgba(13, 11, 9, 0.7)'; ctx.fillRect(0, 0, view.W, view.H);
     frame(r.x, r.y, r.w, r.h);
-    ctx.drawImage(terrainCanvas, r.x, r.y, r.w, r.h);
+    ctx.drawImage(terrainLook(season()), r.x, r.y, r.w, r.h);
     const sx = r.w / WORLD_W, sy = r.h / WORLD_H;
     for (const s of SETTLEMENTS) {
       const x = r.x + s.x * sx, y = r.y + s.y * sy, big = s.kind === 'town' || s.kind === 'stronghold';
@@ -627,25 +647,23 @@ export const mapScene = {
     ctx.fillStyle = '#f2c14e'; ctx.fillRect(r.x + this.pos.x * sx - 3, r.y + this.pos.y * sy - 3, 6, 6);
     text(pointer.touch ? 'Tap a spot to travel there. Tap outside to close.' : 'Click a spot to travel there. M or click outside to close.', view.W / 2, r.y + r.h + 22, 13, '#c9bb9c', 'center');
   },
-  drawSite(s, x, y) {
+  drawSite(s, x, y, lit) {
     const st = game.sites[s.id];
     const f = FACTIONS[s.faction];
-    const orc = peopleOf(s) === 'orc';
-    if (orc && (s.kind === 'town' || s.kind === 'village')) {
-      // Orc places are hide tents round a fire, whoever holds them now.
-      const big = s.kind === 'town';
-      if (big) { ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - 100, y - 50, 72, 72); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x + 28, y - 50, 72, 72); }
-      ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - (big ? 52 : 40), y - (big ? 86 : 52), big ? 104 : 80, big ? 104 : 80);
-    } else if (s.kind === 'town') ctx.drawImage(img.keep, s.art * 32, 0, 32, 32, x - 56, y - 76, 112, 112);
-    else if (s.kind === 'village') { ctx.drawImage(img.houses, 0, 32, 16, 16, x - 24, y - 34, 48, 48); }
-    else if (s.kind === 'camp' || s.kind === 'stronghold') {
+    // A place keeps the look of the people who built it, whoever holds it now.
+    const people = peopleOf(s);
+    if (s.kind === 'town') { shadow(x, y + 34, 62); drawKeep(x, y, people, s.art, lit); }
+    else if (s.kind === 'village') {
+      if (people === 'orc') { shadow(x, y + 14, 34); drawTent(x, y + 18, true, 2); }
+      else { shadow(x, y + 12, 20); drawHouse(x, y, people, 1, true, 0.5, lit && !st.raided); }
+    } else if (s.kind === 'camp' || s.kind === 'stronghold') {
       const big = s.kind === 'stronghold';
       if (st.burned) {
         ctx.fillStyle = '#4a3e34'; ctx.beginPath(); ctx.ellipse(x, y + 4, 44, 18, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#2c2420'; ctx.fillRect(x - 18, y - 6, 12, 6); ctx.fillRect(x + 6, y - 2, 14, 5);
       } else {
-        if (big) { ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - 100, y - 50, 72, 72); ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x + 28, y - 50, 72, 72); }
-        ctx.drawImage(img['orc-tent'], 0, 0, 32, 32, x - (big ? 52 : 40), y - (big ? 86 : 52), big ? 104 : 80, big ? 104 : 80);
+        if (big) { drawTent(x - 64, y + 14, false, 2); drawTent(x + 64, y + 14, false, 2); }
+        drawTent(x, y + 20, true, big ? 3 : 2);
       }
     }
     drawBanner(x - 8, y - (s.kind === 'town' ? 104 : s.kind === 'stronghold' ? 112 : s.kind === 'camp' ? 80 : 62), f.colour);
@@ -694,7 +712,7 @@ export const mapScene = {
     if (!uiMin('minimap')) {
       const mm = this.minimap();
       frame(mm.x, mm.y, mm.w, mm.h);
-      ctx.drawImage(terrainCanvas, mm.x, mm.y, mm.w, mm.h);
+      ctx.drawImage(terrainLook(season()), mm.x, mm.y, mm.w, mm.h);
       const sx = mm.w / WORLD_W, sy = mm.h / WORLD_H;
       for (const s of SETTLEMENTS) {
         ctx.fillStyle = siteColour(s);
@@ -748,13 +766,8 @@ function partyColour(p) {
   return friendly(p.faction) ? '#7fb0ff' : '#e8e0cc';
 }
 
-const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
-const WEATHER = ['Clear skies', 'Clear skies', 'Overcast', 'Light rain', 'Windy', 'Morning fog'];
 function seasonText() {
-  const season = SEASONS[Math.floor((game.day - 1) / (YEAR_DAYS / 4)) % 4] + ', year ' + year();
-  let w = WEATHER[Math.floor(seeded(game.day * 7919 + 13)() * WEATHER.length)];
-  if (season.startsWith('Winter') && w === 'Light rain') w = 'Light snow';
-  return season + ' &middot; ' + w;
+  return SEASONS[season()] + ', year ' + year() + ' &middot; ' + weatherName();
 }
 // Renown turned into a level, so the HUD can show progress towards the next one.
 export function renownLevel() {
