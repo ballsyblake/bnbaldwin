@@ -3,11 +3,11 @@
 // is a quick lookup instead of maths every frame.
 
 import { noise, seeded, dist } from './core.js';
-import { WORLD_W, WORLD_H, SETTLEMENTS, ROADS, FACTIONS } from './data.js';
+import { WORLD_W, WORLD_H, WORLD_SCALE as K, SETTLEMENTS, ROADS, FACTIONS } from './data.js';
 
 export const PX = 3;                       // one terrain pixel = 3 world pixels, same chunkiness as the sprites
 const GW = WORLD_W / PX, GH = WORLD_H / PX;
-export const ISLAND = { x: 1800, y: 1250, rx: 1660, ry: 1060 };
+export const ISLAND = { x: 1800 * K, y: 1250 * K, rx: 1660 * K, ry: 1060 * K };
 
 // Ground types stored in the grid.
 export const T = { SEA: 0, SHALLOW: 1, BEACH: 2, GRASS: 3, FOREST: 4, HILLS: 5, ROAD: 6 };
@@ -25,14 +25,15 @@ export function shoreValue(x, y) {
   const dx = (x - ISLAND.x) / ISLAND.rx;
   const dy = (y - ISLAND.y) / ISLAND.ry;
   const angle = Math.atan2(dy, dx);
+  x /= K; y /= K;   // the coastline keeps its shape as the island grows
   const wobble = 0.08 * Math.sin(angle * 3 + 0.6) + 0.06 * Math.sin(angle * 5 + 2.1) +
     0.2 * (noise(x / 340, y / 340) - 0.5) + 0.07 * (noise(x / 110 + 17, y / 110 + 5) - 0.5);
   return Math.hypot(dx, dy) - wobble;
 }
 
 // Forests grow where this noise is high. Hills are mostly in the north.
-function forestValue(x, y) { return noise(x / 260 + 9, y / 260 + 3); }
-function hillValue(x, y) { return noise(x / 300 + 21, y / 300 + 30) * 0.7 + (1000 - y) / 1500; }
+function forestValue(x, y) { x /= K; y /= K; return noise(x / 260 + 9, y / 260 + 3); }
+function hillValue(x, y) { x /= K; y /= K; return noise(x / 300 + 21, y / 300 + 30) * 0.7 + (1000 - y) / 1500; }
 
 export function terrainAt(x, y) {
   if (!grid || x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return T.SEA;
@@ -125,7 +126,7 @@ export function buildTerrain() {
 
   // 4. Wave glints in the shallows.
   const wr = seeded(5);
-  for (let k = 0; k < 4000 && waves.length < 420; k++) {
+  for (let k = 0; k < 9000 && waves.length < 900; k++) {
     const x = wr() * WORLD_W, y = wr() * WORLD_H, v = shoreValue(x, y);
     if (v > 1.05 && v < 1.5) waves.push({ x, y, phase: wr() * Math.PI * 2 });
   }
@@ -141,8 +142,8 @@ export function buildTerrain() {
       if (SETTLEMENTS.some(s => dist(jx, jy, s.x, s.y) < 130)) continue;
       // Kinds of tree: 0 pine, 1 oak, 2 birch, 3 the silver trees of the elf woods. Pines keep to
       // the north and the hills, and each wood is mostly one kind.
-      const elfWood = SETTLEMENTS.some(s => (s.race || FACTIONS[s.faction].race) === 'elf' && dist(jx, jy, s.x, s.y) < 520);
-      const mix = noise(jx / 420 + 60, jy / 420 + 12) + (900 - jy) / 2600;
+      const elfWood = SETTLEMENTS.some(s => (s.race || FACTIONS[s.faction].race) === 'elf' && dist(jx, jy, s.x, s.y) < 520 * K);
+      const mix = noise(jx / 420 + 60, jy / 420 + 12) + (900 - jy / K) / 2600;
       const kind = elfWood && tr() < 0.7 ? 3 : (mix > 0.62 ? (tr() < 0.8 ? 0 : 2) : (mix > 0.4 ? (tr() < 0.75 ? 1 : 2) : (tr() < 0.6 ? 2 : 1)));
       const h = tr();
       if (t === T.FOREST && r < 0.72) decor.push({ x: jx, y: jy, kind: 'tree', v: kind, h });
