@@ -667,7 +667,7 @@ function afterBattle(foe, res) {
   // Rescued captives and grateful kingdoms.
   if (orcs && Math.random() < 0.55) {
     const n = Math.min(randInt(1, 3), partyLimit() - troopCount());
-    if (n > 0) { addTroops('recruit', n); tiles.push(tile('men', '+' + n, 'Freed captives', 'good')); }
+    if (n > 0) { addTroops('recruit', n); tiles.push(tile('men', '+' + n, 'Freed', 'good')); }
   }
   if (orcs) {
     let near = null, nd = Infinity;

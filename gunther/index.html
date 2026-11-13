@@ -234,10 +234,10 @@
     .dnav button { flex: 1 1 160px; margin: 0; } .dnav button.mini { flex: 0 0 auto; }
     @media (max-width: 520px) { .dface { width: 76px; } .dface img { width: 66px; height: 72px; } .dbody { min-height: 150px; gap: 10px; } .dtext { font-size: 0.95rem; } }
     .ic { width: 26px; height: auto; image-rendering: pixelated; vertical-align: middle; flex: none; }
-    .resgrid { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-    .res { background: var(--tile); padding: 8px 6px 6px; min-width: 76px; flex: 1 0 76px; display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 2px 8px; }
-    .res b { font: 700 1.25rem var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
-    .res span { grid-column: 1 / 3; text-align: center; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .resgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; margin: 10px 0; }
+    .res { background: var(--tile); padding: 8px 8px 6px; min-width: 0; display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 2px 8px; }
+    .res b { white-space: nowrap; font: 700 1.15rem var(--sans); color: var(--text); font-variant-numeric: tabular-nums; }
+    .res span { grid-column: 1 / 3; text-align: center; font-size: 0.64rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; line-height: 1.2; }
     .strip { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 8px 0; }
     .st { display: inline-flex; align-items: center; gap: 6px; }
     .st .ic { width: 20px; }
