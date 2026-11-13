@@ -936,9 +936,9 @@ export function openParty(msg, tab) {
     stat('gold', game.gold.toLocaleString('en-AU'), 'Gold', 'gold') + stat('food', days + 'd', 'Days of food', days < 2 ? 'bad' : '') +
     stat('morale', Math.round(game.morale), 'Morale', 'good') + stat('gold', '-' + wages() + '/wk', 'Wages each week', 'bad') + '</div>';
   const where = 'Near ' + nearestPlace(game.player.x, game.player.y);
-  showPanel(head + '<div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
+  showPanel('<div class="xbar"><button data-act="close" class="x" title="Close (P)" aria-label="Close">X</button></div>' + head + '<div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
     '<div class="rfoot">' + where + '</div>' +
-    '<button data-act="close" class="primary">Back to the map <span class="hk">P</span></button><button data-act="help" class="secondary">How to play</button><button data-act="title" class="secondary">Save and quit to title</button>', {
+    '<button data-act="title" class="secondary">Save and quit to title</button>', {
     tab: t => openParty('', t),
     pick: t => { rosterSel = t; openParty(); },
     dismiss: t => { if (game.troops[t] && game.troops[t].n > 0) { removeTroops(t, 1); save(); openParty('One ' + troopName(t, 1).toLowerCase() + ' was paid off and sent home.'); } },
@@ -957,7 +957,6 @@ export function openParty(msg, tab) {
     story: () => openPrologue(() => openParty('', 'gunther')),
     mortal: () => { game.battleDeath = !game.battleDeath; save(); openParty(game.battleDeath ? 'Captains can now die when struck down in battle.' : 'Captains struck down in battle will always recover. Old age still comes for everyone.'); },
     close: () => hidePanel(),
-    help: () => openHelp(() => openParty()),
     title: () => { save(); setScene(titleScene); }
   }, true);
 }
