@@ -360,7 +360,7 @@ export const battleScene = {
     // The camera eases after Gunther; the pointer is turned from screen to field coordinates.
     const ct = this.camTarget(), ce = Math.min(1, dt * 6);
     this.cam.x += (ct.x - this.cam.x) * ce; this.cam.y += (ct.y - this.cam.y) * ce;
-    const mx = pointer.x + this.cam.x, my = pointer.y + this.cam.y;
+    const aimX = pointer.x + this.cam.x, aimY = pointer.y + this.cam.y;
     this.tap = pointer.tap ? { x: pointer.tap.x + this.cam.x, y: pointer.tap.y + this.cam.y } : null; pointer.tap = null;
     if (!H.dead && !this.over) {
       let mx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
@@ -379,7 +379,7 @@ export const battleScene = {
         const o = this.nearestFoe(H, sword ? 160 : 520);
         if (this.tap) this.aim = Math.atan2(this.tap.y - (H.y - 26), this.tap.x - H.x);
         else if (o) this.aim = Math.atan2(o.y - 16 - (H.y - 26), o.x - H.x);
-      } else this.aim = Math.atan2(my - (H.y - 26), mx - H.x);
+      } else this.aim = Math.atan2(aimY - (H.y - 26), aimX - H.x);
       H.flip = Math.cos(this.aim) < 0;
       if (sword) this.updateSword(dt); else this.updateBow(dt);
     }
