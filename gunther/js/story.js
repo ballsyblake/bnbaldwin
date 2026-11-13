@@ -43,7 +43,7 @@ function placeFoe(st) {
   const ax = P.x + (st.dx || 0), ay = P.y + (st.dy || 0), r = st.spread || 150;
   const spec = st.party;
   const p = spawnParty(spec.faction, 'story', spec.name, Object.assign({}, spec.troops), ax + rand(-r, r), ay + rand(-r, r),
-    { story: chapter().id, quest: true, anchor: { x: ax, y: ay }, desc: spec.desc, gold: 150 });
+    { story: chapter().id, quest: true, anchor: { x: ax, y: ay }, desc: spec.desc, gold: 80 });
   // An ambush comes for Gunther at once; the others wait where the story put them.
   if (st.at === 'player') { p.hunt = true; note(spec.name + ' are coming for you!', '#ff6a5a'); }
   return p;

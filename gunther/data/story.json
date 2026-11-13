@@ -21,7 +21,8 @@
   },
   "chapters": [
     {
-      "id": "ledger", "short": "Ask about the Wall Tithe in Fairmeet.",
+      "id": "ledger",
+      "short": "Ask about the Wall Tithe in Fairmeet.",
       "title": "Where the tithe goes",
       "goal": "Ask about the Wall Tithe in Fairmeet. The free city keeps no tithe-wardens, so people talk there.",
       "step": {
@@ -40,7 +41,8 @@
       }
     },
     {
-      "id": "runners", "short": "Take the chest from the tithe-runners near Gutrot Camp.",
+      "id": "runners",
+      "short": "Take the chest from the tithe-runners near Gutrot Camp.",
       "title": "The tithe-runners",
       "goal": "Find the orc tithe-runners near Gutrot Camp and take the chest they carry. They are marked with ! on the map.",
       "step": {
@@ -51,8 +53,9 @@
           "name": "Tithe-runners",
           "faction": "compact",
           "troops": {
-            "grunt": 6,
-            "brute": 1
+            "grunt": 10,
+            "brute": 3,
+            "shaman": 3
           },
           "desc": "Clan orcs hauling an iron-bound chest north to Skullrock, with no banner. They do not want to be seen."
         }
@@ -81,22 +84,23 @@
           "flag": "kept",
           "text": "Your men cheer when you share it out. Hob says nothing, but he writes something in his ledger.",
           "reward": {
-            "gold": 400
+            "gold": 250
           }
         }
       ]
     },
     {
-      "id": "name", "short": "See Mother Quill, the forger in Brightwater.",
+      "id": "name",
+      "short": "See Mother Quill, the forger in Brightwater.",
       "title": "A borrowed name",
-      "goal": "Hob says the burnt leaf belongs to the Ashen Compact, a circle of highborn houses that meets in secret. To get inside it, you need a highborn name. Find Mother Quill, the forger in Brightwater. You will need to be known (renown 30) and to pay her 250 gold.",
+      "goal": "Hob says the burnt leaf belongs to the Ashen Compact, a circle of highborn houses that meets in secret. To get inside it, you need a highborn name. Find Mother Quill, the forger in Brightwater. You will need to be known (renown 40) and to pay her 400 gold.",
       "step": {
         "type": "visit",
         "place": "brightwater",
         "button": "Visit Mother Quill the forger",
         "needs": {
-          "renown": 30,
-          "gold": 250
+          "renown": 40,
+          "gold": 400
         }
       },
       "scene": [
@@ -105,11 +109,12 @@
         "The writ she hands you is better than real. Hob reads it twice. \"Good. Now, the Compact only takes new blood one way: the Proving at the Highcrag. Each year the young heirs bring their retinues to the hills and fight until one is left standing. The winner gets a seat at the table. They have one rule, and it is not much of a rule: try not to kill each other.\""
       ],
       "reward": {
-        "spend": 250
+        "spend": 400
       }
     },
     {
-      "id": "proving", "short": "Beat Leofric Crane's retinue at the Highcrag, west of Stonefold.",
+      "id": "proving",
+      "short": "Beat Leofric Crane's retinue at the Highcrag, west of Stonefold.",
       "title": "The Proving",
       "goal": "Win the Proving at the Highcrag, in the hills west of Stonefold. Leofric Crane, son of the Compact's chancellor, is the favourite. His retinue is marked with ! on the map.",
       "step": {
@@ -122,9 +127,9 @@
           "name": "Leofric Crane's retinue",
           "faction": "compact",
           "troops": {
-            "knight": 2,
-            "spearman": 6,
-            "ranger": 2,
+            "knight": 5,
+            "spearman": 10,
+            "ranger": 5,
             "recruit": 4
           },
           "desc": "Highborn heirs and their sworn men, here for the Proving. Leofric Crane rides at the front in silvered mail."
@@ -161,13 +166,17 @@
       }
     },
     {
-      "id": "table", "short": "Go to Redcliff and stand before the Ashen Compact.",
+      "id": "table",
+      "short": "Go to Redcliff and stand before the Ashen Compact.",
       "title": "Among wolves",
-      "goal": "As victor of the Proving, you are summoned before the Ashen Compact. Go to Redcliff.",
+      "goal": "As victor of the Proving, you are summoned before the Ashen Compact. Go to Redcliff. The Compact only receives captains of name (renown 80).",
       "step": {
         "type": "visit",
         "place": "redcliff",
-        "button": "Answer the Compact's summons"
+        "button": "Answer the Compact's summons",
+        "needs": {
+          "renown": 80
+        }
       },
       "scene": [
         {
@@ -188,7 +197,7 @@
           "flag": "sworn",
           "text": "You swear. The seal is cold in your palm. On the road north the tithe silver passes through your hands, and the Compact pays you a carrier's cut.",
           "reward": {
-            "gold": 300
+            "gold": 200
           }
         },
         {
@@ -202,7 +211,8 @@
       ]
     },
     {
-      "id": "rouse", "short": "Read Gorrak's letter in three villages.",
+      "id": "rouse",
+      "short": "Read Gorrak's letter in three villages.",
       "title": "Rouse the bondfolk",
       "goal": "Hob wants the villages to know the truth before the Compact can silence it. Read Gorrak's letter aloud in the squares of three villages. Each one will send you men.",
       "step": {
@@ -229,7 +239,8 @@
       ]
     },
     {
-      "id": "unmasked", "short": "Survive the Compact's swords.",
+      "id": "unmasked",
+      "short": "Survive the Compact's swords.",
       "title": "Unmasked",
       "goal": "The Compact knows who you are. Its swords are coming for you. Survive them.",
       "step": [
@@ -242,10 +253,10 @@
             "name": "Leofric Crane's riders",
             "faction": "compact",
             "troops": {
-              "knight": 3,
-              "spearman": 6,
-              "ranger": 3,
-              "bowman": 4
+              "knight": 6,
+              "spearman": 10,
+              "ranger": 6,
+              "bowman": 6
             },
             "desc": "Leofric Crane, whose life you spared at the Highcrag, leads them. He looks sick about it."
           }
@@ -258,10 +269,10 @@
             "name": "The Chancellor's huntsmen",
             "faction": "compact",
             "troops": {
-              "knight": 3,
-              "spearman": 6,
-              "ranger": 3,
-              "bowman": 4
+              "knight": 6,
+              "spearman": 10,
+              "ranger": 6,
+              "bowman": 6
             },
             "desc": "Aurek Crane's household guard, sworn to avenge his son."
           }
@@ -285,15 +296,16 @@
       }
     },
     {
-      "id": "moot", "short": "Recover Hob's ledger in Fairmeet.",
+      "id": "moot",
+      "short": "Recover Hob's ledger in Fairmeet.",
       "title": "The Red Ledger",
-      "goal": "Recover Hob's ledger in Fairmeet and read it before the Guildmoot.",
+      "goal": "Recover Hob's ledger in Fairmeet and read it before the Guildmoot. The Guildmoot will only hear a captain the whole island knows (renown 140).",
       "step": {
         "type": "visit",
         "place": "fairmeet",
         "button": "Read the Red Ledger to the Guildmoot",
         "needs": {
-          "renown": 60
+          "renown": 140
         }
       },
       "scene": [
@@ -317,7 +329,8 @@
       }
     },
     {
-      "id": "host", "short": "Defeat the Ashen Host near Redcliff.",
+      "id": "host",
+      "short": "Defeat the Ashen Host near Redcliff.",
       "title": "The Ashen Host",
       "goal": "Defeat Chancellor Aurek Crane and the Ashen Host near Redcliff. It is the strongest army on the island. Gather your men first.",
       "step": {
@@ -330,11 +343,11 @@
           "name": "The Ashen Host",
           "faction": "compact",
           "troops": {
-            "knight": 6,
-            "spearman": 12,
-            "ranger": 4,
-            "bowman": 4,
-            "brute": 4
+            "knight": 14,
+            "spearman": 20,
+            "ranger": 10,
+            "bowman": 10,
+            "brute": 8
           },
           "desc": "The households of the Ashen Compact and their hired orcs, under the burnt-leaf banner. Chancellor Aurek Crane rides in the middle of them."
         }

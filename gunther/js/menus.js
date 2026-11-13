@@ -4,11 +4,11 @@
 
 import { showPanel, hidePanel, panelOpen, onKeyPress, overlay, setScene, rand, randInt, pick, dist, esc, clamp } from './core.js';
 import { portrait } from './sprites.js';
-import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RACES, MODS, deviceMods, saveDeviceMods } from './data.js';
+import { TROOPS, GOODS, SETTLEMENTS, FACTIONS, KINGDOMS, ORC_CHIEFS, SKILLS, RACES, MODS, deviceMods, saveDeviceMods, RULES } from './data.js';
 import {
   game, save, newGame, hasSave, loadSave, note, site, troopCount, partyLimit, addTroops, removeTroops, strength,
   playerStrength, playerFit, guntherPower, wages, foodStock, foodPerDay, cargo, cargoLimit, hostile, changeRelation, relationWord,
-  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName,
+  buyPrice, sellPrice, nudgePrice, dailyTick, lootFor, campGarrison, troopName, smithCost, smithRenown,
   skill, trainSkill, lord, lordState, remember, chronicle, prisonerCount, prisonerLimit,
   enemiesOf, alliesOf, anyWar, warsText, recruitType
 } from './state.js';
@@ -436,18 +436,24 @@ function completeQuest(q) {
 
 // ---------------------------------------------------------------- smith
 function openSmith(s, msg) {
-  const bowCost = 40 * game.bowLevel, armourCost = 50 * game.armourLevel;
-  const bowMax = game.bowLevel >= 8;
-  const swordCost = 45 * game.swordLevel, swordMax = game.swordLevel >= 8;
+  // One row per piece of kit: its level, then the price and the renown the smith asks for.
+  const row = (kind, name, key, max) => {
+    const lv = game[key];
+    if (max && lv >= max) return '<button disabled>' + name + ' <span class="num">' + lv + '</span> <span class="hk">finest on the island</span></button>';
+    const cost = smithCost(kind, lv), need = smithRenown(lv), ok = game.gold >= cost && game.renown >= need;
+    return '<button data-act="buy" data-arg="' + kind + '"' + (ok ? '' : ' disabled') + '>' + name + ' <span class="num">' + lv + ' &rarr; ' + (lv + 1) + '</span><span class="hk">' +
+      stat('gold', cost, 'Price', game.gold < cost ? 'bad' : 'gold') + (need ? stat('renown', need, 'Renown needed', game.renown < need ? 'bad' : '') : '') + '</span></button>';
+  };
   showPanel('<h2>Smith</h2>' + statusLine() + (msg ? '<p class="msg">' + msg + '</p>' : '') +
-    '<p>Bow level ' + game.bowLevel + ', sword level ' + game.swordLevel + ', armour level ' + game.armourLevel + '.</p>' +
-    '<button data-act="armour"' + (game.gold < armourCost ? ' disabled' : '') + '>Better armour: +25 health, less damage (' + armourCost + ' gold)</button>' +
-    (bowMax ? '<button disabled>Your bow is the finest on the island</button>' : '<button data-act="bow"' + (game.gold < bowCost ? ' disabled' : '') + '>Better bow: faster draw, harder hitting (' + bowCost + ' gold)</button>') +
-    (swordMax ? '<button disabled>Your sword is the finest on the island</button>' : '<button data-act="sword"' + (game.gold < swordCost ? ' disabled' : '') + '>Better sword: harder blows (' + swordCost + ' gold)</button>') +
+    row('bow', 'Bow', 'bowLevel', 8) + row('sword', 'Sword', 'swordLevel', 8) + row('armour', 'Armour', 'armourLevel', 10) +
     '<button data-act="back" class="secondary">Back</button>', {
-    armour: () => { game.gold -= armourCost; game.armourLevel++; game.maxHealth += 25; game.health = game.maxHealth; openSmith(s, 'The smith fits new plates. You feel sturdier.'); },
-    bow: () => { game.gold -= bowCost; game.bowLevel++; openSmith(s, 'The bowyer hands you a stronger bow.'); },
-    sword: () => { game.gold -= swordCost; game.swordLevel++; openSmith(s, 'The smith hands you a better-balanced blade.'); },
+    buy: kind => {
+      const key = kind + 'Level';
+      game.gold -= smithCost(kind, game[key]); game[key]++;
+      if (kind === 'armour') { game.maxHealth += 25; game.health = game.maxHealth; }
+      save();
+      openSmith(s, { bow: 'A stronger bow.', sword: 'A better blade.', armour: 'New plates: +25 health.' }[kind]);
+    },
     back: () => openSettlement(s)
   });
 }
@@ -630,8 +636,9 @@ function afterBattle(foe, res) {
       if (hostile(p.faction, foe.party.faction)) { remember(p.lord, 'Gunther fought ' + foe.party.name + ' near ' + nearestPlace(p.x, p.y), 8); lines.push(lord(p.lord).name + ' saw you fight.'); }
     }
   }
-  let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * 4 + (foe.siege ? 220 : 60));
-  const renown = Math.max(1, Math.round(enemyPower / 5));
+  let gold = foe.party ? lootFor(enemyTroops, foe.party.kind) + (foe.party.gold || 0) : Math.round(enemyPower * RULES.siteLootPerPower + (foe.siege ? 150 : 40));
+  // Renown comes from beating your equals or betters; routing a handful of outlaws earns almost none.
+  const renown = Math.max(enemyPower > 8 ? 1 : 0, Math.round(enemyPower * RULES.renownPerPower * clamp(enemyPower / Math.max(1, playerStrength()), 0.25, 1.5)));
   game.gold += gold; game.renown += renown;
   game.morale = clamp(game.morale + 8, 0, 100);
   tiles.unshift(tile('slain', slain, 'Slain'), tile('gold', '+' + gold, 'Loot', 'gold'), tile('renown', '+' + renown, 'Renown'));
@@ -863,7 +870,7 @@ function rosterHtml() {
     det = '<div class="kind">' + ROLE(t) + ' &middot; ' + st.n + ' in the warband</div><h3>' + d.name + '</h3>' +
       (st.wounded ? '<p class="bad">' + st.wounded + ' wounded, they will not fight until they heal.</p>' : '') +
       '<div class="sg">' + stat(d.ranged ? 'Ranged' : 'Melee', d.dmg) + stat('Health', d.hp) + stat('Armour', Math.round((d.armour || 0) * 100) + '%') + stat('Shield', Math.round((d.shield || 0) * 100) + '%') + stat('Speed', d.speed) +
-      stat('Range', d.ranged ? d.range : 'Close') + stat('Upkeep', d.wage + 'g/wk') + '</div>' +
+      stat('Range', d.ranged ? d.range : 'Close') + stat('Upkeep', Math.round(d.wage * RULES.wageScale) + 'g/wk') + '</div>' +
       (need ? '<p class="lbl">Experience</p><div class="meter"><i style="width:' + Math.min(100, Math.round(st.xp / need * 100)) + '%;background:var(--gold)"></i></div><p class="small">' + Math.min(st.xp, need) + ' / ' + need + ' xp to train one man</p>' : '<p class="small">Fully trained.</p>') +
       ups + '<button data-act="dismiss" data-arg="' + t + '" class="secondary">Dismiss one</button>';
   }
