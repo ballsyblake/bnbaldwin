@@ -155,6 +155,7 @@ function think(p) {
   let threat = null, prey = null, threatD = Infinity, preyD = Infinity;
   for (const o of game.parties.concat([player])) {
     if (o === p || !enemies(p, o)) continue;
+    if (p.story && o.id === 'player') continue;   // story foes wait for Gunther to come to them
     const d = dist(p.x, p.y, o.x, o.y);
     if (d > SIGHT) continue;
     const them = partyStrength(o);

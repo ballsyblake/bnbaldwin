@@ -39,7 +39,12 @@ export function storyTick() {
   if (!s.offered && game.day >= STORY.startDay && !panelOpen()) { s.offered = true; openPrologue(); return; }
   if (s.pending && !panelOpen()) { s.pending = false; openScene(); return; }
   const st = step();
-  if (st && st.type === 'defeat' && !game.parties.some(p => p.story === chapter().id)) placeFoe(st);
+  if (st && st.type === 'defeat') {
+    const foe = game.parties.find(p => p.story === chapter().id);
+    if (!foe) placeFoe(st);
+    // A foe placed by an older, harsher version of the story is cut back to what the story now says.
+    else for (const t in foe.troops) if (foe.troops[t] > (st.party.troops[t] || 0)) { foe.troops[t] = st.party.troops[t] || 0; if (!foe.troops[t]) delete foe.troops[t]; }
+  }
 }
 
 function placeFoe(st) {
