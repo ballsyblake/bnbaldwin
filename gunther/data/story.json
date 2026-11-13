@@ -21,7 +21,7 @@
   },
   "chapters": [
     {
-      "id": "ledger",
+      "id": "ledger", "short": "Ask about the Wall Tithe in Fairmeet.",
       "title": "Where the tithe goes",
       "goal": "Ask about the Wall Tithe in Fairmeet. The free city keeps no tithe-wardens, so people talk there.",
       "step": {
@@ -40,7 +40,7 @@
       }
     },
     {
-      "id": "runners",
+      "id": "runners", "short": "Take the chest from the tithe-runners near Gutrot Camp.",
       "title": "The tithe-runners",
       "goal": "Find the orc tithe-runners near Gutrot Camp and take the chest they carry. They are marked with ! on the map.",
       "step": {
@@ -87,7 +87,7 @@
       ]
     },
     {
-      "id": "name",
+      "id": "name", "short": "See Mother Quill, the forger in Brightwater.",
       "title": "A borrowed name",
       "goal": "Hob says the burnt leaf belongs to the Ashen Compact, a circle of highborn houses that meets in secret. To get inside it, you need a highborn name. Find Mother Quill, the forger in Brightwater. You will need to be known (renown 30) and to pay her 250 gold.",
       "step": {
@@ -109,7 +109,7 @@
       }
     },
     {
-      "id": "proving",
+      "id": "proving", "short": "Beat Leofric Crane's retinue at the Highcrag, west of Stonefold.",
       "title": "The Proving",
       "goal": "Win the Proving at the Highcrag, in the hills west of Stonefold. Leofric Crane, son of the Compact's chancellor, is the favourite. His retinue is marked with ! on the map.",
       "step": {
@@ -161,7 +161,7 @@
       }
     },
     {
-      "id": "table",
+      "id": "table", "short": "Go to Redcliff and stand before the Ashen Compact.",
       "title": "Among wolves",
       "goal": "As victor of the Proving, you are summoned before the Ashen Compact. Go to Redcliff.",
       "step": {
@@ -202,7 +202,7 @@
       ]
     },
     {
-      "id": "rouse",
+      "id": "rouse", "short": "Read Gorrak's letter in three villages.",
       "title": "Rouse the bondfolk",
       "goal": "Hob wants the villages to know the truth before the Compact can silence it. Read Gorrak's letter aloud in the squares of three villages. Each one will send you men.",
       "step": {
@@ -229,7 +229,7 @@
       ]
     },
     {
-      "id": "unmasked",
+      "id": "unmasked", "short": "Survive the Compact's swords.",
       "title": "Unmasked",
       "goal": "The Compact knows who you are. Its swords are coming for you. Survive them.",
       "step": [
@@ -285,7 +285,7 @@
       }
     },
     {
-      "id": "moot",
+      "id": "moot", "short": "Recover Hob's ledger in Fairmeet.",
       "title": "The Red Ledger",
       "goal": "Recover Hob's ledger in Fairmeet and read it before the Guildmoot.",
       "step": {
@@ -317,7 +317,7 @@
       }
     },
     {
-      "id": "host",
+      "id": "host", "short": "Defeat the Ashen Host near Redcliff.",
       "title": "The Ashen Host",
       "goal": "Defeat Chancellor Aurek Crane and the Ashen Host near Redcliff. It is the strongest army on the island. Gather your men first.",
       "step": {

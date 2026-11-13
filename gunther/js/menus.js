@@ -842,10 +842,10 @@ function rosterHtml() {
   let det;
   const stat = (a, b) => '<div><span>' + a + '</span><b>' + b + '</b></div>';
   if (rosterSel === 'gunther') {
-    det = '<div class="kind">Captain &middot; Level ' + lv + ' &middot; Age ' + heroAge() + '</div><h3>' + esc(game.hero.name) + '</h3><p>Leads from the front with bow and sword. Renown ' + game.renown + '.</p>' +
+    det = '<div class="kind">Captain &middot; Level ' + lv + ' &middot; Age ' + heroAge() + '</div><h3>' + esc(game.hero.name) + '</h3>' +
       '<div class="sg">' + stat('Health', Math.ceil(game.health) + '/' + game.maxHealth) + stat('Bow', game.bowLevel) + stat('Armour', game.armourLevel) + stat('Archery', skill('archery')) +
       stat('Bladework', skill('blade')) + stat('Sword', game.swordLevel) + stat('Leadership', skill('leadership')) + '</div>' +
-      '<p class="lbl">Kit</p><p>Hunting bow (level ' + game.bowLevel + '), arming sword and shield (level ' + game.swordLevel + '), armour (level ' + game.armourLevel + '). Upgrade them at a town smith.</p>';
+      '<p class="small">Upgrade kit at a town smith.</p>';
   } else {
     const t = rosterSel, st = game.troops[t], d = TROOPS[t];
     let ups = '';
@@ -869,18 +869,19 @@ let partyTab = 'troops';
 export function openParty(msg, tab) {
   partyShownAt = performance.now();
   if (tab) partyTab = tab;
-  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Roster', gunther: 'Captain and family', world: 'The island' }[t] + '</button>').join('');
+  const tabs = ['troops', 'gunther', 'world'].map(t => '<button class="tab' + (partyTab === t ? ' on' : '') + '" data-act="tab" data-arg="' + t + '">' + { troops: 'Roster', gunther: 'Captain', world: 'The island' }[t] + '</button>').join('');
   let body = '';
   if (partyTab === 'troops') {
     body = rosterHtml() + '<h3>Prisoners</h3>' + prisonersSection();
   } else if (partyTab === 'gunther') {
     const quests = game.quests.map(q => '<li>' + esc(q.title) + ' &middot; ' + plural(Math.max(0, q.deadline - game.day), 'day') + ' left &middot; ' + q.reward + ' gold</li>').join('');
-    body = '<p class="stats">Health ' + Math.ceil(game.health) + '/' + game.maxHealth + ' &middot; Bow ' + game.bowLevel + ' &middot; Armour ' + game.armourLevel + ' &middot; Renown ' + game.renown + '</p>' +
+    const tile = (a, b) => '<div><span>' + a + '</span><b>' + b + '</b></div>';
+    body = '<div class="sg">' + tile('Health', Math.ceil(game.health) + ' / ' + game.maxHealth) + tile('Renown', game.renown) + tile('Age', heroAge()) + tile('Bow', game.bowLevel) + tile('Sword', game.swordLevel) + tile('Armour', game.armourLevel) + '</div>' +
       journalHtml() +
-      '<h3>Quests</h3>' + (quests ? '<ul class="left">' + quests + '</ul>' : '<p class="small">No work taken. Ask in any town tavern.</p>') +
-      '<p>' + contractLine() + '</p>' + familySection() +
+      '<h3>Quests</h3>' + (quests ? '<ul class="left">' + quests + '</ul>' : '<p class="small">None. Ask in a tavern.</p>') +
+      '<h3>Service</h3><p>' + contractLine() + '</p>' + familySection() +
       '<h3>Skills</h3>' + skillsTable() +
-      '<p class="small">Day ' + game.day + ' &middot; Battles won ' + game.stats.won + ', lost ' + game.stats.lost + ' &middot; Orcs slain ' + game.stats.orcsSlain + ' &middot; Camps burned ' + game.stats.campsBurned + '</p>';
+      '<p class="small">Battles won ' + game.stats.won + ', lost ' + game.stats.lost + '</p>';
   } else {
     let realms = '';
     for (const k of KINGDOMS.concat('free')) {
@@ -896,7 +897,7 @@ export function openParty(msg, tab) {
   const head = '<div class="rhead"><h2>Gunther\'s Warband</h2><span class="small">' + troopCount() + ' / ' + partyLimit() + ' men</span>' +
     '<span class="chip">Gold<b class="gold">' + game.gold.toLocaleString('en-AU') + '</b></span><span class="chip">Food<b>' + days + ' days</b></span>' +
     '<span class="chip">Morale<b class="good">' + Math.round(game.morale) + '</b></span><span class="chip">Wages<b class="bad">-' + wages() + ' / wk</b></span></div>';
-  const where = 'Near ' + nearestPlace(game.player.x, game.player.y) + (game.contract ? ' &middot; ' + contractLine() : '') + (game.quests[0] ? ' &middot; Quest: ' + esc(game.quests[0].title) + ' (' + plural(Math.max(0, game.quests[0].deadline - game.day), 'day') + ' left)' : '');
+  const where = 'Near ' + nearestPlace(game.player.x, game.player.y);
   showPanel(head + '<div class="tabs">' + tabs + '</div>' + (msg ? '<p class="msg">' + msg + '</p>' : '') + body +
     '<div class="rfoot">' + where + '</div>' +
     '<button data-act="close" class="primary">Back to the map <span class="hk">P</span></button><button data-act="help" class="secondary">How to play</button><button data-act="title" class="secondary">Save and quit to title</button>', {
@@ -926,15 +927,14 @@ export function openParty(msg, tab) {
 // Gunther's family: spouse, children, the heir, and the captains who came before.
 function familySection() {
   const h = game.hero, sp = game.spouse;
-  let html = '<h3>Family</h3><p>' + esc(h.name) + ', aged ' + heroAge() + (h.gen > 1 ? ', captain since day ' + h.since + ' (' + (['', 'first', 'second', 'third', 'fourth', 'fifth'][h.gen] || h.gen + 'th') + ' of the line)' : '') + '. ' +
-    (sp ? 'Married to ' + esc(sp.name) + ', kin of ' + esc(lord(sp.from).name) + '.' : 'Unmarried. A lord who thinks well of you may offer a match: ask in their kingdom\'s hall.') + '</p>';
+  let html = '<h3>Family</h3><p>' + (sp ? 'Married to ' + esc(sp.name) + ', kin of ' + esc(lord(sp.from).name) + '.' : 'Unmarried.') +
+    (h.gen > 1 ? ' ' + (['', 'First', 'Second', 'Third', 'Fourth', 'Fifth'][h.gen] || h.gen + 'th') + ' of the line.' : '') + '</p>';
   if (game.children.length) html += '<ul class="left">' + game.children.map(c => '<li>' + esc(c.first) + ', ' + (c.sex === 'm' ? 'son' : 'daughter') + ', age ' + ageOf(c.born) +
     (ageOf(c.born) >= RACES.human.adult ? ' <span class="good">(of age)</span>' : '') + ' &middot; knack for ' + SKILLS[c.talent].name + '</li>').join('') + '</ul>';
   const heir = adultHeirs()[0];
-  html += '<p class="small">Heir: ' + (heir ? esc(heir.first) + ' Gunther.' : 'none of age. If you die, a cousin takes over, and more of your men will leave.') +
-    ' Chance of dying when struck down in a lost battle: ' + Math.round(deathChance(true) * 100) + '%.</p>' +
-    '<button class="mini secondary" data-act="mortal">Death in battle: ' + (game.battleDeath ? 'on' : 'off') + '</button>';
-  if (game.dynasty.length) html += '<p class="small">Before you: ' + game.dynasty.map(d => esc(d.name) + ' (' + d.cause.replace(/ near .*/, '') + ' at ' + d.age + ', day ' + d.to + ')').join('; ') + '.</p>';
+  html += '<div class="rhead"><span class="chip">Heir<b>' + (heir ? esc(heir.first) : 'None') + '</b></span>' +
+    '<button class="mini secondary" data-act="mortal">Death in battle: ' + (game.battleDeath ? 'on <span class="num">' + Math.round(deathChance(true) * 100) + '%</span>' : 'off') + '</button></div>';
+  if (game.dynasty.length) html += '<details><summary>Before you</summary><p class="small">' + game.dynasty.map(d => esc(d.name) + ' (' + d.cause.replace(/ near .*/, '') + ' at ' + d.age + ', day ' + d.to + ')').join('; ') + '.</p></details>';
   return html;
 }
 

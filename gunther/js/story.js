@@ -201,15 +201,16 @@ function give(r, s) {
 export function journalHtml() {
   const s = game.story;
   if (!s.on) return '<h3>' + esc(STORY.title) + '</h3><p>' + esc(STORY.about) + '</p><button class="mini" data-act="story">Begin the story</button>';
-  const done = STORY.chapters.slice(0, s.ch).map((c, i) => '<li class="small">' + (i + 1) + '. ' + esc(c.title) + '</li>').join('');
-  const c = chapter();
-  let now = '';
-  if (c) {
-    const st = step();
-    let extra = '';
-    if (st.type === 'visits') extra = ' (' + s.visited.length + ' of ' + st.count + ' done)';
-    const why = st.type === 'visit' ? unmet(st.needs) : null;
-    now = '<li><b>' + (s.ch + 1) + '. ' + esc(c.title) + '</b><br>' + esc(c.goal) + extra + (why ? ' <span class="warn">(' + esc(why) + ')</span>' : '') + '</li>';
-  }
-  return '<h3>Story: ' + esc(STORY.title) + '</h3><ul class="left">' + done + now + '</ul>' + (s.done ? '<p class="good">' + esc(STORY.ending) + '</p>' : '');
+  // One line for what to do now. The full telling is a tap away, for anyone who wants it.
+  const c = chapter(), total = STORY.chapters.length;
+  const head = '<h3>Story <span class="count">' + Math.min(s.ch + 1, total) + ' / ' + total + '</span></h3>';
+  if (!c) return head + '<p class="good">' + esc(STORY.title) + ': finished.</p>';
+  const st = step();
+  let chips = '';
+  if (st.type === 'visits') chips += '<span class="chip">Villages<b>' + s.visited.length + ' / ' + st.count + '</b></span>';
+  const n = st.type === 'visit' && st.needs;
+  if (n && n.renown) chips += '<span class="chip">Renown<b class="' + (game.renown < n.renown ? 'bad' : 'good') + '">' + game.renown + ' / ' + n.renown + '</b></span>';
+  if (n && n.gold) chips += '<span class="chip">Gold<b class="' + (game.gold < n.gold ? 'bad' : 'good') + '">' + n.gold + '</b></span>';
+  return head + '<p class="goal"><b>' + esc(c.title) + '</b> ' + esc(c.short || c.goal) + '</p>' + (chips ? '<div class="rhead">' + chips + '</div>' : '') +
+    (c.short ? '<details><summary>More</summary><p class="small">' + esc(c.goal) + '</p></details>' : '');
 }

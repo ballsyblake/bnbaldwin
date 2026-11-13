@@ -176,9 +176,11 @@ export function skillsTable() {
   let rows = '';
   for (const k in SKILLS) {
     const pct = Math.round(skillProgress(k) * 100);
-    rows += '<tr><td>' + SKILLS[k].name + '</td><td>' + skill(k) + '</td><td><span class="meter"><span style="width:' + pct + '%"></span></span></td><td class="small">Grows by ' + SKILLS[k].how + '. ' + SKILLS[k].effect + '.</td></tr>';
+    const tip = 'Grows by ' + SKILLS[k].how + '. ' + SKILLS[k].effect + '.';
+    rows += '<div title="' + tip + '"><span>' + SKILLS[k].name + '</span><b>' + skill(k) + '</b><span class="meter"><i style="width:' + pct + '%;background:var(--gold)"></i></span></div>';
   }
-  return '<table><tr><th>Skill</th><th>Lv</th><th></th><th></th></tr>' + rows + '</table>';
+  // Skills grow by using them; what each one does is in How to play.
+  return '<div class="skills">' + rows + '</div>';
 }
 
 export function prisonersSection() {
@@ -208,7 +210,7 @@ export function contractLine() {
   const c = game.contract;
   if (!c) {
     const held = heldSites();
-    return (held.length ? 'You serve no one and hold ' + held.map(h => h.name).join(', ') + ' in your own name (' + fiefRent() + ' gold a day). ' : 'You serve no one. ') + 'Kingdom halls hire mercenaries.';
+    return (held.length ? 'You serve no one and hold ' + held.map(h => h.name).join(', ') + ' (' + fiefRent() + ' gold a day).' : 'You serve no one.');
   }
   if (c.kind === 'merc') return 'Mercenary of ' + FACTIONS[c.faction].name + ', paid ' + contractPay() + ' gold a day.';
   const held = heldSites();
