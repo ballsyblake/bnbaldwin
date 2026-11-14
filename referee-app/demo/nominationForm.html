@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86"/>
+        <title>NCF Team Nomination</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <link rel="stylesheet" href="css/main.css">
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+    </head>
+    <body>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+        </ul>
+        <div class="main" id="nominationFormMain">
+            <div class="nominationForm">
+                <h1>NCF Team Nomination Form</h1>
+                <form>
+                    <fieldset class="col-adjust">
+                        <legend>Team Information</legend>
+                        <input required type="text" id="nameTeam" name="nameTeam" placeholder="Team Name...">
+                        <select required id="ageGroup" name="ageGroup">
+                            <option value="" disabled selected hidden>Choose Age Group...</option>
+                            <option value="U7">Under 7 Open/Girls</option>
+                            <option value="U8">Under 8 Open/Girls</option>
+                            <option value="U9">Under 9 Open/Girls</option>
+                            <option value="U10">Under 10 Open/Girls</option>
+                            <option value="U11">Under 11 Open Only</option>
+                            <option value="U12">Under 12 Open/Girls</option>
+                            <option value="U13">Under 13 Open Only</option>
+                            <option value="U14">Under 14 Open/Girls</option>
+                            <option value="U15">Under 15 Open Only</option>
+                            <option value="U16">Under 16 Open/Girls</option>
+                            <option value="U18">Under 18 Mixed</option>
+                            <option value="U20">Under 20 Mixed</option>
+                        </select>
+                        <select required id="gender" name="gender">
+                            <option value="" disabled selected hidden>Choose Gender...</option>
+                            <option value="open">Open</option>
+                            <option value="girls">Girls</option>
+                        </select>
+                        <select required id="division" name="division">
+                            <option value="" disabled selected hidden>Choose Division...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                        </select>
+                    </fieldset>
+                    <fieldset class="col-adjust">
+                        <legend>Coach</legend>
+                        <input required type="text" id="nameCoach" name="nameCoach" placeholder="Name...">
+                        <input required type="email" id="emailCoach" name="emailCoach" placeholder="Email...">
+                        <input required type="tel" id="mobileCoach" name="mobileCoach" placeholder="Mobile..." pattern="[0-9]{10}">
+                        <input required type="text" id="wwvpNoCoach" name="wwvpNoCoach" placeholder="WWVP Number...">
+                        <input required type="date" id="wwvpExCoach" name="wwvpExCoach" title="WWVP Expiry">
+                    </fieldset>
+                    <fieldset class="col-adjust">
+                        <legend>Manager</legend>
+                        <input type="text" id="nameManager" name="nameManager" placeholder="Name...">
+                        <input type="email" id="emailManager" name="emailManager" placeholder="Email...">
+                        <input type="tel" id="mobileManager" name="mobileManager" placeholder="Mobile..." pattern="[0-9]{10}">
+                        <input type="text" id="wwvpNoManager" name="wwvpNoManager" placeholder="WWVP Number...">
+                        <input type="date" id="wwvpExManager" name="wwvpExManager" title="WWVP Expiry">
+                    </fieldset>
+                    <fieldset class="col-adjust">
+                        <legend>3<sup>rd</sup> Team Official</legend>
+                        <input type="text" id="name3rd" name="name3rd" placeholder="Name...">
+                        <input type="email" id="email3rd" name="email3rd" placeholder="Email...">
+                        <input type="tel" id="mobile3rd" name="mobile3rd" placeholder="Mobile..." pattern="[0-9]{10}">
+                        <input type="text" id="wwvpNo3rd" name="wwvpNo3rd" placeholder="WWVP Number...">
+                        <input type="date" id="wwvpEx3rd" name="wwvpEx3rd" title="WWVP Expiry">
+                    </fieldset>
+                    <fieldset class="players" id="playersFieldset">
+                        <legend>Players (at least 5)</legend>
+                        <button type="button" class="plusBtn" id="addNewPlayer">+</button><br>
+                    </fieldset>
+                    <input id="submitBtn" type="submit" value="Submit">
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

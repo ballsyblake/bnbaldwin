@@ -1,0 +1,107 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head lang="en" xml:lang="en">
+        <title>NCF</title>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86"/>
+        <title>NCF Appointments</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <link rel="stylesheet" href="css/main.css">
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+        
+    </head>
+    <body>
+        <div id="menuToggle">
+            <input type="checkbox" />
+            <span></span>
+            <span></span>
+            <span></span>
+            <ul id="menu">
+                <li><a href="admin.html">Dashboard</a></li>
+                <li><a href="refereeSchedule.html">Referee Schedule</a></li>
+                <li><a href="venueManagerSchedule.html">VM's Schedule</a></li>
+                <li><a href='payments.html'>Payments</a></li>
+                <li><a href="nominationFormData.html">Nominations</a></li>
+                <li><a href="users.html">Users</a></li>
+                <li><a href="index.html">Logout</a></li>
+            </ul>
+        </div>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+            <li><a class="hide" href="index.html">Logout</a></li>
+            <li><a class="hide" href="users.html">Users</a></li>
+            <li><a class="hide" href="nominationFormData.html">Nominations</a></li>
+            <li><a class="hide" href='payments.html'>Payments</a></li>
+            <li><a class="hide" href="venueManagerSchedule.html">VM's Schedule</a></li>
+            <li><a class="hide" href="refereeSchedule.html">Referee Schedule</a></li>
+            <li><a class="hide" href="admin.html">Dashboard</a></li>
+        </ul>
+        <div class="main" id="vmScheduleMain">
+            <div class="paymentsPagesBtns" id="mainvmBtns">
+                <button class="buttonClicked">Schedule</button>
+                <button>Availability</button>
+                <button>Shifts</button>
+            </div>
+            <div id="hiddenSection">
+                <h1>Venue Manager Availability</h1>
+                <div class="wrapper">
+                    <div class="table" id="VMAvailabilityTable">
+                        <div class="row header dark">
+                            <div class="cell">Day</div>
+                            <div class="cell">Venue</div>
+                            <div class="cell">Time Slot</div>
+                            <div class="cell">Available VM's</div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Friday</div>
+                            <div class="cell">Lyneham</div>
+                            <div class="cell">04:15PM - 10:00PM</div>
+                            <div class="cell" id="lynfriaft"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Lyneham</div>
+                            <div class="cell">08:15AM - 01:45PM</div>
+                            <div class="cell" id="lynsunmor"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Lyneham</div>
+                            <div class="cell">01:30PM - 07:00PM</div>
+                            <div class="cell" id="lynsunaft"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Gold Creek</div>
+                            <div class="cell">09:00AM - 01:15PM</div>
+                            <div class="cell" id="gcrsunmor"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Gold Creek</div>
+                            <div class="cell">01:00PM - 05:00PM</div>
+                            <div class="cell" id="gcrsunaft"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Radford</div>
+                            <div class="cell">09:00AM - 01:15PM</div>
+                            <div class="cell" id="radsunmor"></div>
+                        </div>
+                        <div class="row">
+                            <div class="cell">Sunday</div>
+                            <div class="cell">Radford</div>
+                            <div class="cell">01:00PM - 05:00PM</div>
+                            <div class="cell" id="radsunaft"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head lang="en" xml:lang="en">
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86, user-scalable=no"/>
+        <title>Availability</title>
+        <head>
+        <link rel="stylesheet" type="text/css" href="css/main.css">
+        <link href="//fonts.googleapis.com/css2?family=B612&display=swap" rel="stylesheet">
+        <style type="text/css">
+            .main {
+                padding-left: 5%;
+                max-width: 1000px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            
+            table {
+                border-collapse: collapse;
+            }
+
+            table td {
+                width:10%;
+                height: 100%;
+                text-align:center;
+                vertical-align:middle;
+                background-color: #d9514eff;
+                border:3px solid #ebebea;
+                
+                
+                border-top: none;
+                border-bottom: none;
+                color: #f5f5f5;
+                
+            }
+        
+            table th {
+                width:10%;
+                height: 100%;
+                text-align:center;
+                vertical-align:middle;
+                background-color: #2B2E30;
+                border:3px solid #ebebea;
+                
+                
+                border-top-width: 20px;
+                color: #889199;
+            } 
+
+            table tbody {
+                border-bottom-width: 10px !important;
+            }       
+
+            td:empty {
+                visibility: hidden;
+            }
+
+            table td.highlighted {
+            background-color:#2da8d8ff;
+            color: #f5f5f5;
+            }
+
+            .testingTable {
+                margin-right: 5%;
+                width: 95%;
+                
+            }
+
+            .testingTable thead th{
+                height: 50px !important;
+                font-size: 20px;
+            }
+            .testingTable tbody td{
+                height: 50px !important;
+                font-size: calc(14px + (24 - 14) * ((100vw - 300px) / (1600 - 300)));
+                cursor: pointer;
+                
+            }
+
+            textarea {
+                resize: none;
+                
+                background-color: #2B2E30;
+                border: 0;
+                font-family: inherit;
+                width: auto;
+                min-width: 75%;
+                outline: 0;
+                font-size: 1.3rem;
+                color: #fff;
+                padding: 8px 6px 8px 6px;
+                margin: 10%;
+                margin-top: 20px;
+                margin-bottom: 5px;
+                
+                transition: border-color 0.2s;
+                
+            }
+            /*<input type="checkbox" id="sameAsPrev" name="sameAsPrev" value="sameAsPrev" style="display: inline-block !important">*/
+        </style>
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+    </head>
+    <body class="noselect">
+        <div id="menuToggle">
+            <input type="checkbox" />
+            <span></span>
+            <span></span>
+            <span></span>
+            <ul id="menu">
+                <li><a href="homePage.html">Home</a></li>
+                <li><a href="availability.html">Availability</a></li>
+                <li id="menuOption"></li>
+                <li><a href='profile.html'>Profile</a></li>           
+                <li><a href="index.html">Logout</a></li>
+            </ul>
+        </div>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+            <li><a class="hide" href="index.html">Logout</a></li>
+            <li><a class='hide' href='profile.html'>Profile</a></li>
+            <li id="menuOptionHide"></li>
+            <li><a class="hide" href="availability.html">Availability</a></li>
+            <li><a class="hide" href="homePage.html">Home</a></li>
+        </ul>
+        <div class="main" id="mainDiv">
+            <h1>Set Your Availability</h1>
+                <table class='testingTable' id='testingTable1'>
+                    <thead><tr id="lynehamFriHead"><th style='background: transparent'></th><th colspan='3'>Lyneham Friday</th><th style='background: transparent'></th></tr></thead>
+                    <tbody>
+                        <tr id="lynehamFri">
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <table class='testingTable' id='testingTable2'>
+                    <thead><tr><th colspan='5'>Lyneham Sunday</th></tr></thead>
+                    <tbody>
+                        <tr id="lynehamSun">                    
+                            
+                        </tr>
+                    </tbody>
+                    <thead><tr><th colspan='5'>Radford Sunday</th></tr></thead>
+                    <tbody>
+                        <tr id="radfordSun">                    
+                            
+                        </tr>
+                    </tbody>
+                    <thead><tr><th colspan='5'>Gold Creek Sunday</th></tr></thead>
+                    <tbody>
+                        <tr id="goldcreekSun">                    
+                            
+                        </tr>
+                    </tbody>
+                </table>
+            <textarea name='comments' id='comments' placeholder='Leave comments here...' rows='3'></textarea>
+            <input type="submit" value="submit" id="submit">
+        </div>
+    </body>
+</html>

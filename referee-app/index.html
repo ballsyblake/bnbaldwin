@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Referee Appointments System - Blake Baldwin</title>
+  <meta name="description" content="Case study: a referee and venue scheduling system for a community futsal club, rebuilt with sessions, hashed passwords, role checks and tests.">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f6f5f2;
+      --surface: #ffffff;
+      --ink: #1b1d22;
+      --muted: #5d6270;
+      --line: #e2e0da;
+      --accent: #2f6fe4;
+      --accent-ink: #ffffff;
+      --tag: #eef2fb;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #121418;
+        --surface: #1b1e24;
+        --ink: #eceef2;
+        --muted: #a0a6b3;
+        --line: #2c3039;
+        --accent: #6a9cff;
+        --accent-ink: #0d1016;
+        --tag: #232a38;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #121418;
+      --surface: #1b1e24;
+      --ink: #eceef2;
+      --muted: #a0a6b3;
+      --line: #2c3039;
+      --accent: #6a9cff;
+      --accent-ink: #0d1016;
+      --tag: #232a38;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.6 "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+
+    header { padding: 56px 0 40px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+    header img { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; border: 3px solid var(--line); }
+    header h1 { font-size: clamp(2rem, 6vw, 2.75rem); font-weight: 800; line-height: 1.1; }
+    header p { color: var(--muted); margin-top: 6px; }
+    .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .links a {
+      text-decoration: none; font-weight: 600; font-size: 0.9rem;
+      padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink);
+    }
+    .links a:hover { border-color: var(--accent); color: var(--accent); }
+
+    section { padding: 32px 0; border-top: 1px solid var(--line); }
+    h2 { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 20px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .card h3 { font-size: 1.1rem; }
+    .card p { color: var(--muted); font-size: 0.95rem; flex: 1; }
+    .card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .card img.pixel { image-rendering: pixelated; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { font-size: 0.75rem; background: var(--tag); padding: 2px 8px; border-radius: 6px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.9rem; font-weight: 600; }
+    .play {
+      background: var(--accent); color: var(--accent-ink); text-decoration: none;
+      padding: 6px 14px; border-radius: 8px;
+    }
+    .note { font-size: 0.85rem; color: var(--muted); }
+
+    .list { list-style: none; display: grid; gap: 14px; }
+    .list li { display: grid; grid-template-columns: 1fr; gap: 2px; }
+    .list em { font-style: normal; color: var(--muted); font-size: 0.85rem; }
+    .list strong { font-weight: 600; }
+    .list span { color: var(--muted); font-size: 0.95rem; }
+
+    footer { padding: 32px 0 48px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); }
+  
+    .back { display: inline-block; margin: 32px 0 0; font-weight: 600; text-decoration: none; }
+    .lead { color: var(--muted); font-size: 1.05rem; margin-top: 8px; }
+    main h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 800; line-height: 1.15; margin-top: 16px; }
+    main p, main li { max-width: 68ch; }
+    main ul { padding-left: 20px; display: grid; gap: 6px; }
+    main h3 { font-size: 1.05rem; margin: 18px 0 6px; }
+    figure { margin: 18px 0; }
+    figure img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+    figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+    .shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+    .phone img { max-width: 260px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .tablewrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="../">&larr; Blake Baldwin</a>
+    <main>
+      <h1>Referee Appointments System</h1>
+      <p class="lead">Weekend scheduling for a community futsal club: who is available, who referees which match, who runs each venue, what everyone is paid, and the emails that tell them.</p>
+      <div class="tags" style="margin-top:14px"><span>PHP 8</span><span>MySQL / MariaDB</span><span>jQuery</span><span>PHPMailer</span><span>Playwright</span></div>
+      <div class="actions" style="margin-top:18px"><a class="play" href="demo/">Try the demo</a><a href="https://github.com/ballsyblake/referee-appointments">Code on GitHub</a></div>
+      <p class="note" style="margin-top:8px">The demo runs the real front end with a simulated server in your browser, filled with fake data. Pick a role on the login page. Nothing you enter leaves your browser, and it resets daily.</p>
+
+      <figure>
+        <img src="admin-schedule.jpg" alt="Admin schedule page listing Friday matches at Lyneham with referees appointed to each" width="1280" height="860">
+        <figcaption>Appointing referees. The picker only offers people who said they're free for that venue and time. All names are fake demo data.</figcaption>
+      </figure>
+
+      <section>
+        <h2>The problem</h2>
+        <p>North Canberra Futsal runs dozens of junior matches every weekend across three venues. Each match needs two or three referees, and each venue needs a manager on shift. Availability used to arrive by text and email, the schedule lived in a spreadsheet, and pay was counted by hand.</p>
+      </section>
+
+      <section>
+        <h2>What it does</h2>
+        <ul>
+          <li><strong>Referees and venue managers</strong> tick the slots they can do each week, then see their matches or shifts on their phone and confirm them.</li>
+          <li><strong>The admin</strong> appoints referees from a list of who's available, adds or imports fixtures from CSV, assigns venue shifts, and emails everyone in one click.</li>
+          <li><strong>Pay</strong> is calculated by the database: match pay from the age group, shift hours from start and end times. Totals by week, month or year export to CSV.</li>
+          <li><strong>Public forms</strong> handle team nominations and venue manager applications, which the admin approves.</li>
+        </ul>
+        <div class="shots" style="margin-top:18px">
+          <figure><img src="ref-availability.jpg" alt="Referee availability grid with time slots for each venue" loading="lazy" width="1280" height="900"><figcaption>Referee availability</figcaption></figure>
+          <figure class="phone"><img src="phone-appointments.jpg" alt="A referee's appointments on a phone" loading="lazy" width="390" height="844"><figcaption>A referee's weekend, on a phone</figcaption></figure>
+        </div>
+      </section>
+
+      <section>
+        <h2>Rebuilding it securely</h2>
+        <p>I first built this in 2020 while learning. It worked, and the club used it, but when I came back to it during my cyber security studies, I could see how exposed it was. The 2026 rebuild fixed each problem at the root:</p>
+        <div class="tablewrap">
+          <table>
+            <tr><th>Before</th><th>After</th></tr>
+            <tr><td>The browser said who you were, using a cookie anyone could edit.</td><td>Server-side sessions with an HttpOnly cookie, and a role check on every endpoint.</td></tr>
+            <tr><td>The admin "password" was 1234, sent to the browser and checked there.</td><td>A separate admin role, enforced on the server.</td></tr>
+            <tr><td>Passwords stored in plain text.</td><td>bcrypt hashes. Old passwords are upgraded the next time each person logs in, so nobody has to be reset.</td></tr>
+            <tr><td>SQL built by gluing strings together (SQL injection).</td><td>Prepared statements for every query.</td></tr>
+            <tr><td>Any website could call the API (open CORS) and post on a user's behalf.</td><td>Same-origin only, plus a request header that other sites can't forge (CSRF protection).</td></tr>
+            <tr><td>Uploads kept their original names and were publicly reachable.</td><td>Random names, file type checked from the contents, and served only after a login check.</td></tr>
+            <tr><td>Database errors shown to visitors.</td><td>Errors logged on the server; visitors see a generic message.</td></tr>
+          </table>
+        </div>
+        <h3>Other engineering</h3>
+        <ul>
+          <li>No database schema survived, so I rebuilt it from the queries in the code and the table structure of old exports, including generated columns for pay and hours.</li>
+          <li>Configuration comes from environment variables or a config file kept out of git, so it runs on cheap shared hosting or a container.</li>
+          <li>Two test suites: a curl security suite that checks logged-out, wrong-role, CSRF, injection and blocked-file cases, and a Playwright browser suite that covers every role's main flow. Both run against MariaDB and against Apache with the production rules.</li>
+          <li>A demo mode with one-click logins for each role, which also blocks actions that would let visitors lock each other out.</li>
+          <li>The demo on this site is the real front end with the PHP server swapped for a JavaScript stand-in that follows the same rules (roles, validation, pay maths) against fake data in the browser. The same Playwright suite runs against it.</li>
+        </ul>
+        <figure>
+          <img src="admin-users.jpg" alt="Admin users page listing referees and venue managers with approve and reset actions" loading="lazy" width="1280" height="860">
+          <figcaption>Managing accounts. A venue manager's application waits for approval.</figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2>Why plain PHP</h2>
+        <p>A volunteer-run club pays for the cheapest shared hosting it can find. PHP and MySQL run on all of it, with no build step and no server to look after, so the whole thing can be handed over and kept running for a few dollars a month.</p>
+      </section>
+    </main>
+    <footer>Blake Baldwin</footer>
+  </div>
+</body>
+</html>

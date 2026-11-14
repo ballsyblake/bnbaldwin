@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head lang="en" xml:lang="en">
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86"/>
+        <title>NCF Appointments</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <link rel="stylesheet" href="css/main.css">
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+    </head>
+    <body class="noselect">
+        <div id="menuToggle">
+            <input type="checkbox" />
+            <span></span>
+            <span></span>
+            <span></span>
+            <ul id="menu">
+                <li><a href="homePage.html">Home</a></li>
+                <li><a href="availability.html">Availability</a></li>
+                <li id="menuOption"></li>
+                <li><a href='profile.html'>Profile</a></li>
+                <li><a href="index.html">Logout</a></li>
+            </ul>
+        </div>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+            <li><a class="hide" href="index.html">Logout</a></li>
+            <li><a class='hide' href='profile.html'>Profile</a></li>
+            <li id="menuOptionHide"></li>
+            <li><a class="hide" href="availability.html">Availability</a></li>
+            <li><a class="hide" href="homePage.html">Home</a></li>
+        </ul>
+        <div class="main" id="mainDiv">
+            <div id="headerSection">
+                <h1>Welcome </h1><h1 class="usernameArea"></h1><h1>, to the North Canberra Futsal Referee Portal</h1>
+            </div>
+            <hr>
+            <div class="halfPage" id="generalInfo">
+                <h3>General Information</h3>
+                <p id="introText"></p>
+            </div>
+            <div class="halfPage" id="currAvailability">
+                <h3>Current Availability</h3>
+                <table class='currAvailTable'>
+                    <tbody id="currAvailBody">
+                        <tr id="lynfri">
+                            <th>Lyneham Friday</th>
+                        </tr>
+                        <tr id="lynsun">
+                            <th>Lyneham Sunday</th>
+                        </tr>
+                        <tr id="radsun">
+                            <th>Radford Sunday</th>
+                        </tr>
+                        <tr id="gcrsun">
+                            <th>Gold Creek Sunday</th>
+                        </tr>
+                    </tbody>
+                </table>
+                <a id="availabilityBtn" href="availability.html" style="margin-top: 30px">Change Availability</a>
+            </div>
+        </div>
+    </body>
+</html>
