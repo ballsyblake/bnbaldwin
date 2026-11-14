@@ -1,0 +1,1182 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+* {
+    -webkit-tap-highlight-color: rgba(0,0,0,0); /* make transparent link selection, adjust last value opacity 0 to 1.0 */
+    margin: 0;
+        padding: 0;
+        border: 0;
+        outline: 0;
+        
+        vertical-align: baseline;
+        
+}
+
+#headerSection {
+    padding: 20px;
+    text-align: center;
+}
+
+#headerSection h1 {
+    display: inline !important;
+    padding: 0 !important;
+}
+
+
+
+body {
+    user-select: none;
+    -webkit-touch-callout: none;                /* prevent callout to copy image, etc when tap to hold */
+    -webkit-text-size-adjust: none;             /* prevent webkit from resizing text to fit */
+    -webkit-user-select: none;                  /* prevent copy paste, to allow, change 'none' to 'text' */
+    background-color:#E4E4E4;
+    /*background-image:linear-gradient(to bottom, #A7A7A7 0%, #E4E4E4 51%);*/
+    font-family: system-ui, -apple-system, -apple-system-font, 'Segoe UI', 'Roboto', sans-serif;
+    font-size:12px;
+    margin:0px;
+    padding:0px;
+    /* Padding to avoid the "unsafe" areas behind notches in the screen */
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    text-transform:none;
+    width:100%;
+    color: black;
+    
+}
+
+h1 {
+    text-align: center;
+}
+
+.hidden {
+    visibility: hidden;
+}
+
+.visible {
+    visibility: visible;
+}
+
+.hide {
+    display: none;
+}
+
+.show {
+    display: block;
+}
+
+.eye {
+    margin: 100px;
+    width: 13px;
+    height: 13px;
+    border: solid 1px #000;
+    border-radius:  75% 15%;
+    position: relative;
+    transform: rotate(45deg);
+  }
+.eye:before {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border: solid 1px #000;
+    border-radius: 50%;
+    left: 3px;
+    top: 3px;
+}
+
+.dark {
+    border-color: rgba(0,0,0,0.3);;
+}
+
+.dark:before {
+    border-color: rgba(0,0,0,0.3);
+}
+
+.field-icon {
+    float: right;
+    margin-left: -25px;
+    margin-top: 10px;
+    position: absolute;
+    
+}
+
+/* Admin Dashboard */
+
+#adminDashMain {
+    padding: 2.5%;
+}
+
+#userGraph {
+    width: 45%;
+    height: 500px;
+    border-radius: 25px;
+    border: 2px solid black;
+    display: inline-block;
+    margin: 2%;
+}
+
+#userGraph svg, #userGraph svg > * {
+    border-radius: 25px;
+}
+
+#userComments {
+    padding-bottom: 2%;
+    padding-top: 2%;
+    margin: 2%;
+    border-radius: 25px;
+    vertical-align: top;
+    border: 2px solid black;
+    width: 45%;
+    display: inline-block;
+}
+#userComments h2 {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding-bottom: 10px;
+}
+
+#userComments a {
+    text-align: center;
+    width: 100%;
+    text-decoration: underline;
+    color: black;
+    margin-left: 45%;
+}
+
+.commentElement {
+    border-radius: 25px;
+    border: 2px solid black;
+    margin: 5%;
+    width: 90%;
+    height: auto;
+    
+}
+
+.commentElement p {
+    font-size: 16px !important;
+    word-wrap: break-word;
+}
+
+.commentElement h3 {
+    display: block;
+    width: 100%;
+    text-align: center;
+    border-bottom: 2px solid black;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    height: 20px;
+    font-size: 18px;
+}
+
+.usernameSection {
+    padding: 2%;
+    width: 25%;
+    height: 95%;
+    display: inline-block;
+    vertical-align: middle;
+    text-align: center;
+    
+}
+
+.commentSection {
+    vertical-align: top;
+    padding: 2%;
+    width: 57%;
+    height: 95%;
+    display: inline-block;
+    text-align: left;
+}
+
+/* Referee Schedule Page */
+
+#dayvenueBtns {
+    margin-right: 20%;
+    margin-left: 20%;
+    width: 60%;
+    display: flex;
+    height: 75px;
+}
+#dayvenueBtns button {
+    width: 25%;
+    display: inline-block;
+    flex: 1;
+    height: 100%;
+    border: 1px solid black;
+    background-color: #f5f5f4;
+    color: black;
+    transition:all ease 0.4s;
+}
+
+#dayvenueBtns button:hover {
+    background-color: #2DA8D8;
+    color: #f5f5f4;
+}
+
+.buttonClicked {
+    background-color: #2DA8D8 !important;
+}
+
+.scheduleStructure {
+    margin-left: 5%;
+    margin-right: 5%;
+    margin-bottom: 5%;
+    width: 90%;
+    height: auto;
+    border: 1px solid black;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.scheduleStructure h3, .scheduleStructure input {
+    margin: auto;
+    font-weight: bold;
+    font-size: 16px;
+    text-align: center;
+    flex: 1 0 16%;
+    margin-bottom: 1%;
+    border-bottom: 1px solid black;
+}
+
+.scheduleStructure input {
+    min-width: 0;
+    margin-right: 1%;
+    flex: 1 0 20%;
+}
+
+.h3Special {
+    margin: 2% !important;
+    border-bottom: 2px solid black !important;
+}
+
+#submitBtn, #notifyBtn {
+    background-color: #393D40;
+    border: none;
+    padding: 0px;
+    margin-left: 7%;
+    margin-top: 2.5%;
+    width: 40%;
+    height: 70px;
+    border-radius: 0px 0px 3px 3px;
+    color: white;
+    text-transform: uppercase;
+    font-weight: 900;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.3s ease;
+    outline: none;
+    margin-bottom: 2.5%;
+    display: inline-block;
+}
+#submitBtn:hover, #notifyBtn:hover {
+    color: #46b7e5;
+    background-color: #2B2E30;
+  }
+
+.weekNum {
+    text-align: center;
+    width: 100px;
+    margin-left: calc(50% - 50px);
+    margin-top: 10px;
+    margin-bottom: 10px;
+    background-color: #393D40;
+    color: white;
+}
+
+/* Payments Page */
+
+#paymentsMain {
+    font-size: 1.5vw;
+    padding: 0;
+    background-color: #ebebea;
+   
+}
+
+#topSection {
+    width: 98%;
+    margin: 1%;
+    height: 30vh;
+}
+
+#bottomSection {
+    display: flex;
+    width: 98%;
+    margin: 1%;
+    height: 45vh;
+}
+
+#bottomSection div {
+    flex: 1 0 48%;
+}
+
+#costsPerUser {
+    display: flex;
+    max-height: 25vh;
+}
+
+#costsPerUser div {
+    flex: 1 0 26%;
+    border-radius: 25px;
+    background-color: white;
+    margin: 3%;
+    margin-top: 5vh;
+    margin-bottom: 5vh;
+    text-align: center;
+    height: 15vh;
+}
+
+#costsPerUser div h3 {
+    height: 40%;
+    padding: 2%;
+    font-size: 24px;
+}
+
+#totalMembers {
+    background-color: white;
+    border-radius: 25px;
+    margin: 5%;
+    max-width: 300px;
+    max-height: 300px;
+    min-width: 200px;
+    min-height: 200px;
+}
+
+#totalMembers h3 {
+    height: 40%;
+    padding: 2%;
+    font-size: 24px;
+    text-align: center;
+}
+
+#costsGraph {
+    width: 45%;
+    border-radius: 25px;
+    display: inline-block;
+    margin: 2%;
+}
+
+#costsGraph svg, #costsGraph svg > * {
+    border-radius: 25px;
+}
+
+.timeCategoryBtns {
+    max-height: 5vh;
+}
+
+.paymentsPagesBtns {
+    
+    margin-right: 20%;
+    margin-left: 20%;
+    width: 60%;
+    display: flex;
+    height: 75px;
+}
+
+.paymentsPagesBtns button {
+    width: 25%;
+    display: inline-block;
+    flex: 1;
+    height: 100%;
+    border: 1px solid black;
+    background-color: #f5f5f4;
+    color: black;
+    transition:all ease 0.4s;
+}
+
+.paymentsPagesBtns button:hover {
+    background-color: #2DA8D8;
+    color: #f5f5f4;
+}
+
+.wrapper {
+    margin: 0 auto;
+    padding: 40px;
+}
+
+.table {
+    margin: 0 0 40px 0;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    display: table;
+}
+@media screen and (max-width: 580px) {
+  .table {
+    display: block;
+  }
+}
+
+.row {
+    display: table-row;
+    background: #f6f6f6;
+}
+.row:nth-of-type(odd) {
+    background: #e9e9e9;
+}
+.row.header {
+    font-weight: 900;
+    color: #ffffff;
+    background: #ea6153;
+}
+.row.green {
+    background: #27ae60;
+}
+.row.blue {
+    background: #2980b9;
+}
+.row.dark {
+    background: #333333;
+}
+@media screen and (max-width: 580px) {
+  .row {
+    padding: 8px 0;
+    display: block;
+  }
+}
+
+.cell {
+    padding: 6px 12px;
+    display: table-cell;
+    text-align: center;
+}
+@media screen and (max-width: 580px) {
+  .cell {
+    padding: 2px 12px;
+    display: block;
+  }
+}
+
+
+/* Login Page */
+
+.loginForm
+{
+    max-width: 500px;
+    background: #f4f7f8;
+    margin: 10px auto;
+    margin-top: calc(45vh - 150px);
+    padding: 20px;
+    height: 300px;
+    background: #f4f7f8;
+    border-radius: 8px;
+    font-family: Georgia, "Times New Roman", Times, serif;
+}
+.loginForm p {
+    padding: 0;
+    margin: 0;
+    line-height: none;
+    color: black;
+    text-transform: none;
+}
+.loginForm button {
+    padding: 0;
+    margin: 0;
+    line-height: none;
+    color: #3792b6;
+    text-decoration: underline;    
+}
+.loginForm button:hover {
+    cursor: pointer;
+}
+.loginForm button:active {
+    color: #46b7e5;
+}
+.loginForm img
+{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 50%;
+    
+}
+.loginForm fieldset
+{
+    border: none;
+}
+.loginForm legend 
+{
+    color: black;
+    font-size: 1.4em;
+    margin-bottom: 10px;
+}
+.loginForm label 
+{
+    display: block;
+    margin-bottom: 8px;
+}
+.loginForm input[type="text"],
+.loginForm input[type="password"],
+.loginForm input[type="email"]
+{
+    font-family: Georgia, "Times New Roman", Times, serif;
+    background: rgba(255,255,255,.1);
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    margin: 0;
+    outline: 0;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box; 
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box; 
+    background-color: #e8eeef;
+    color:#8a97a0;
+    -webkit-box-shadow: 0 1px 0 rgba(0,0,0,0.03) inset;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.03) inset;
+    margin-bottom: 30px;
+}
+.loginForm input[type="text"]:focus,
+.loginForm input[type="password"]:focus
+{
+    background: #d2d9dd;
+}
+.loginForm input[type="submit"],
+.loginForm input[type="button"]
+{
+    position: relative;
+    display: block;
+    padding: 19px 39px 18px 39px;
+    color: #889199;
+    margin: 0 auto;
+    background: #393D40;
+    font-size: 18px;
+    text-align: center;
+    font-style: normal;
+    width: 100%;
+    border: 1px solid #46b7e5;
+    border-width: 1px 1px 3px;
+    margin-bottom: 10px;
+}
+.loginForm input[type="submit"]:hover,
+.loginForm input[type="button"]:hover
+{
+    background: #2B2E30;
+    color: #46b7e5;
+}
+#password {
+    display: inline-block;
+}
+
+/* The message box is shown when the user clicks on the password field */
+#message {
+    display:none;
+    background: #f1f1f1;
+    color: #000;
+    position: relative;
+    padding: 20px;
+    margin-top: 10px;
+    max-width: 500px;
+    background: #f4f7f8;
+    margin: 10px auto;
+    padding: 20px;
+    background: #f4f7f8;
+    border-radius: 8px;
+    font-family: Georgia, "Times New Roman", Times, serif;
+}
+
+#message p {
+    padding: 10px 35px;
+    font-size: 18px;
+}
+
+/* Add a green text color and a checkmark when the requirements are right */
+.valid {
+    display: none;
+}
+
+/* Add a red text color and an "x" icon when the requirements are wrong */
+.invalid {
+    color: rgb(248, 82, 82);
+    display: block;
+}
+  
+
+/* Bottom navigation buttons */
+.bottomBtns {
+    width: 100%;
+    height: 10%;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+}
+
+.bottomBtns a {
+    width: 33.33%;
+    height: 100%;
+    text-align: center;
+    background-color: rgba(102, 157, 179, 0.85);
+    color: black;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.bottomBtns a img {
+    width: auto;
+    height: 70%;
+    margin-top: 10px;
+}
+
+.bottomsBtns a:active {
+    background-color: rgba(102, 157, 179, 1) !important;
+}
+
+.activeBtn {
+    background-color: rgba(102, 157, 179, 1) !important;
+    pointer-events: none;
+}
+
+.bottomBtns a:hover {
+    background-color: rgba(102, 157, 179, 0.7) !important;
+}
+
+/* Home page designs */
+.inFormCards, .draftGame, .collection {
+    margin: auto;
+    margin-top: 9vh;
+    width: 80%;
+    display: block;
+    border-radius: 15px;
+    border: 1px solid black;
+    background-color: white;
+    height: 18vh;
+    max-height: 25%;
+    font-size: 0;
+}
+.inFormCards img, .draftGame img, .collection img {
+    width: 100%;
+    height: 100%;
+    
+}
+
+/* Scan page designs */
+.scanResults {
+    width: 80%;
+    margin: 10%;
+    margin-top: 0;
+    height: 50%;
+}
+
+.scanResults input[type=image] {
+    width: 100px;
+    height: 100px;
+    border: none;
+}
+
+.scanBtn {
+    height: 10%;
+    width :60%;
+    margin-left: 20%;
+    margin-right: 20%;
+    position: fixed;
+    bottom: 10%;
+}
+
+/* Card Flip Animation */
+
+.flip-container.flip .flipper {
+	transform: rotateY(180deg);
+}
+
+.flip-container, .front, .back {
+    width: 400px;
+    height: auto;
+}
+
+.flipper {
+	transition: 0.6s;
+	transform-style: preserve-3d;
+
+	position: relative;
+}
+
+.front, .back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.front img, .back img {
+    width: 100%;
+    height: 100%;
+}
+
+.front {
+	z-index: 2;
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+}
+
+.back {
+	transform: rotateY(180deg);
+}
+
+/* Template Card Design */
+#template {   
+    width: 300px;
+    height: 60vh;
+    display: grid;
+    grid-template-areas: ". . . rank . . ."
+    ". team . silh . flag ."
+    ". . name name name. ."
+    ". . pace . dribble . ."
+    ". . shooting . defense . ."
+    ". . passing . physical . ."
+    ". . . . . . .";
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-image: url(../img/BlankCard.png);
+    margin: auto;
+    min-height: 400px;
+    margin-top: 5%;
+}
+
+#template > * {
+    display: flex;
+    justify-content: center;
+    align-items: normal;
+}
+
+#template > img {
+    padding-top: 10%;
+    width: 100%;
+    height: auto;
+    margin: auto;
+}
+
+#team {
+    width: 50px;
+    height: 50px;
+    grid-area: team;
+}
+
+#flag {
+    width: 50px;
+    height: 50px;
+    grid-area: flag;
+}
+
+#silhouette {
+    width: 50px;
+    height: 50px;
+    grid-area: silh;
+}
+
+#name {
+    grid-area: name;
+}
+
+#rank {
+    grid-area: rank;
+    align-items: flex-end !important;
+}
+
+#pace {
+    grid-area: pace;
+}
+
+#dribble {
+    grid-area: dribble;
+}
+
+#shooting {
+    grid-area: shooting;
+}
+
+#defense {
+    grid-area: defense;
+}
+
+#passing {
+    grid-area: passing;
+}
+
+#physical {
+    grid-area: physical;
+}
+
+/* Profile page */
+
+#profilePic {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 150px;
+    height: 150px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 4px solid #393d40;
+    object-fit: cover;
+}
+
+/* Search Page */
+#topSearchBar {
+    height: 10vh;
+}
+#topSearchBar form, .autocomplete input {
+    margin: auto;
+    width: 60vw;
+    margin-top: 1vh;
+}
+
+#categories div {
+    width: 80vw;
+    height: 20vh;
+    display: block;
+    background-color:#505050;
+    margin: auto;
+    margin-bottom: 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+}
+
+#categories h1 {
+    display: flex;
+    height: 90%;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+.autocomplete, .autocomplete input {
+    position: relative;
+    display: inline-block;
+    height: 5vh;
+    padding-left: 5px;
+}
+
+.autocomplete-items {
+    position: absolute;
+    border: 1px solid #d4d4d4;
+    border-bottom: none;
+    border-top: none;
+    z-index: 99;
+    /*position the autocomplete items to be the same width as the container:*/
+    top: 100%;
+    left: 0;
+    right: 0;
+}
+  
+.autocomplete-items div {
+    padding: 10px;
+    cursor: pointer;
+    background-color: #fff; 
+    border-bottom: 1px solid #d4d4d4; 
+}
+  
+/*when hovering an item:*/
+.autocomplete-items div:hover {
+    background-color: #e9e9e9; 
+}
+  
+/*when navigating through the items using the arrow keys:*/
+.autocomplete-active {
+    background-color: DodgerBlue !important; 
+    color: #ffffff; 
+}
+
+/* Portrait layout (default) */
+.app {
+    background:url(../img/logo.png) no-repeat center top; /* 170px x 200px */
+    position:absolute;             /* position in the center of the screen */
+    left:50%;
+    top:50%;
+    height:50px;                   /* text area height */
+    width:225px;                   /* text area width */
+    text-align:center;
+    padding:180px 0px 0px 0px;     /* image height is 200px (bottom 20px are overlapped with text) */
+    margin:-115px 0px 0px -112px;  /* offset vertical: half of image height and text area height */
+                                   /* offset horizontal: half of text area width */
+}
+
+/* Landscape layout (with min-width) */
+@media screen and (min-aspect-ratio: 1/1) and (min-width:400px) {
+    .app {
+        background-position:left center;
+        padding:75px 0px 75px 170px;  /* padding-top + padding-bottom + text area = image height */
+        margin:-90px 0px 0px -198px;  /* offset vertical: half of image height */
+                                      /* offset horizontal: half of image width and text area width */
+    }
+}
+
+h1 {
+    font-size:24px;
+    font-weight:normal;
+    margin:0px;
+    overflow:visible;
+    padding:0px;
+    text-align:center;
+}
+
+sup {font-size:small !important; vertical-align:super !important;}
+
+/* Nomination Form */
+
+#nominationFormMain {
+    font-size: 1.5vw;
+    padding: 0;
+    background-color: #ebebea;
+    
+    padding: 10px;
+}
+
+.nominationForm {
+    width: auto;
+    background: #f4f7f8;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f4f7f8;
+    border-radius: 8px;
+    font-family: 'Roboto Slab', serif;
+    margin-bottom: 20px;
+}
+
+.nominationForm legend {
+    font-size: 24px !important;
+    padding-bottom: 10px;
+}
+
+.nominationForm label {
+    font-size: 18px !important;
+    line-height: normal;
+}
+
+.nominationForm input {
+    font-family: 'Roboto Slab', serif;
+    background: rgba(255,255,255,.1);
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    margin: 0;
+    outline: 0;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    background-color: #e8eeef;
+    color: #8a97a0;
+    -webkit-box-shadow: 0 1px 0 rgb(0 0 0 / 3%) inset;
+    box-shadow: 0 1px 0 rgb(0 0 0 / 3%) inset;
+    margin-bottom: 10px;
+}
+
+.nominationForm select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    font-family: Georgia, "Times New Roman", Times, serif;
+    background: rgba(255,255,255,.1);
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    margin: 0;
+    outline: 0;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    background-color: #e8eeef;
+    color: #8a97a0;
+    -webkit-box-shadow: 0 1px 0 rgb(0 0 0 / 3%) inset;
+    box-shadow: 0 1px 0 rgb(0 0 0 / 3%) inset;
+    margin-bottom: 10px;
+}
+
+/* Nomination Form Data */
+.halfPage {
+    width: 49%;
+    display: inline-block;
+    vertical-align: top;
+}
+
+.players input {
+    display: inline-block;
+    width: 23%;
+    margin: 1%;
+}
+
+#notifyBtn {
+
+}
+
+.backBtn {
+    width: 40px;
+    height: 30px;
+    background-color: #2980b9;
+    color: white;
+}
+
+.btnMenu {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.basicBtn {
+    background-color: #2980b9;
+    border: none;
+    color: white;
+    padding: 16px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    transition-duration: 0.4s;
+    cursor: pointer;
+    order: 3;
+}
+.basicBtn:hover {
+    background-color: #4d90bd;
+    color: white;
+}
+
+.sml {
+    padding: 8px 16px !important;
+}
+
+.nominationForm input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    margin: 0 !important;
+    vertical-align: bottom;
+}
+
+.col-adjust {
+    width: 23%;
+    display: inline-block;
+    vertical-align: top;
+    padding: 0.8%;
+    margin: 0;
+}
+
+@media screen and (max-width: 1000px) {
+    .col-adjust {
+        width: 48%;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .col-adjust {
+        width: auto;
+        display: block;
+        vertical-align: baseline;
+    }
+    .players input {
+        display: block;
+        width: 100%;
+        margin: 0;
+        margin-bottom: 10px;
+    }
+}
+
+.plusBtn {
+    user-select: none;
+    border: none;
+    display: inline-block;
+    padding: 8px 12px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    background-color: inherit;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-appearance: button;
+    text-transform: none;
+    font: inherit;
+    margin: 0;
+    box-sizing: inherit;
+    color: #fff!important;
+    background-color: #000!important;
+    font-size: 20px;
+}
+
+.plusBtn:hover {
+    color: #fff!important;
+    background-color: rgb(73, 73, 73)!important;
+}
+
+.event {
+    border-radius:4px;
+    color:#FFFFFF;
+    font-size:12px;
+    margin:0px 30px;
+    padding:2px 0px;
+}
+
+.event.listening {
+    background-color:#333333;
+    display:block;
+}
+
+.event.received {
+    background-color:#4B946A;
+    display:none;
+}
+
+#deviceready.ready .event.listening { display: none; }
+#deviceready.ready .event.received { display: block; }
+
+@keyframes fade {
+    from { opacity: 1.0; }
+    50% { opacity: 0.4; }
+    to { opacity: 1.0; }
+}
+
+.blink {
+    animation:fade 3000ms infinite;
+    -webkit-animation:fade 3000ms infinite;
+}
+
+
+/*@media screen and (prefers-color-scheme: dark) {
+    body {
+        background-image:linear-gradient(to bottom, #585858 0%, #1B1B1B 51%);
+    }
+}*/
+
+@media screen and (max-width: 800px) {
+    .flip-container, .front, .back {
+        width: 300px;
+    }
+}
+
+#playerAmount {
+    width: 75px;
+    text-align: center;
+    margin-left: calc(50% - 37.5px);
+}
+
+.formLimit {
+    max-width: 800px;
+}
+.demoLogins {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.demoLogins button {
+  margin: 6px 6px 0 0;
+  padding: 6px 10px;
+  cursor: pointer;
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head lang="en" xml:lang="en">
+        <title>NCF</title>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86"/>
+        <title>NCF Appointments</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <link rel="stylesheet" href="css/main.css">
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+    </head>
+    <body>
+        <div id="menuToggle">
+            <input type="checkbox" />
+            <span></span>
+            <span></span>
+            <span></span>
+            <ul id="menu">
+                <li><a href="admin.html">Dashboard</a></li>
+                <li><a href="refereeSchedule.html">Referee Schedule</a></li>
+                <li><a href="venueManagerSchedule.html">VM's Schedule</a></li>
+                <li><a href='payments.html'>Payments</a></li>
+                <li><a href="nominationFormData.html">Nominations</a></li>
+                <li><a href="users.html">Users</a></li>
+                <li><a href="index.html">Logout</a></li>
+            </ul>
+        </div>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+            <li><a class="hide" href="index.html">Logout</a></li>
+            <li><a class="hide" href="users.html">Users</a></li>
+            <li><a class="hide" href="nominationFormData.html">Nominations</a></li>
+            <li><a class="hide" href='payments.html'>Payments</a></li>
+            <li><a class="hide" href="venueManagerSchedule.html">VM's Schedule</a></li>
+            <li><a class="hide" href="refereeSchedule.html">Referee Schedule</a></li>
+            <li><a class="hide" href="admin.html">Dashboard</a></li>
+        </ul>
+        <div class="main" id="refereeScheduleMain">
+            <div id="dayvenueBtns">
+                <button class="buttonClicked" id="frilynbtn">Lyneham Friday</button>
+                <button id="sunlynbtn">Lyneham Sunday</button>
+                <button id="sunradbtn">Radford Sunday</button>
+                <button id="sungcrbtn">Gold Creek Sunday</button>
+            </div>
+            <select class="weekNum" id="weekNum"></select>
+            
+            <div class="scheduleStructure" id="scheduleDiv">
+                <h3 class="h3Special">Court</h3>
+                <h3 class="h3Special">Time</h3>
+                <h3 class="h3Special">Referee 1</h3>
+                <h3 class="h3Special">Referee 2</h3>
+                <h3 class="h3Special">Referee 3</h3>
+            </div>
+            <button id="submitBtn">Submit Schedule</button>
+            <button id="notifyBtn" disabled>Notify Referees</button>
+            <div class="nominationForm" id="addMatches">
+                <h2>Add a match</h2>
+                <form id="addMatchForm">
+                    <input type="date" name="date" required>
+                    <input type="time" name="time" required>
+                    <select name="venue" required><option value="lyn">Lyneham</option><option value="gcr">Gold Creek</option><option value="rad">Radford</option></select>
+                    <input type="text" name="court" placeholder="Court" value="1" required>
+                    <input type="text" name="ageGroup" placeholder="Age group, e.g. U12 Open" required>
+                    <input type="submit" value="Add match">
+                </form>
+                <h2>Import matches from a CSV file</h2>
+                <p>Columns: date, time, venue (lyn, gcr or rad), court, age group. For example: <code>2026-11-20,17:00,lyn,1,U12 Open</code></p>
+                <form id="importForm">
+                    <input type="file" name="csv" accept=".csv,text/csv" required>
+                    <input type="submit" value="Import">
+                </form>
+            </div>
+        </div>
+        
+            
+    </body>
+    
+</html>

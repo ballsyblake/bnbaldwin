@@ -118,6 +118,8 @@
       <h1>Referee Appointments System</h1>
       <p class="lead">Weekend scheduling for a community futsal club: who is available, who referees which match, who runs each venue, what everyone is paid, and the emails that tell them.</p>
       <div class="tags" style="margin-top:14px"><span>PHP 8</span><span>MySQL / MariaDB</span><span>jQuery</span><span>PHPMailer</span><span>Playwright</span></div>
+      <div class="actions" style="margin-top:18px"><a class="play" href="demo/">Try the demo</a></div>
+      <p class="note" style="margin-top:8px">The demo runs the real front end with a simulated server in your browser, filled with fake data. Pick a role on the login page. Nothing you enter leaves your browser, and it resets daily.</p>
 
       <figure>
         <img src="admin-schedule.jpg" alt="Admin schedule page listing Friday matches at Lyneham with referees appointed to each" width="1280" height="860">
@@ -164,6 +166,7 @@
           <li>Configuration comes from environment variables or a config file kept out of git, so it runs on cheap shared hosting or a container.</li>
           <li>Two test suites: a curl security suite that checks logged-out, wrong-role, CSRF, injection and blocked-file cases, and a Playwright browser suite that covers every role's main flow. Both run against MariaDB and against Apache with the production rules.</li>
           <li>A demo mode with one-click logins for each role, which also blocks actions that would let visitors lock each other out.</li>
+          <li>The demo on this site is the real front end with the PHP server swapped for a JavaScript stand-in that follows the same rules (roles, validation, pay maths) against fake data in the browser. The same Playwright suite runs against it.</li>
         </ul>
         <figure>
           <img src="admin-users.jpg" alt="Admin users page listing referees and venue managers with approve and reset actions" loading="lazy" width="1280" height="860">

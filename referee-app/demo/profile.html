@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head lang="en" xml:lang="en">
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=3.0, minimum-scale=0.86"/>
+        <title>Profile</title>
+        <link rel="stylesheet" type="text/css" href="css/index.css">
+        <link rel="stylesheet" href="css/main.css">
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/mock-api.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+        <style type="text/css">
+            .appointmentTable {
+                width: 100% !important;
+                height: auto !important;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="menuToggle">
+            <input type="checkbox" />
+            <span></span>
+            <span></span>
+            <span></span>
+            <ul id="menu">
+                <li><a href="homePage.html">Home</a></li>
+                <li><a href="availability.html">Availability</a></li>
+                <li id="menuOption"></li>
+                <li><a href='profile.html'>Profile</a></li>           
+                <li><a href="index.html">Logout</a></li>
+            </ul>
+        </div>
+        <ul id="untoggleMenu">
+            <li><img src="img/ncf_logo_correct.png" alt="logo"></li>
+            <li><a class="hide" href="index.html">Logout</a></li>
+            <li><a class='hide' href='profile.html'>Profile</a></li>
+            <li id="menuOptionHide"></li>
+            <li><a class="hide" href="availability.html">Availability</a></li>
+            <li><a class="hide" href="homePage.html">Home</a></li>
+        </ul>
+        <div class="main" id="mainDiv">
+            <h1>Your Profile</h1>
+            <hr>
+            <img src="uploads/avatar.png" alt="avatar" class="avatar" id="profilePic">
+            <table class='appointmentTable'>
+                <tr><td>First Name: </td><td id="FirstName"></td></tr>
+                <tr><td>Last Name: </td><td id="LastName"></td></tr>
+                <tr><td>Date of Birth: </td><td id="DOB"></td></tr>
+                <tr><td>Password: </td><td>*******</td></tr>
+                <tr><td>BSB: </td><td id="bsb"></td></tr>
+                <tr><td>Account Number: </td><td id="accNum"></td></tr>
+            </table>
+            <hr>
+            <div class="editBtn">
+                <a class='profileBtn1' href='changeDetails.html'>Edit Details</a>
+            </div>
+        </div>        
+    </body>
+    
+</html>
