@@ -9,8 +9,23 @@
   <meta property="og:url" content="https://bnbaldwin.com/">
   <meta property="og:title" content="Blake Baldwin">
   <meta property="og:description" content="IT graduate studying a Master of Cyber Security, building games and apps on the side.">
-  <meta property="og:image" content="https://bnbaldwin.com/images/me.jpg">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://bnbaldwin.com/images/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://bnbaldwin.com/">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Blake Baldwin",
+    "url": "https://bnbaldwin.com/",
+    "image": "https://bnbaldwin.com/images/me.jpg",
+    "sameAs": ["https://github.com/ballsyblake", "https://www.linkedin.com/in/blake-baldwin-22b68ba9/"],
+    "alumniOf": {"@type": "CollegeOrUniversity", "name": "University of Canberra"},
+    "knowsAbout": ["Cyber security", "Web development", "Game development"]
+  }
+  </script>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,7 +96,7 @@
     }
     .card h3 { font-size: 1.1rem; }
     .card p { color: var(--muted); font-size: 0.95rem; flex: 1; }
-    .card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .card img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
     .card img.pixel { image-rendering: pixelated; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .tags span { font-size: 0.75rem; background: var(--tag); padding: 2px 8px; border-radius: 6px; }
@@ -90,7 +105,15 @@
       background: var(--accent); color: var(--accent-ink); text-decoration: none;
       padding: 6px 14px; border-radius: 8px;
     }
+    .actions a:not(.play) { padding: 6px 2px; }
     .note { font-size: 0.85rem; color: var(--muted); }
+
+    .feature { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
+    .feature img { aspect-ratio: 16 / 10; object-position: left top; }
+    @media (max-width: 680px) { .feature { grid-template-columns: 1fr; } }
+    .skills { display: grid; gap: 12px; }
+    .skills h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    footer a { color: inherit; }
 
     .list { list-style: none; display: grid; gap: 14px; }
     .list li { display: grid; grid-template-columns: 1fr; gap: 2px; }
@@ -104,7 +127,7 @@
 <body>
   <div class="wrap">
     <header>
-      <img src="images/me.jpg" alt="Blake Baldwin">
+      <img src="images/me.jpg" alt="Blake Baldwin" width="112" height="112">
       <div>
         <h1>Blake Baldwin</h1>
         <p>IT graduate studying a Master of Cyber Security. I build games and small apps on the side.</p>
@@ -116,61 +139,22 @@
       </div>
     </header>
 
-    <section id="projects">
-      <h2>Projects</h2>
-      <div class="grid">
-        <article class="card">
-          <a href="referee-app/"><img src="images/referee-app.jpg" alt="Referee app: the admin schedule, appointing available referees to matches" loading="lazy"></a>
+    <main>
+    <section id="featured">
+      <h2>Featured project</h2>
+      <article class="card feature">
+        <a href="referee-app/" tabindex="-1" aria-hidden="true"><img src="images/referee-app.jpg" alt="" width="960" height="495"></a>
+        <div style="display:flex;flex-direction:column;gap:10px">
           <h3>Referee Appointments System</h3>
-          <p>Scheduling for a community futsal club: availability, match appointments, venue shifts, pay and email alerts. Used by the club from 2020, then rebuilt in 2026 with proper security and tests.</p>
-          <div class="tags"><span>PHP</span><span>MySQL</span><span>jQuery</span><span>Security</span></div>
+          <p>Scheduling for a community futsal club: availability, match appointments, venue shifts, pay and email alerts. Used by the club from 2020, then rebuilt in 2026 to fix its security holes: hashed passwords, server-side sessions and role checks, prepared statements against SQL injection, CSRF protection, and automated security tests.</p>
+          <div class="tags"><span>PHP</span><span>MySQL</span><span>jQuery</span><span>Security</span><span>Playwright</span></div>
           <div class="actions">
             <a class="play" href="referee-app/demo/">Try the demo</a>
             <a href="referee-app/">Case study</a>
             <a href="https://github.com/ballsyblake/referee-appointments">Code</a>
           </div>
-        </article>
-
-        <article class="card">
-          <a href="https://ballsyblake.github.io/A-little-to-the-left/"><img src="images/just-so.jpg" alt="Just So: a row of mugs to turn so their handles match" loading="lazy"></a>
-          <h3>Just So</h3>
-          <p>A cozy tidying puzzle for your phone. 100 levels where everything has a right place.</p>
-          <div class="tags"><span>TypeScript</span><span>Vite</span><span>Mobile web</span></div>
-          <div class="actions">
-            <a class="play" href="https://ballsyblake.github.io/A-little-to-the-left/">Play</a>
-            <a href="https://github.com/ballsyblake/A-little-to-the-left">Code</a>
-          </div>
-        </article>
-
-        <article class="card">
-          <a href="https://ballsyblake.github.io/croc-2/"><img class="pixel" src="images/bimbles-bounce.jpg" alt="Bimble's Bounce: the mascot in a low-poly grassy level" loading="lazy"></a>
-          <h3>Bimble's Bounce</h3>
-          <p>A low-poly 3D collect-a-thon platformer that runs in iPhone Safari. Early test level.</p>
-          <div class="tags"><span>three.js</span><span>Rapier physics</span><span>PWA</span></div>
-          <div class="actions">
-            <a class="play" href="https://ballsyblake.github.io/croc-2/">Play</a>
-            <a href="https://github.com/ballsyblake/croc-2">Code</a>
-          </div>
-        </article>
-
-        <article class="card">
-          <h3>75 Hard Tracker</h3>
-          <p>A shared tracker for the 75 Hard challenge: daily checklist, progress photos, coins for streaks and a crew leaderboard.</p>
-          <div class="tags"><span>React</span><span>Firebase</span><span>Tailwind</span></div>
-          <p class="note">Private to my crew, so no public link.</p>
-        </article>
-
-        <article class="card">
-          <a href="gunther/"><img class="pixel" src="images/gunther.jpg" alt="Gunther: an archer fighting orcs among trees" loading="lazy"></a>
-          <h3>Gunther</h3>
-          <p>A medieval warband sandbox. Recruit and train soldiers, trade between towns, pick sides between two kingdoms and lead your army in real-time battles against an orc horde. Started in MonoGame and Godot, now playable in the browser.</p>
-          <div class="tags"><span>JavaScript</span><span>Canvas</span><span>Godot</span></div>
-          <div class="actions">
-            <a class="play" href="gunther/">Play</a>
-            <a href="https://github.com/ballsyblake/bnbaldwin/tree/master/gunther">Code</a>
-          </div>
-        </article>
-      </div>
+        </div>
+      </article>
     </section>
 
     <section id="about">
@@ -189,10 +173,50 @@
       </ul>
     </section>
 
+    <section id="projects">
+      <h2>Games and side projects</h2>
+      <div class="grid">
+        <article class="card">
+          <a href="gunther/" tabindex="-1" aria-hidden="true"><img class="pixel" src="images/gunther.jpg" alt="" loading="lazy" width="640" height="480"></a>
+          <h3>Gunther</h3>
+          <p>A medieval warband sandbox. Build an army, trade between towns, and lead it in real-time battles and sieges while five rival realms of humans, elves, dwarves and orcs go to war, ally and betray each other. Story campaign, heirs and mod support.</p>
+          <div class="tags"><span>JavaScript</span><span>Canvas</span><span>Game design</span></div>
+          <div class="actions">
+            <a class="play" href="gunther/">Play</a>
+            <a href="https://github.com/ballsyblake/bnbaldwin/tree/master/gunther">Code</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <a href="https://ballsyblake.github.io/A-little-to-the-left/" tabindex="-1" aria-hidden="true"><img src="images/just-so.jpg" alt="" loading="lazy" width="537" height="402"></a>
+          <h3>Just So</h3>
+          <p>A cozy tidying puzzle for your phone. 100 levels where everything has a right place.</p>
+          <div class="tags"><span>TypeScript</span><span>Vite</span><span>Mobile web</span></div>
+          <div class="actions">
+            <a class="play" href="https://ballsyblake.github.io/A-little-to-the-left/">Play</a>
+            <a href="https://github.com/ballsyblake/A-little-to-the-left">Code</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <a href="https://ballsyblake.github.io/croc-2/" tabindex="-1" aria-hidden="true"><img class="pixel" src="images/bimbles-bounce.jpg" alt="" loading="lazy" width="585" height="438"></a>
+          <h3>Bimble's Bounce</h3>
+          <p>A low-poly 3D collect-a-thon platformer that runs in iPhone Safari. Early test level.</p>
+          <div class="tags"><span>three.js</span><span>Rapier physics</span><span>PWA</span></div>
+          <div class="actions">
+            <a class="play" href="https://ballsyblake.github.io/croc-2/">Play</a>
+            <a href="https://github.com/ballsyblake/croc-2">Code</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section id="skills">
       <h2>Skills</h2>
-      <div class="tags">
-        <span>Cyber security fundamentals</span><span>Access control</span><span>System administration</span><span>Cloud and IoT</span><span>Python</span><span>SQL</span><span>TypeScript</span><span>React</span><span>Firebase</span><span>Power BI</span><span>Excel</span>
+      <div class="skills">
+        <div><h3>Security and infrastructure</h3><div class="tags"><span>Cyber security fundamentals</span><span>Access control</span><span>Secure web development</span><span>System administration</span><span>Cloud and IoT</span></div></div>
+        <div><h3>Development</h3><div class="tags"><span>Python</span><span>JavaScript</span><span>TypeScript</span><span>PHP</span><span>SQL</span><span>React</span><span>Firebase</span></div></div>
+        <div><h3>Data and reporting</h3><div class="tags"><span>Power BI</span><span>Excel</span><span>SQL</span></div></div>
       </div>
     </section>
 
@@ -203,8 +227,9 @@
         <li><strong>Bachelor of Information Technology, University of Canberra</strong><em>2018 to 2020, graduated</em><span>AI, cyber security and system administration, data science, cloud computing and IoT.</span></li>
       </ul>
     </section>
+    </main>
 
-    <footer>References available on request.</footer>
+    <footer>Blake Baldwin &middot; <a href="https://github.com/ballsyblake">GitHub</a> &middot; <a href="https://www.linkedin.com/in/blake-baldwin-22b68ba9/">LinkedIn</a></footer>
   </div>
 </body>
 </html>
