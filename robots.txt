@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+# Nothing to see here. Definitely do not look in /vault/
+Disallow: /vault/
 
 Sitemap: https://bnbaldwin.com/sitemap.xml
