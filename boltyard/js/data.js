@@ -5,8 +5,8 @@ export const MAX_LVL = 3;
 export const START_CREDITS = 250;
 export const BAY_COST = [0, 300, 900];        // cost to unlock bay 1, 2, 3
 export const BATTLE_TIME = 75;                // seconds before a timeout decision
-export const LOSS_PAYOUT = 0.3;               // share of the reward paid on a loss
-export const REPLAY_PAYOUT = 0.4;             // share of the reward paid when replaying a won arena
+export const LOSS_PAYOUT = 0.25;              // share of the reward paid on a loss
+export const REPLAY_PAYOUT = 0.25;            // share of the reward paid when replaying a won arena
 
 // shape = number of sides drawn for the hull
 export const FRAMES = {
@@ -86,20 +86,12 @@ export const LAYOUTS = {
             { t: 'c', x: 330, y: 400, r: 26 }, { t: 'c', x: 570, y: 400, r: 26 }, { t: 'c', x: 450, y: 280, r: 40 }],
   bunker:  [{ t: 'r', x: 230, y: 230, w: 30, h: 100 }, { t: 'r', x: 640, y: 230, w: 30, h: 100 },
             { t: 'r', x: 380, y: 60, w: 140, h: 36 }, { t: 'r', x: 380, y: 464, w: 140, h: 36 }],
+  grid:    [{ t: 'c', x: 300, y: 170, r: 22 }, { t: 'c', x: 450, y: 170, r: 22 }, { t: 'c', x: 600, y: 170, r: 22 },
+            { t: 'c', x: 300, y: 390, r: 22 }, { t: 'c', x: 450, y: 390, r: 22 }, { t: 'c', x: 600, y: 390, r: 22 }],
+  lanes:   [{ t: 'r', x: 260, y: 180, w: 380, h: 26 }, { t: 'r', x: 260, y: 354, w: 380, h: 26 }],
+  scrap:   [{ t: 'r', x: 250, y: 120, w: 50, h: 50 }, { t: 'c', x: 380, y: 400, r: 30 }, { t: 'r', x: 600, y: 390, w: 50, h: 50 },
+            { t: 'c', x: 520, y: 160, r: 30 }, { t: 'r', x: 430, y: 255, w: 40, h: 50 }],
 };
 
-// Enemy bot spec: f frame, d drive, w weapons, p plate, m module, lv level, hm hp multiplier.
-const B = (f, d, w, p = null, m = null, lv = 1, hm = 1) => ({ f, d, w, p, m, lv, hm });
-
-export const ARENAS = [
-  { name: 'Rust Pit',      layout: 'pit',    reward: 200,  team: [B('skiff', 'rollers', ['rivet'], null, null, 1, 0.7)] },
-  { name: 'Twin Posts',    layout: 'posts',  reward: 280,  team: [B('skiff', 'rollers', ['rivet'], null, null, 1, 0.65), B('skiff', 'rollers', ['grinder'], null, null, 1, 0.65)] },
-  { name: 'Crosscut',      layout: 'cross',  reward: 360,  team: [B('brick', 'rollers', ['scatter'], 'tin')] },
-  { name: 'Scrap Maze',    layout: 'maze',   reward: 460,  team: [B('brick', 'rollers', ['rivet'], 'tin'), B('skiff', 'rollers', ['grinder'])] },
-  { name: 'Pillar Ring',   layout: 'ring',   reward: 580,  team: [B('brick', 'treads', ['arc'], 'tin'), B('skiff', 'rollers', ['rivet'], 'tin', null, 1, 0.8)] },
-  { name: 'Bunker Line',   layout: 'bunker', reward: 720,  team: [B('brick', 'treads', ['arc'], 'steel'), B('skiff', 'rollers', ['grinder'], 'tin')] },
-  { name: 'Hammer Hall',   layout: 'cross',  reward: 880,  team: [B('warden', 'treads', ['scatter', 'grinder'], 'steel'), B('brick', 'rollers', ['rivet'], 'tin')] },
-  { name: 'Volt Garden',   layout: 'ring',   reward: 1060, team: [B('warden', 'strider', ['arc', 'rivet'], 'steel'), B('brick', 'hover', ['scatter'], 'tin')] },
-  { name: 'Iron Court',    layout: 'maze',   reward: 1300, team: [B('warden', 'treads', ['lobber', 'rivet'], 'steel'), B('brick', 'hover', ['arc'], 'tin'), B('skiff', 'rollers', ['grinder'], 'tin', 'booster')] },
-  { name: 'Grand Foundry', layout: 'bunker', reward: 2000, team: [B('titan', 'treads', ['rail', 'scatter'], 'steel'), B('brick', 'hover', ['arc'], 'tin'), B('skiff', 'rollers', ['grinder'], null, null, 1, 0.8)] },
-];
+// Arena list and enemy teams are written by tools/gen-arenas.mjs (tuned by simulation).
+export { ARENAS, LEAGUES } from './arenas.js';

@@ -37,14 +37,14 @@ function rotObs(o) {
 /**
  * teams: [[unit,...],[unit,...]] where unit = { st, tactic, color, name }
  */
-export function createBattle({ teams, layout = 'pit', seed = 1, portrait = false }) {
+export function createBattle({ teams, layout = 'pit', seed = 1, portrait = false, smart = [false, false] }) {
   const W = portrait ? LAND.H : LAND.W;
   const H = portrait ? LAND.W : LAND.H;
   const obs = (LAYOUTS[layout] || []).map((o) => (portrait ? rotObs(o) : { ...o }));
   const rand = mulberry32(seed);
   const b = {
     W, H, obs, rand, t: 0, bots: [], shots: [], events: [], over: false, winner: -1,
-    focus: [null, null], portrait,
+    focus: [null, null], portrait, smart, smartT: [0, 0],
   };
   let id = 0;
   teams.forEach((units, team) => {
@@ -387,9 +387,29 @@ function updateShots(b, dt) {
   b.shots = keep;
 }
 
+// Smart teams pick a shared target: the enemy that is cheapest to finish and close to them.
+function teamFocus(b, team, dt) {
+  b.smartT[team] -= dt;
+  const cur = b.focus[team];
+  if (cur && cur.alive && b.smartT[team] > 0) return;
+  b.smartT[team] = 1.5 + b.rand();
+  let cx = 0, cy = 0, n = 0;
+  for (const m of b.bots) if (m.alive && m.team === team) { cx += m.x; cy += m.y; n++; }
+  if (!n) return;
+  cx /= n; cy /= n;
+  let best = null, bs = Infinity;
+  for (const e of b.bots) {
+    if (!e.alive || e.team === team) continue;
+    const s = (e.hp + e.shield) * (1 + e.st.arm * 0.15) + Math.hypot(e.x - cx, e.y - cy) * 0.25;
+    if (s < bs) { bs = s; best = e; }
+  }
+  b.focus[team] = best;
+}
+
 export function step(b, dt) {
   if (b.over) return;
   b.t += dt;
+  for (let tm = 0; tm < 2; tm++) if (b.smart[tm]) teamFocus(b, tm, dt);
   for (const bot of b.bots) if (bot.alive) think(b, bot, dt);
   for (const bot of b.bots) {
     if (bot.alive) moveBot(b, bot, dt);

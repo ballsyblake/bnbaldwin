@@ -1,9 +1,9 @@
 // Boltyard: game state, garage, arenas and the battle loop.
 import {
-  CATS, FRAMES, DRIVES, WEAPONS, PLATES, MODULES, ARENAS, TACTICS, TEAM_COLORS, ENEMY_COLOR, BAY_COST,
+  CATS, FRAMES, DRIVES, WEAPONS, PLATES, MODULES, ARENAS, LEAGUES, TACTICS, TEAM_COLORS, ENEMY_COLOR, BAY_COST,
   START_CREDITS, MAX_LVL, LOSS_PAYOUT, REPLAY_PAYOUT, BATTLE_TIME, upgradeCost, lvlMul,
 } from './data.js';
-import { botStats, buildIssue, partsWeight, power, enemyBuild } from './bot.js';
+import { botStats, buildIssue, partsWeight, power, enemyBuild, enemyTactic } from './bot.js';
 import { createBattle, step } from './sim.js';
 import { drawBot, partIcon, botThumb, createView, drawBattle, absorbEvents, tickView, screenToWorld } from './render.js';
 
@@ -13,7 +13,7 @@ const $ = (s) => document.querySelector(s);
 // ---------- state ----------
 function fresh() {
   return {
-    v: 1, credits: START_CREDITS, nextId: 4, bays: 1, sel: 0, beaten: [], intro: false,
+    v: 2, credits: START_CREDITS, nextId: 4, bays: 1, sel: 0, beaten: [], intro: false,
     inv: [
       { id: 1, cat: 'frame', key: 'skiff', lvl: 1, spent: 60 },
       { id: 2, cat: 'drive', key: 'rollers', lvl: 1, spent: 30 },
@@ -28,10 +28,12 @@ function newBot(i, s = {}) {
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.v === 1) return s;
+    if (s && s.v === 2) return s;
+    if (s && s.v === 1) oldSave = true; // the 10-arena campaign: start over on the new one
   } catch (e) { /* no storage */ }
   return null;
 }
+let oldSave = false;
 let S = load() || fresh();
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } }
 
@@ -71,7 +73,7 @@ function teamUnits() {
 function enemyUnits(arena) {
   return arena.team.map((s, i) => {
     const b = enemyBuild(s);
-    return { st: botStats(b, s.hm), tactic: ['rush', 'range', 'flank'][i % 3], color: ENEMY_COLOR, name: 'R' + (i + 1), look: lookOf(b, ENEMY_COLOR) };
+    return { st: botStats(b, s.hm), tactic: enemyTactic(s, i), color: ENEMY_COLOR, name: 'R' + (i + 1), look: lookOf(b, ENEMY_COLOR) };
   });
 }
 
@@ -307,13 +309,18 @@ function renderArenas() {
   ARENAS.forEach((a, i) => {
     const won = S.beaten.includes(i);
     const open = i === 0 || S.beaten.includes(i - 1);
+    if (i === 0 || ARENAS[i - 1].league !== a.league) {
+      const inL = ARENAS.map((x, j) => j).filter((j) => ARENAS[j].league === a.league);
+      const done = inL.filter((j) => S.beaten.includes(j)).length;
+      html += `<div class="league"><b>${LEAGUES[a.league]}</b><span>${done}/${inL.length}</span></div>`;
+    }
     const foes = enemyUnits(a);
     const ep = foes.reduce((s, u) => s + power(u.st), 0);
     const cls = ep > mine * 1.15 ? 'hi' : ep < mine * 0.85 ? 'lo' : '';
     const pay = won ? Math.round(a.reward * REPLAY_PAYOUT) : a.reward;
-    html += `<div class="arena ${won ? 'won' : ''} ${open ? '' : 'locked'}">
+    html += `<div class="arena ${won ? 'won' : ''} ${open ? '' : 'locked'} ${a.boss ? 'boss' : ''}">
       <div class="num">${String(i + 1).padStart(2, '0')}</div>
-      <div class="mid"><b>${a.name}</b><div class="foes">${foes.map((u) => `<img alt="" src="${botThumb(u.look, 30)}">`).join('')}</div></div>
+      <div class="mid"><b>${a.name}${a.boss ? ' <span class="tag">BOSS</span>' : ''}</b><div class="foes">${foes.map((u) => `<img alt="" src="${botThumb(u.look, 30)}">`).join('')}</div></div>
       <div class="side"><span class="pw ${cls}">PWR ${ep}</span><span>${coin(pay)}</span></div>
       <button class="btn acc" data-act="fight" data-i="${i}" ${open ? '' : 'disabled'}>${won ? 'Again' : 'Fight'}</button>
     </div>`;
@@ -334,7 +341,7 @@ function startBattle(i) {
   el.classList.remove('hidden');
   const c = $('#arena');
   const portrait = c.clientHeight > c.clientWidth * 1.05;
-  B = createBattle({ teams: [team, enemyUnits(ARENAS[i])], layout: ARENAS[i].layout, seed: (Date.now() % 100000) + 1, portrait });
+  B = createBattle({ teams: [team, enemyUnits(ARENAS[i])], layout: ARENAS[i].layout, seed: (Date.now() % 100000) + 1, portrait, smart: [false, !!ARENAS[i].smart] });
   view = createView(c);
   paused = false; endT = 0; resultShown = false; rt = 0;
   $('#pauseBtn').textContent = 'II';
@@ -491,6 +498,7 @@ $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' && S.
 
 render();
 if (!S.intro) showIntro();
+if (oldSave) toast('New 20-arena campaign: progress reset');
 
 // Small hook so automated tests can read the game state. Not used by the game itself.
 window.__boltyard = { get state() { return S; }, get battle() { return B; }, get view() { return view; } };

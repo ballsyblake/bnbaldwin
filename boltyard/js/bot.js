@@ -77,3 +77,13 @@ export function enemyBuild(spec) {
     module: spec.m ? { key: spec.m, lvl: L } : null,
   };
 }
+
+// Tactic an enemy bot uses: its own if set, otherwise one that suits its weapons.
+export function enemyTactic(spec, i) {
+  if (spec.t) return spec.t;
+  const ranges = spec.w.map((k) => WEAPONS[k].range);
+  const mn = Math.min(...ranges);
+  if (mn >= 220) return 'range';
+  if (mn <= 20) return 'rush';
+  return i % 2 ? 'flank' : 'rush';
+}
