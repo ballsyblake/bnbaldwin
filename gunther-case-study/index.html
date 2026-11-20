@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gunther case study - Blake Baldwin</title>
+  <meta name="description" content="Case study: Gunther, a medieval warband sandbox that runs in the browser. Simulation, data-driven design and mods, with no build step.">
+    <meta property="og:type" content="article">
+  <meta property="og:url" content="https://bnbaldwin.com/gunther-case-study/">
+  <meta property="og:title" content="Gunther case study - Blake Baldwin">
+  <meta property="og:description" content="A medieval warband sandbox in the browser: five rival realms, real-time battles and sieges, moddable data.">
+  <meta property="og:image" content="https://bnbaldwin.com/gunther-case-study/map.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://bnbaldwin.com/gunther-case-study/">
+  <script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f6f5f2;
+      --surface: #ffffff;
+      --ink: #1b1d22;
+      --muted: #5d6270;
+      --line: #e2e0da;
+      --accent: #2f6fe4;
+      --accent-ink: #ffffff;
+      --tag: #eef2fb;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #121418;
+        --surface: #1b1e24;
+        --ink: #eceef2;
+        --muted: #a0a6b3;
+        --line: #2c3039;
+        --accent: #6a9cff;
+        --accent-ink: #0d1016;
+        --tag: #232a38;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #121418;
+      --surface: #1b1e24;
+      --ink: #eceef2;
+      --muted: #a0a6b3;
+      --line: #2c3039;
+      --accent: #6a9cff;
+      --accent-ink: #0d1016;
+      --tag: #232a38;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.6 "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+
+    header { padding: 56px 0 40px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+    header img { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; border: 3px solid var(--line); }
+    header h1 { font-size: clamp(2rem, 6vw, 2.75rem); font-weight: 800; line-height: 1.1; }
+    header p { color: var(--muted); margin-top: 6px; }
+    .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .links a {
+      text-decoration: none; font-weight: 600; font-size: 0.9rem;
+      padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink);
+    }
+    .links a:hover { border-color: var(--accent); color: var(--accent); }
+
+    section { padding: 32px 0; border-top: 1px solid var(--line); }
+    h2 { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 20px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .card h3 { font-size: 1.1rem; }
+    .card p { color: var(--muted); font-size: 0.95rem; flex: 1; }
+    .card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .card img.pixel { image-rendering: pixelated; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags span { font-size: 0.75rem; background: var(--tag); padding: 2px 8px; border-radius: 6px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.9rem; font-weight: 600; }
+    .play {
+      background: var(--accent); color: var(--accent-ink); text-decoration: none;
+      padding: 6px 14px; border-radius: 8px;
+    }
+    .note { font-size: 0.85rem; color: var(--muted); }
+
+    .list { list-style: none; display: grid; gap: 14px; }
+    .list li { display: grid; grid-template-columns: 1fr; gap: 2px; }
+    .list em { font-style: normal; color: var(--muted); font-size: 0.85rem; }
+    .list strong { font-weight: 600; }
+    .list span { color: var(--muted); font-size: 0.95rem; }
+
+    footer { padding: 32px 0 48px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); }
+  
+    .back { display: inline-block; margin: 32px 0 0; font-weight: 600; text-decoration: none; }
+    .lead { color: var(--muted); font-size: 1.05rem; margin-top: 8px; }
+    main h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 800; line-height: 1.15; margin-top: 16px; }
+    main p, main li { max-width: 68ch; }
+    main ul { padding-left: 20px; display: grid; gap: 6px; }
+    main h3 { font-size: 1.05rem; margin: 18px 0 6px; }
+    figure { margin: 18px 0; }
+    figure img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+    figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+    .shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+    .phone img { max-width: 260px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .tablewrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="../">&larr; Blake Baldwin</a>
+    <main>
+      <h1>Gunther</h1>
+      <p class="lead">A medieval warband sandbox that runs in any browser, phone included. Raise an army, trade between towns, and fight real-time battles and sieges while five rival realms go to war, make alliances and betray each other.</p>
+      <div class="tags" style="margin-top:14px"><span>JavaScript (ES modules)</span><span>Canvas 2D</span><span>JSON data</span><span>GitHub Pages</span><span>Playwright</span></div>
+      <div class="actions" style="margin-top:18px"><a class="play" href="../gunther/">Play Gunther</a><a href="https://github.com/ballsyblake/bnbaldwin/tree/master/gunther">Code on GitHub</a></div>
+
+      <figure>
+        <img src="map.jpg" alt="The island map in spring: a walled town with a market, roads and forest, and a minimap of the whole island" width="1200" height="692">
+        <figcaption>The overworld. Towns, villages and lords' armies all move on their own schedule; the player is one party among many.</figcaption>
+      </figure>
+
+      <section>
+        <h2>The problem</h2>
+        <p>Gunther started in 2019 as a MonoGame project, then moved to Godot. Both versions stalled: they needed an install to play, so nobody played them, and the code had no clear structure to grow into a bigger game.</p>
+        <p>The goal for the rebuild: something anyone can play from a link on a phone or a laptop, with the depth of a simulation sandbox rather than a single arena.</p>
+      </section>
+
+      <section>
+        <h2>What I built</h2>
+        <ul>
+          <li><strong>Two-layer game loop.</strong> A strategic map (travel, trade, recruit, diplomacy) feeds into real-time tactical battles, and the results flow back into the world.</li>
+          <li><strong>A world that runs without you.</strong> Five realms (humans, elves, dwarves and the orc clans) each have lords with traits and grudges. They declare wars, call allies to arms, refuse, and sometimes betray each other. Lords age, die and pass their titles to heirs.</li>
+          <li><strong>Skill-based combat.</strong> Directional sword swings, blocking and parrying, a bow you have to draw and aim, and orders for foot and archers. Armour and shields really stop arrows, so tactics matter more than numbers.</li>
+          <li><strong>Sieges and ownership.</strong> Towns have garrisons and walls; AI lords besiege them too, and the player can take and hold towns.</li>
+          <li><strong>A story campaign.</strong> Nine chapters told as dialogue with portraits, plus a short training fight that teaches the controls.</li>
+        </ul>
+        <div class="shots" style="margin-top:18px">
+          <figure><img src="combat.jpg" alt="Close-up of a melee: soldiers with swords and spears clash while archers fire from the flanks" loading="lazy" width="1000" height="609"><figcaption>Battles: every soldier is simulated, and weapons turn toward their target.</figcaption></figure>
+          <figure class="phone"><img src="phone.jpg" alt="Gunther running on a phone in portrait, showing a riverside village" loading="lazy" width="390" height="674"><figcaption>The same game on a phone.</figcaption></figure>
+        </div>
+      </section>
+
+      <section>
+        <h2>Engineering decisions</h2>
+        <h3>No build step</h3>
+        <p>The game is plain JavaScript modules loaded straight by the browser, drawn on a canvas, and hosted on GitHub Pages. There is nothing to install or compile, so it deploys on every push and anyone can read the source.</p>
+        <h3>Data, not code</h3>
+        <p>Troops, realms, lords, places, goods, skills, balance numbers and the whole story live in JSON files. Changing the game's balance means editing a number, not a function. The same format powers mods: players can load a JSON file from the title screen to add troops or change rules.</p>
+        <h3>All art drawn in code</h3>
+        <p>Early versions used third-party sprites with unclear licences. Every character and piece of scenery is now painted by code at runtime, which removed the licensing question and made it easy to restyle everything at once.</p>
+        <h3>Tested in a real browser</h3>
+        <p>Each change was checked with scripted Playwright runs that start a campaign, fight battles and take screenshots at desktop and phone sizes. One bug, where the camera change broke aiming with a mouse, taught me that tests have to move the mouse and check the result, not just take a picture.</p>
+        <figure>
+          <img src="siege.jpg" alt="A siege battle: the player's army attacks a stone wall defended by a garrison" loading="lazy" width="1200" height="694">
+          <figcaption>Storming a town. Walls and breaches change how the battle plays.</figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2>How it was made</h2>
+        <p>I set the design, wrote the brief for each stage, playtested every version and decided what to change. Most of the code was written with Claude Code, an AI coding assistant, one pull request at a time. Working this way taught me to write precise specifications, to test what I'm told works, and to break a big idea into stages that can each ship.</p>
+      </section>
+
+      <section>
+        <h2>Result</h2>
+        <ul>
+          <li>Playable at <a href="../gunther/">bnbaldwin.com/gunther</a> on desktop and phone, with saves kept in the browser.</li>
+          <li>About 6,200 lines of JavaScript across 19 modules, plus 11 data files.</li>
+          <li>Went from the first browser version to sieges, dynasties, diplomacy and a story campaign in 14 incremental releases.</li>
+        </ul>
+        <figure>
+          <img src="realms.jpg" alt="The realms panel listing each kingdom's wars and alliances and what the lords think of the player" loading="lazy" width="1200" height="694">
+          <figcaption>The realms panel: who is at war with whom, and what each lord thinks of you.</figcaption>
+        </figure>
+      </section>
+    </main>
+    <footer>Blake Baldwin</footer>
+  </div>
+</body>
+</html>
