@@ -50,8 +50,9 @@ export function createBattle({ teams, layout = 'pit', seed = 1, portrait = false
   teams.forEach((units, team) => {
     const n = units.length;
     units.forEach((u, i) => {
-      let x = team === 0 ? 90 : LAND.W - 90;
-      let y = LAND.H / 2 + (i - (n - 1) / 2) * 120;
+      // start positions vary a little each fight
+      let x = (team === 0 ? 90 : LAND.W - 90) + (rand() - 0.5) * 70;
+      let y = LAND.H / 2 + (i - (n - 1) / 2) * 120 + (rand() - 0.5) * 90;
       let a = team === 0 ? 0 : Math.PI;
       if (portrait) { const nx = y; y = LAND.W - x; x = nx; a -= Math.PI / 2; }
       const st = u.st;
@@ -59,7 +60,10 @@ export function createBattle({ teams, layout = 'pit', seed = 1, portrait = false
         id: id++, team, name: u.name, color: u.color, look: u.look, tactic: u.tactic || 'rush', st,
         x, y, vx: 0, vy: 0, a, ta: a, hp: st.hp, maxHp: st.hp, shield: st.shield, shieldT: 0,
         cd: st.weapons.map((w) => (rand() * 0.6) / w.rof), target: null, retarget: 0,
-        alive: true, hitT: 0, side: id % 2 ? 1 : -1, dmgDone: 0, kills: 0, deadT: 0,
+        alive: true, hitT: 0, side: rand() < 0.5 ? 1 : -1, dmgDone: 0, kills: 0, deadT: 0,
+        // movement personality, rolled fresh every fight
+        pref: 0.75 + rand() * 0.5, sway: 0.6 + rand() * 0.9, wa: rand() * Math.PI * 2,
+        sideT: 1 + rand() * 2.5, jukeT: 0, jukeX: 0, jukeY: 0,
       });
     });
   });
@@ -223,7 +227,7 @@ function think(b, bot, dt) {
   if (f && f.alive) bot.target = f;
   else if (!bot.target || !bot.target.alive || bot.retarget <= 0) {
     bot.target = pickTarget(b, bot);
-    bot.retarget = 0.7;
+    bot.retarget = 0.5 + b.rand() * 0.6;
   }
   const t = bot.target;
   let mx = 0, my = 0;
@@ -237,9 +241,12 @@ function think(b, bot, dt) {
     los = hasLOS(b, bot.x, bot.y, t.x, t.y);
     const minNeed = Math.max(0, ...st.weapons.map((w) => w.min || 0));
     let want;
-    if (bot.tactic === 'range') want = Math.max(minNeed + 10, st.minRange * 0.85);
-    else if (bot.tactic === 'flank') want = Math.max(minNeed + 10, st.minRange * 0.7);
-    else want = Math.max(minNeed + 10, st.minRange * 0.45);
+    if (bot.tactic === 'range') want = Math.max(minNeed + 10, st.minRange * Math.min(0.95, 0.85 * bot.pref));
+    else if (bot.tactic === 'flank') want = Math.max(minNeed + 10, st.minRange * 0.7 * bot.pref);
+    else want = Math.max(minNeed + 10, st.minRange * 0.45 * bot.pref);
+    // now and then switch strafe direction
+    bot.sideT -= dt;
+    if (bot.sideT <= 0) { if (b.rand() < 0.45) bot.side = -bot.side; bot.sideT = 1.2 + b.rand() * 2.8; }
     const px = -uy * bot.side, py = ux * bot.side;
     if (!los) {
       mx += ux; my += uy;
@@ -251,7 +258,7 @@ function think(b, bot, dt) {
         mx += qx * 1.1; my += qy * 1.1;
       }
     } else {
-      let strafe = bot.tactic === 'flank' ? 0.9 : bot.tactic === 'range' ? 0.35 : 0.15;
+      let strafe = (bot.tactic === 'flank' ? 0.9 : bot.tactic === 'range' ? 0.35 : 0.2) * bot.sway;
       if (edge > want) { mx += ux; my += uy; }
       else if (edge < minNeed || (bot.tactic !== 'rush' && edge < want * 0.6)) { mx -= ux; my -= uy; }
       else strafe *= 1.4;
@@ -261,6 +268,17 @@ function think(b, bot, dt) {
     const w0 = st.weapons[0];
     const lead = w0.pspd && w0.kind !== 'shell' ? d / w0.pspd : 0;
     aimA = Math.atan2(t.y + t.vy * lead - bot.y, t.x + t.vx * lead - bot.x);
+  }
+
+  // random wander, plus the odd sideways juke
+  bot.wa += (b.rand() - 0.5) * 6 * dt;
+  const wk = los ? 0.45 : 0.2;
+  mx += Math.cos(bot.wa) * wk; my += Math.sin(bot.wa) * wk;
+  if (bot.jukeT > 0) { bot.jukeT -= dt; mx += bot.jukeX; my += bot.jukeY; }
+  else if (t && los && b.rand() < dt * 0.3) {
+    const s2 = b.rand() < 0.5 ? 1 : -1;
+    const ang = Math.atan2(t.y - bot.y, t.x - bot.x) + s2 * (Math.PI / 2) + (b.rand() - 0.5) * 0.8;
+    bot.jukeT = 0.35 + b.rand() * 0.45; bot.jukeX = Math.cos(ang) * 1.6; bot.jukeY = Math.sin(ang) * 1.6;
   }
 
   // keep clear of obstacles, walls and other bots
