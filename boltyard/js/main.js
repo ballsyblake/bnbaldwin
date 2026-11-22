@@ -2,7 +2,9 @@
 import {
   CATS, FRAMES, DRIVES, WEAPONS, PLATES, MODULES, ARENAS, LEAGUES, TACTICS, TEAM_COLORS, ENEMY_COLOR, BAY_COST,
   START_CREDITS, MAX_LVL, LOSS_PAYOUT, REPLAY_PAYOUT, BATTLE_TIME, upgradeCost, lvlMul,
+  STAR_BONUS, STAR_HP, STAR_GOALS, RIVALS, LAYOUTS,
 } from './data.js';
+import { unlock as unlockSound, play, eventSound, soundOn, setSound } from './sfx.js';
 import { botStats, buildIssue, partsWeight, power, enemyBuild, enemyTactic } from './bot.js';
 import { createBattle, step } from './sim.js';
 import { DUEL_BUDGET, encodeTeam, decodeTeam, layoutFor, cleanName } from './duel.js';
@@ -15,7 +17,7 @@ const $ = (s) => document.querySelector(s);
 // ---------- state ----------
 function fresh() {
   return {
-    v: 2, credits: START_CREDITS, nextId: 4, bays: 1, sel: 0, beaten: [], intro: false,
+    v: 2, credits: START_CREDITS, nextId: 4, bays: 1, sel: 0, beaten: [], intro: false, stars: {},
     inv: [
       { id: 1, cat: 'frame', key: 'skiff', lvl: 1, spent: 60 },
       { id: 2, cat: 'drive', key: 'rollers', lvl: 1, spent: 30 },
@@ -38,6 +40,8 @@ function load() {
 let oldSave = false;
 // Two separate saves: the campaign (C) and the duel team (DU). S is whichever one is being edited.
 let C = load() || fresh();
+// stars[i] is a bit mask: 1 = won, 2 = no bot lost, 4 = half the team HP left. Older saves get the win star.
+if (!C.stars) { C.stars = {}; for (const i of C.beaten) C.stars[i] = 1; }
 function freshDuel() {
   return { v: 2, duel: true, credits: DUEL_BUDGET, nextId: 1, bays: 3, sel: 0, beaten: [], intro: true, inv: [],
     bots: [newBot(0), newBot(1), newBot(2)], name: '', record: {} };
@@ -317,17 +321,25 @@ function closeSheet() { $('#sheet').classList.add('hidden'); $('#sheet').innerHT
 // ---------- arenas ----------
 function teamPower() { return teamUnits().reduce((s, u) => s + power(u.st), 0); }
 
+const starMask = (i) => C.stars[i] || 0;
+const starCount = (i) => [1, 2, 4].filter((b) => starMask(i) & b).length;
+const starsHtml = (n, cls = '') => `<span class="stars ${cls}">${[0, 1, 2].map((k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</span>`;
+const totalStars = () => ARENAS.reduce((s, a, i) => s + starCount(i), 0);
+
 function renderArenas() {
   const mine = teamPower();
   const n = teamUnits().length;
-  let html = `<div class="teambar"><span>Team <b>${n}</b> bot${n === 1 ? '' : 's'}</span><span>PWR <b>${mine}</b></span></div>`;
+  const done = S.beaten.length;
+  let html = `<div class="camp"><div><b>${done}</b>/${ARENAS.length} arenas<i style="width:${(100 * done) / ARENAS.length}%"></i></div>
+    <div class="cs">${starsHtml(1)}<b>${totalStars()}</b>/${ARENAS.length * 3}</div></div>
+    <div class="teambar"><span>Team <b>${n}</b> bot${n === 1 ? '' : 's'}</span><span>PWR <b>${mine}</b></span></div>`;
   ARENAS.forEach((a, i) => {
     const won = S.beaten.includes(i);
     const open = i === 0 || S.beaten.includes(i - 1);
     if (i === 0 || ARENAS[i - 1].league !== a.league) {
       const inL = ARENAS.map((x, j) => j).filter((j) => ARENAS[j].league === a.league);
-      const done = inL.filter((j) => S.beaten.includes(j)).length;
-      html += `<div class="league"><b>${LEAGUES[a.league]}</b><span>${done}/${inL.length}</span></div>`;
+      const lDone = inL.filter((j) => S.beaten.includes(j)).length;
+      html += `<div class="league"><b>${LEAGUES[a.league]}</b><span>${lDone}/${inL.length}</span></div>`;
     }
     const foes = enemyUnits(a);
     const ep = foes.reduce((s, u) => s + power(u.st), 0);
@@ -336,12 +348,65 @@ function renderArenas() {
     html += `<div class="arena ${won ? 'won' : ''} ${open ? '' : 'locked'} ${a.boss ? 'boss' : ''}">
       <div class="num">${String(i + 1).padStart(2, '0')}</div>
       <div class="mid"><b>${a.name}${a.boss ? ' <span class="tag">BOSS</span>' : ''}</b><div class="foes">${foes.map((u) => `<img alt="" src="${botThumb(u.look, 30)}">`).join('')}</div></div>
-      <div class="side"><span class="pw ${cls}">PWR ${ep}</span><span>${coin(pay)}</span></div>
-      <button class="btn acc" data-act="fight" data-i="${i}" ${open ? '' : 'disabled'}>${won ? 'Again' : 'Fight'}</button>
+      <div class="side"><span class="pw ${cls}">PWR ${ep}</span>${won ? starsHtml(starCount(i)) : `<span>${coin(pay)}</span>`}</div>
+      <button class="btn acc" data-act="brief" data-i="${i}" ${open ? '' : 'disabled'}>${won ? 'Again' : 'Fight'}</button>
     </div>`;
   });
   html += `<div class="foot"><button class="btn" data-act="reset" id="resetBtn">Reset progress</button></div>`;
   $('#view').innerHTML = html;
+}
+
+// ---------- arena briefing ----------
+const TACTIC_LABEL = { rush: 'Rush', range: 'Range', flank: 'Flank' };
+function mapThumb(layout, w = 180) {
+  const h = Math.round((w * 560) / 900), k = w / 900;
+  const c = document.createElement('canvas');
+  c.width = w * 2; c.height = h * 2;
+  const g = c.getContext('2d');
+  g.scale(2, 2);
+  g.fillStyle = '#23262c'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#3a3f48'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+  g.fillStyle = '#4a505b';
+  for (const o of LAYOUTS[layout] || []) {
+    if (o.t === 'c') { g.beginPath(); g.arc(o.x * k, o.y * k, o.r * k, 0, Math.PI * 2); g.fill(); }
+    else g.fillRect(o.x * k, o.y * k, o.w * k, o.h * k);
+  }
+  g.fillStyle = TEAM_COLORS[0]; g.fillRect(8, h / 2 - 8, 4, 16);
+  g.fillStyle = ENEMY_COLOR; g.fillRect(w - 12, h / 2 - 8, 4, 16);
+  return c.toDataURL();
+}
+function openBrief(i) {
+  S = C;
+  const a = ARENAS[i];
+  const foes = enemyUnits(a);
+  const ep = pwr(foes), mine = teamPower();
+  const won = S.beaten.includes(i), mask = starMask(i);
+  const pay = won ? Math.round(a.reward * REPLAY_PAYOUT) : a.reward;
+  const rows = a.team.map((spec, k) => {
+    const u = foes[k], st = u.st;
+    const ws = spec.w.map((w) => WEAPONS[w].name).join(' + ');
+    return `<div class="row foe"><img alt="" src="${botThumb(u.look, 40)}"><span class="nm"><b>${ws}${lv(spec.lv)}</b>
+      <span class="kv" style="display:block;text-align:left">HP <em>${st.hp}</em> ARM <em>${st.arm}</em> SPD <em>${st.spd}</em> RNG <em>${st.range}</em></span></span>
+      <span class="tac">${TACTIC_LABEL[u.tactic]}</span></div>`;
+  }).join('');
+  const goals = STAR_GOALS.map((g, k) => {
+    const has = mask & (1 << k);
+    const bonus = k === 0 || has ? '' : `<span class="bon">+${coin(Math.round(a.reward * STAR_BONUS))}</span>`;
+    return `<li class="${has ? 'got' : ''}">${starsHtml(has ? 1 : 0, 'one')}<span>${g}</span>${bonus}</li>`;
+  }).join('');
+  const cls = ep > mine * 1.15 ? 'hi' : ep < mine * 0.85 ? 'lo' : '';
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="sheet-in brief"><header><b>${String(i + 1).padStart(2, '0')} ${a.name}</b><button class="x" data-act="close" aria-label="Close">&times;</button></header>
+    <div class="bhead"><img class="map" alt="" src="${mapThumb(a.layout)}">
+      <div class="bside"><small>${LEAGUES[a.league]}${a.boss ? ' <span class="tag">BOSS</span>' : ''}</small>
+      <div class="vs"><span>You <b>${mine}</b></span><span class="pw ${cls}">Them <b>${ep}</b></span></div>
+      <div>${coin(pay)}${a.smart ? ' <span class="smart">FOCUS FIRE</span>' : ''}</div></div></div>
+    ${RIVALS[a.name] ? `<p class="rival">"${RIVALS[a.name]}"</p>` : ''}
+    <h4>Enemy</h4>${rows}
+    <h4>Stars</h4><ul class="goals">${goals}</ul>
+    <div class="acts"><button class="btn" data-act="tab" data-tab="garage">Garage</button><button class="btn acc" data-act="fight" data-i="${i}">Fight</button></div></div>`;
+  sh.classList.remove('hidden');
+  sh.dataset.slot = '';
 }
 
 // ---------- duel ----------
@@ -416,10 +481,12 @@ async function shareChallenge(text) {
 
 // ---------- battle ----------
 let B = null, view = null, arenaIdx = 0, speed = 1, paused = false, endT = 0, raf = 0, last = 0, rt = 0, resultShown = false;
+let countT = 0, countShown = -1; // pre-fight countdown (seconds left)
 
 function startBattle(i) {
   const duel = i < 0;
   S = duel ? DU : C;
+  closeSheet();
   const team = duel ? duelUnits(duelTeam(), null, 'B') : teamUnits();
   if (!team.length) { toast('No bot is ready: check the garage'); tab = 'garage'; render(); return; }
   if (!duel && team.length < S.bays) toast(`${S.bays - team.length} bot sits out (not ready)`);
@@ -435,9 +502,13 @@ function startBattle(i) {
   paused = false; endT = 0; resultShown = false; rt = 0;
   $('#pauseBtn').textContent = 'II';
   $('#result').classList.add('hidden');
+  const a = duel ? null : ARENAS[i];
+  $('#countTitle').innerHTML = duel ? `vs ${esc(incoming.name)}` : `${a.name}${a.boss ? ' <span class="tag">BOSS</span>' : ''}`;
+  $('#count').classList.remove('hidden');
+  countT = 2.4; countShown = -1;
   const hint = $('#hint');
   hint.style.opacity = 1;
-  setTimeout(() => (hint.style.opacity = 0), 3500);
+  setTimeout(() => (hint.style.opacity = 0), 5000);
   last = performance.now();
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
@@ -450,11 +521,21 @@ function loop(now) {
   const real = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (!B) return;
-  if (!paused) {
+  if (countT > 0) {
+    countT -= real;
+    const n = Math.ceil(countT / 0.8);
+    if (n !== countShown) {
+      countShown = n;
+      $('#countNum').textContent = n > 0 ? n : 'GO';
+      play(n > 0 ? 'tick' : 'go');
+    }
+    if (countT <= 0) setTimeout(() => $('#count').classList.add('hidden'), 350);
+  } else if (!paused) {
     acc += real * speed;
     while (acc >= DT) {
       step(B, DT);
       absorbEvents(view, B);
+      for (const e of B.events) eventSound(e);
       B.events.length = 0;
       acc -= DT;
     }
@@ -472,14 +553,21 @@ function loop(now) {
   }
 }
 
+function teamRows() {
+  const mine = B.bots.filter((x) => x.team === 0);
+  const mvp = mine.length > 1 ? mine.reduce((m, x) => (x.dmgDone > m.dmgDone ? x : m)) : null;
+  return mine.map((x) =>
+    `<tr><td style="color:${x.color}">${x.name}${x === mvp ? ' <span class="mvp">MVP</span>' : ''}</td><td>${Math.round(x.dmgDone)}</td><td>${x.kills}</td><td>${x.alive ? Math.round((100 * x.hp) / x.maxHp) + '%' : 'KO'}</td></tr>`).join('');
+}
+
 function showDuelResult() {
   const win = B.winner === 0;
+  play(win ? 'win' : 'loss');
   const r = DU.record[incoming.name] || { w: 0, l: 0 };
   if (win) r.w++; else r.l++;
   DU.record[incoming.name] = r;
   try { localStorage.setItem(DUEL_KEY, JSON.stringify(DU)); } catch (e) { /* */ }
-  const rows = B.bots.filter((x) => x.team === 0).map((x) =>
-    `<tr><td style="color:${x.color}">${x.name}</td><td>${Math.round(x.dmgDone)}</td><td>${x.kills}</td><td>${x.alive ? Math.round((100 * x.hp) / x.maxHp) + '%' : 'KO'}</td></tr>`).join('');
+  const rows = teamRows();
   $('#result').innerHTML = `<div class="box">
     <h2 class="${win ? 'win' : 'loss'}">${win ? 'VICTORY' : 'DEFEAT'}</h2>
     <div style="color:var(--muted);font-size:12px">Duel vs ${esc(incoming.name)}${B.timeout ? ' · time' : ''}</div>
@@ -499,24 +587,42 @@ function showResult() {
   const a = ARENAS[arenaIdx];
   const win = B.winner === 0;
   const first = win && !S.beaten.includes(arenaIdx);
-  const pay = Math.round(a.reward * (win ? (first ? 1 : REPLAY_PAYOUT) : LOSS_PAYOUT));
+  let pay = Math.round(a.reward * (win ? (first ? 1 : REPLAY_PAYOUT) : LOSS_PAYOUT));
+  // stars: 1 win, 2 no bot lost, 3 at least half the team's HP left. Each new star 2/3 pays a one-time bonus.
+  const mine = B.bots.filter((x) => x.team === 0);
+  const hpShare = mine.reduce((s, x) => s + Math.max(0, x.hp), 0) / mine.reduce((s, x) => s + x.maxHp, 0);
+  const earned = [win, win && mine.every((x) => x.alive), win && hpShare >= STAR_HP];
+  const had = starMask(arenaIdx);
+  let bonus = 0;
+  for (const k of [1, 2]) if (earned[k] && !(had & (1 << k))) bonus += Math.round(a.reward * STAR_BONUS);
+  if (win) C.stars[arenaIdx] = had | earned.reduce((m, e, k) => m | (e ? 1 << k : 0), 0);
+  pay += bonus;
   S.credits += pay;
   if (first) S.beaten.push(arenaIdx);
   save();
-  const rows = B.bots.filter((x) => x.team === 0).map((x) =>
-    `<tr><td style="color:${x.color}">${x.name}</td><td>${Math.round(x.dmgDone)}</td><td>${x.kills}</td><td>${x.alive ? Math.round((100 * x.hp) / x.maxHp) + '%' : 'KO'}</td></tr>`).join('');
+  const leagueDone = first && ARENAS.every((x, j) => x.league !== a.league || S.beaten.includes(j));
+  const champion = leagueDone && a.league === LEAGUES.length - 1;
+  const banner = champion ? `<div class="banner gold">BOLTYARD CHAMPION<small>Next: all ${ARENAS.length * 3} stars</small></div>`
+    : leagueDone ? `<div class="banner">${LEAGUES[a.league]} cleared<small>${LEAGUES[a.league + 1]} open</small></div>` : '';
+  const goalRow = STAR_GOALS.map((g, k) => `<span class="${earned[k] ? 'got' : ''}">${g}</span>`).join('');
+  const rows = teamRows();
   const next = win && arenaIdx + 1 < ARENAS.length;
   $('#result').innerHTML = `<div class="box">
     <h2 class="${win ? 'win' : 'loss'}">${win ? 'VICTORY' : 'DEFEAT'}</h2>
     <div style="color:var(--muted);font-size:12px">${a.name}${B.timeout ? ' · time' : ''}</div>
-    <div class="pay">+${coin(pay)}</div>
+    ${banner}
+    <div class="rstars">${[0, 1, 2].map((k) => `<i class="${earned[k] ? 'on' : ''}" style="animation-delay:${0.25 + k * 0.3}s"></i>`).join('')}</div>
+    <div class="goalrow">${goalRow}</div>
+    <div class="pay"><span>+${coin(pay)}</span>${bonus ? `<small>incl. star bonus ${bonus}</small>` : ''}</div>
     <table><tr><th>BOT</th><th>DMG</th><th>KO</th><th>HP</th></tr>${rows}</table>
     <div class="acts">
       <button class="btn" data-act="leave">Garage</button>
       <button class="btn" data-act="fight" data-i="${arenaIdx}">Retry</button>
-      ${next ? `<button class="btn acc" data-act="fight" data-i="${arenaIdx + 1}">Next</button>` : ''}
+      ${next ? `<button class="btn acc" data-act="nextBrief" data-i="${arenaIdx + 1}">Next</button>` : ''}
     </div></div>`;
   $('#result').classList.remove('hidden');
+  play(win ? 'win' : 'loss');
+  earned.forEach((e, k) => e && setTimeout(() => play('star'), 600 + k * 300));
 }
 
 function leaveBattle() {
@@ -537,6 +643,7 @@ $('#arena').addEventListener('pointerdown', (e) => {
     const d = Math.hypot(bot.x - p.x, bot.y - p.y);
     if (d < bot.st.r + 22 && d < bd) { bd = d; best = bot; }
   }
+  if (countT > 0) { countT = 0.01; return; } // tap skips the countdown
   B.focus[0] = best && best !== B.focus[0] ? best : null;
   $('#hint').style.opacity = 0;
 });
@@ -580,6 +687,7 @@ function render() {
 }
 
 let resetArmed = false;
+document.addEventListener('pointerdown', unlockSound);
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
@@ -605,6 +713,9 @@ document.addEventListener('click', (e) => {
     case 'unequip': unequip(d.slot); break;
     case 'sell': sell(+d.id, d.slot); break;
     case 'fight': startBattle(+d.i); break;
+    case 'brief': openBrief(+d.i); break;
+    case 'nextBrief': leaveBattle(); tab = 'arenas'; render(); openBrief(+d.i); break;
+    case 'sound': setSound(!soundOn()); el.classList.toggle('off', !soundOn()); break;
     case 'leave': leaveBattle(); break;
     case 'quit': leaveBattle(); toast('Left the arena: no pay'); break;
     case 'speed': speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; el.textContent = speed + 'x'; break;
@@ -621,6 +732,7 @@ $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' && C.
 readHash();
 window.addEventListener('hashchange', () => { if (readHash()) { closeSheet(); render(); } });
 render();
+$('#soundBtn').classList.toggle('off', !soundOn());
 if (!C.intro) showIntro();
 if (oldSave) toast('New 20-arena campaign: progress reset');
 

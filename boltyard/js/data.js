@@ -7,6 +7,17 @@ export const BAY_COST = [0, 300, 900];        // cost to unlock bay 1, 2, 3
 export const BATTLE_TIME = 75;                // seconds before a timeout decision
 export const LOSS_PAYOUT = 0.25;              // share of the reward paid on a loss
 export const REPLAY_PAYOUT = 0.25;            // share of the reward paid when replaying a won arena
+export const STAR_BONUS = 0.1;                // one-time share of the reward for each of stars 2 and 3
+export const STAR_HP = 0.5;                   // star 3: win with at least this share of team HP left
+export const STAR_GOALS = ['Win', 'No bot lost', 'Keep 50% HP'];
+
+// One line from each league's boss, shown on the arena briefing.
+export const RIVALS = {
+  'The Junk King': 'Every bolt in your bot was mine first.',
+  'Iron Matron': 'Nothing gets past the line. Nothing.',
+  'Thunderhead': 'You will hear me long before you see me.',
+  'Grand Foundry': 'I built the champions you think you can beat.',
+};
 
 // shape = number of sides drawn for the hull
 export const FRAMES = {
