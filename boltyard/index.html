@@ -16,7 +16,10 @@
 <body>
   <header class="top">
     <div class="logo">BOLT<span>YARD</span></div>
-    <div class="cr" id="credits">0</div>
+    <div class="topr">
+      <button class="snd" id="soundBtn" data-act="sound" aria-label="Sound on or off"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path class="m" d="M16 9l6 6M22 9l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <div class="cr" id="credits">0</div>
+    </div>
   </header>
   <nav class="tabs">
     <button data-act="tab" data-tab="garage" class="on">Garage</button>
@@ -36,6 +39,7 @@
       <button data-act="quit" aria-label="Leave battle">&times;</button>
     </div>
     <div class="hint" id="hint">Tap a foe to focus fire</div>
+    <div class="count hidden" id="count"><div id="countTitle"></div><b id="countNum">3</b></div>
     <div class="result hidden" id="result"></div>
   </section>
   <div id="toast" class="toast"></div>
