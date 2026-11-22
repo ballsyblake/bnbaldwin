@@ -5,9 +5,11 @@ import {
 } from './data.js';
 import { botStats, buildIssue, partsWeight, power, enemyBuild, enemyTactic } from './bot.js';
 import { createBattle, step } from './sim.js';
+import { DUEL_BUDGET, encodeTeam, decodeTeam, layoutFor, cleanName } from './duel.js';
 import { drawBot, partIcon, botThumb, createView, drawBattle, absorbEvents, tickView, screenToWorld } from './render.js';
 
 const SAVE_KEY = 'boltyard.v1';
+const DUEL_KEY = 'boltyard.duel';
 const $ = (s) => document.querySelector(s);
 
 // ---------- state ----------
@@ -34,8 +36,20 @@ function load() {
   return null;
 }
 let oldSave = false;
-let S = load() || fresh();
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } }
+// Two separate saves: the campaign (C) and the duel team (DU). S is whichever one is being edited.
+let C = load() || fresh();
+function freshDuel() {
+  return { v: 2, duel: true, credits: DUEL_BUDGET, nextId: 1, bays: 3, sel: 0, beaten: [], intro: true, inv: [],
+    bots: [newBot(0), newBot(1), newBot(2)], name: '', record: {} };
+}
+function loadDuel() {
+  try { const s = JSON.parse(localStorage.getItem(DUEL_KEY)); if (s && s.duel) return s; } catch (e) { /* no storage */ }
+  return freshDuel();
+}
+let DU = loadDuel();
+let S = C;
+function save() { try { localStorage.setItem(S === DU ? DUEL_KEY : SAVE_KEY, JSON.stringify(S)); } catch (e) { /* private mode */ } }
+const refund = (it) => Math.floor(it.spent / (S.duel ? 1 : 2)); // duel drafts refund in full
 
 const item = (id) => S.inv.find((x) => x.id === id) || null;
 const def = (cat, key) => CATS[cat].defs[key];
@@ -178,7 +192,7 @@ function sell(id, slot) {
     for (const k of ['frame', 'drive', 'plate', 'module']) if (b.slots[k] === id) b.slots[k] = null;
     b.slots.weapons = b.slots.weapons.filter((x) => x !== id);
   }
-  S.credits += Math.floor(it.spent / 2);
+  S.credits += refund(it);
   S.inv = S.inv.filter((x) => x.id !== id);
   save(); render(); openPicker(slot);
 }
@@ -235,7 +249,8 @@ function renderGarage() {
 
   const tactics = Object.entries(TACTICS).map(([k, t]) => `<button data-act="tactic" data-t="${k}" class="${bot.tactic === k ? 'on' : ''}">${t.label}<small>${t.hint}</small></button>`).join('');
 
-  $('#view').innerHTML = `
+  const banner = S.duel ? `<div class="duelbar"><span>DUEL TEAM <b>${DUEL_BUDGET - S.credits}</b>/${DUEL_BUDGET}</span><button class="btn" data-act="tab" data-tab="duel">Done</button></div>` : '';
+  $('#view').innerHTML = `${banner}
     <div class="bays">${bays}</div>
     <div class="botcard">
       <canvas id="preview" width="256" height="256"></canvas>
@@ -270,7 +285,7 @@ function openPicker(slot) {
       <div class="acts">
         ${cur.lvl < MAX_LVL ? `<button class="btn acc" data-act="upgrade" data-id="${cur.id}" data-slot="${slot}" ${S.credits < up ? 'disabled' : ''}>Upgrade ${coin(up)}</button>` : '<button class="btn" disabled>Max level</button>'}
         <button class="btn" data-act="unequip" data-slot="${slot}">Remove</button>
-        <button class="btn" data-act="sell" data-id="${cur.id}" data-slot="${slot}">Sell +${coin(Math.floor(cur.spent / 2))}</button>
+        <button class="btn" data-act="sell" data-id="${cur.id}" data-slot="${slot}">Sell +${coin(refund(cur))}</button>
       </div></div>`;
   }
   const spare = S.inv.filter((x) => x.cat === cat && !used.has(x.id));
@@ -279,7 +294,7 @@ function openPicker(slot) {
     for (const x of spare) {
       const ok = !needFrame && fits(bot, slot, x.key);
       html += `<div class="row"><img alt="" src="${partIcon(cat, x.key)}"><span class="nm"><b>${def(cat, x.key).name}${lv(x.lvl)}</b><span class="kv" style="display:block;text-align:left">${statLine(cat, x.key, x.lvl)}${wtTag(x.key)}</span></span>
-        <button class="btn" data-act="sell" data-id="${x.id}" data-slot="${slot}">+${coin(Math.floor(x.spent / 2))}</button>
+        <button class="btn" data-act="sell" data-id="${x.id}" data-slot="${slot}">+${coin(refund(x))}</button>
         <button class="btn acc" data-act="equip" data-id="${x.id}" data-slot="${slot}" ${ok ? '' : 'disabled'}>Fit</button></div>`;
     }
   }
@@ -329,19 +344,93 @@ function renderArenas() {
   $('#view').innerHTML = html;
 }
 
+// ---------- duel ----------
+let incoming = null; // { code, name, team, cost } from a challenge link
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function duelTeam() {
+  return DU.bots.map((bot) => ({ build: buildOf(bot), tactic: bot.tactic })).filter((t) => !buildIssue(t.build));
+}
+function duelUnits(team, color, prefix) {
+  return team.map((t, i) => ({ st: botStats(t.build), tactic: t.tactic, color: color || TEAM_COLORS[i], name: prefix + (i + 1), look: lookOf(t.build, color || TEAM_COLORS[i]) }));
+}
+const thumbs = (units) => units.map((u) => `<img alt="" src="${botThumb(u.look, 36)}">`).join('');
+const pwr = (units) => units.reduce((x, u) => x + power(u.st), 0);
+
+function readHash() {
+  const m = location.hash.match(/^#duel=(.+)$/);
+  if (!m) return false;
+  const r = decodeTeam(m[1]);
+  if (r.error) { toast(r.error); return false; }
+  incoming = { ...r, code: m[1] };
+  tab = 'duel';
+  return true;
+}
+
+function renderDuel() {
+  const mine = duelTeam();
+  const mu = duelUnits(mine, null, 'B');
+  const rec = (n) => DU.record[n] || { w: 0, l: 0 };
+  let html = `<p class="lead">Both sides get ${coin(DUEL_BUDGET)} to build with. Build a team, send the link, and your friend fights it on their own device.</p>
+    <label class="namefield">Your name <input id="duelName" maxlength="12" autocomplete="off" placeholder="anon" value="${esc(DU.name)}"></label>`;
+  if (incoming) {
+    const iu = duelUnits(incoming.team, ENEMY_COLOR, 'R');
+    const r = rec(incoming.name);
+    html += `<div class="dcard in"><div class="dtop"><b>Challenge from ${esc(incoming.name)}</b><span>PWR ${pwr(iu)}</span></div>
+      <div class="foes">${thumbs(iu)}</div>
+      <div class="dsub">Spent ${incoming.cost}/${DUEL_BUDGET} · You ${r.w}-${r.l}</div>
+      <div class="acts"><button class="btn acc" data-act="duelfight" ${mine.length ? '' : 'disabled'}>Fight</button></div>
+      ${mine.length ? '' : '<div class="issue">Build your duel team first</div>'}</div>`;
+  }
+  html += `<div class="dcard"><div class="dtop"><b>Your duel team</b><span>PWR ${pwr(mu)}</span></div>
+    <div class="foes">${mine.length ? thumbs(mu) : '<span class="dsub">No bots ready yet</span>'}</div>
+    <div class="dsub">Spent ${DUEL_BUDGET - DU.credits}/${DUEL_BUDGET}</div>
+    <div class="acts"><button class="btn" data-act="duelEdit">Edit team</button>
+    <button class="btn acc" data-act="duelShare" ${mine.length ? '' : 'disabled'}>Send challenge</button></div></div>`;
+  const names = Object.keys(DU.record);
+  if (names.length) {
+    html += '<h4 class="sub">Record</h4>' + names.map((n) => `<div class="recrow"><span>${esc(n)}</span><b>${DU.record[n].w}-${DU.record[n].l}</b></div>`).join('');
+  }
+  html += `<div class="foot"><button class="btn" data-act="duelReset" id="duelResetBtn">Clear duel team</button></div>`;
+  $('#view').innerHTML = html;
+  $('#duelName').addEventListener('input', (e) => { DU.name = cleanName(e.target.value); try { localStorage.setItem(DUEL_KEY, JSON.stringify(DU)); } catch (er) { /* */ } });
+}
+
+function challengeURL() {
+  const code = encodeTeam(DU.name, duelTeam());
+  return location.origin + location.pathname + '#duel=' + code;
+}
+async function shareChallenge(text) {
+  const url = challengeURL();
+  window.__lastShare = url; // read by tests
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Boltyard duel', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Challenge link copied'); return; } catch (e) { /* no clipboard */ }
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="sheet-in"><header><b>Challenge link</b><button class="x" data-act="close" aria-label="Close">&times;</button></header>
+    <p class="dsub">Copy this and send it to a friend.</p><input class="linkbox" readonly value="${esc(url)}"></div>`;
+  sh.classList.remove('hidden');
+  const box = sh.querySelector('.linkbox'); box.focus(); box.select();
+}
+
 // ---------- battle ----------
 let B = null, view = null, arenaIdx = 0, speed = 1, paused = false, endT = 0, raf = 0, last = 0, rt = 0, resultShown = false;
 
 function startBattle(i) {
-  const team = teamUnits();
+  const duel = i < 0;
+  S = duel ? DU : C;
+  const team = duel ? duelUnits(duelTeam(), null, 'B') : teamUnits();
   if (!team.length) { toast('No bot is ready: check the garage'); tab = 'garage'; render(); return; }
-  if (team.length < S.bays) toast(`${S.bays - team.length} bot sits out (not ready)`);
+  if (!duel && team.length < S.bays) toast(`${S.bays - team.length} bot sits out (not ready)`);
   arenaIdx = i;
   const el = $('#battle');
   el.classList.remove('hidden');
   const c = $('#arena');
   const portrait = c.clientHeight > c.clientWidth * 1.05;
-  B = createBattle({ teams: [team, enemyUnits(ARENAS[i])], layout: ARENAS[i].layout, seed: (Date.now() % 100000) + 1, portrait, smart: [false, !!ARENAS[i].smart] });
+  const foes = duel ? duelUnits(incoming.team, ENEMY_COLOR, 'R') : enemyUnits(ARENAS[i]);
+  const layout = duel ? layoutFor(incoming.code) : ARENAS[i].layout;
+  B = createBattle({ teams: [team, foes], layout, seed: (Date.now() % 100000) + 1, portrait, smart: [false, duel || !!ARENAS[i].smart] });
   view = createView(c);
   paused = false; endT = 0; resultShown = false; rt = 0;
   $('#pauseBtn').textContent = 'II';
@@ -383,8 +472,30 @@ function loop(now) {
   }
 }
 
+function showDuelResult() {
+  const win = B.winner === 0;
+  const r = DU.record[incoming.name] || { w: 0, l: 0 };
+  if (win) r.w++; else r.l++;
+  DU.record[incoming.name] = r;
+  try { localStorage.setItem(DUEL_KEY, JSON.stringify(DU)); } catch (e) { /* */ }
+  const rows = B.bots.filter((x) => x.team === 0).map((x) =>
+    `<tr><td style="color:${x.color}">${x.name}</td><td>${Math.round(x.dmgDone)}</td><td>${x.kills}</td><td>${x.alive ? Math.round((100 * x.hp) / x.maxHp) + '%' : 'KO'}</td></tr>`).join('');
+  $('#result').innerHTML = `<div class="box">
+    <h2 class="${win ? 'win' : 'loss'}">${win ? 'VICTORY' : 'DEFEAT'}</h2>
+    <div style="color:var(--muted);font-size:12px">Duel vs ${esc(incoming.name)}${B.timeout ? ' · time' : ''}</div>
+    <div class="pay">${r.w}-${r.l}</div>
+    <table><tr><th>BOT</th><th>DMG</th><th>KO</th><th>HP</th></tr>${rows}</table>
+    <div class="acts">
+      <button class="btn" data-act="leave">Back</button>
+      <button class="btn" data-act="duelfight">Again</button>
+      <button class="btn acc" data-act="duelReply" data-win="${win ? 1 : 0}">Send yours</button>
+    </div></div>`;
+  $('#result').classList.remove('hidden');
+}
+
 function showResult() {
   resultShown = true;
+  if (arenaIdx < 0) { showDuelResult(); return; }
   const a = ARENAS[arenaIdx];
   const win = B.winner === 0;
   const first = win && !S.beaten.includes(arenaIdx);
@@ -460,9 +571,12 @@ function showIntro() {
 
 // ---------- render + events ----------
 function render() {
+  if (tab === 'arenas') S = C;
+  if (tab === 'duel') S = DU;
   $('#credits').textContent = S.credits;
   document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  if (tab === 'garage') renderGarage(); else { previewLook = null; renderArenas(); }
+  if (tab === 'garage') renderGarage();
+  else { previewLook = null; if (tab === 'duel') renderDuel(); else renderArenas(); }
 }
 
 let resetArmed = false;
@@ -471,7 +585,15 @@ document.addEventListener('click', (e) => {
   if (!el || el.disabled) return;
   const d = el.dataset;
   switch (d.act) {
-    case 'tab': tab = d.tab; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'tab': if (d.tab === 'garage') S = C; tab = d.tab; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'duelEdit': S = DU; tab = 'garage'; render(); window.scrollTo(0, 0); break;
+    case 'duelShare': shareChallenge(`${DU.name || 'Someone'} challenges you to a Boltyard duel`); break;
+    case 'duelReply': shareChallenge(d.win === '1' ? `I beat your team. Can you beat mine?` : `You won. Try my team next.`); break;
+    case 'duelfight': if (incoming) startBattle(-1); break;
+    case 'duelReset':
+      if (!resetArmed) { resetArmed = true; el.textContent = 'Tap again to clear'; setTimeout(() => { resetArmed = false; if (el.isConnected) el.textContent = 'Clear duel team'; }, 3000); break; }
+      DU = freshDuel(); S = DU; save(); resetArmed = false; render(); toast('Duel team cleared');
+      break;
     case 'bay': S.sel = +d.i; save(); render(); break;
     case 'unlock': unlockBay(+d.i); break;
     case 'tactic': S.bots[S.sel].tactic = d.t; save(); render(); break;
@@ -487,18 +609,20 @@ document.addEventListener('click', (e) => {
     case 'quit': leaveBattle(); toast('Left the arena: no pay'); break;
     case 'speed': speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; el.textContent = speed + 'x'; break;
     case 'pause': paused = !paused; el.textContent = paused ? '>' : 'II'; break;
-    case 'introdone': S.intro = true; save(); closeSheet(); break;
+    case 'introdone': C.intro = true; try { localStorage.setItem(SAVE_KEY, JSON.stringify(C)); } catch (er) { /* */ } closeSheet(); break;
     case 'reset':
       if (!resetArmed) { resetArmed = true; el.textContent = 'Tap again to wipe save'; setTimeout(() => { resetArmed = false; if (el.isConnected) el.textContent = 'Reset progress'; }, 3000); break; }
-      S = fresh(); S.intro = true; save(); tab = 'garage'; resetArmed = false; render(); toast('Progress reset');
+      C = fresh(); C.intro = true; S = C; save(); tab = 'garage'; resetArmed = false; render(); toast('Progress reset');
       break;
   }
 });
-$('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' && S.intro) closeSheet(); });
+$('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet' && C.intro) closeSheet(); });
 
+readHash();
+window.addEventListener('hashchange', () => { if (readHash()) { closeSheet(); render(); } });
 render();
-if (!S.intro) showIntro();
+if (!C.intro) showIntro();
 if (oldSave) toast('New 20-arena campaign: progress reset');
 
 // Small hook so automated tests can read the game state. Not used by the game itself.
-window.__boltyard = { get state() { return S; }, get battle() { return B; }, get view() { return view; } };
+window.__boltyard = { get state() { return S; }, get campaign() { return C; }, get duel() { return DU; }, get battle() { return B; }, get view() { return view; } };
