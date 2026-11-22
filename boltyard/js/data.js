@@ -33,7 +33,7 @@ export const WEAPONS = {
   arc:     { name: 'Arc Lance', kind: 'beam',    dmg: 19, rof: 0.8,  range: 240, wt: 10, cost: 450, pierce: 0.5 },
   lobber:  { name: 'Lobber',    kind: 'shell',   dmg: 26, rof: 0.5,  range: 330, pspd: 240, min: 70, splash: 46, wt: 14, cost: 600 },
   swarm:   { name: 'Swarm Pod', kind: 'missile', dmg: 9,  rof: 0.45, range: 300, pspd: 230, pellets: 3, wt: 13, cost: 900 },
-  rail:    { name: 'Railspike', kind: 'rail',    dmg: 70, rof: 0.33, range: 440, pspd: 1500, wt: 18, cost: 1200 },
+  rail:    { name: 'Railspike', kind: 'rail',    dmg: 58, rof: 0.33, range: 380, pspd: 1500, wt: 18, cost: 1200 },
 };
 
 export const PLATES = {

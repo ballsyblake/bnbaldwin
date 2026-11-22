@@ -162,3 +162,20 @@ main { padding-bottom: 24px; }
   .bay img { width: 36px; height: 36px; }
   .bay { padding: 4px; gap: 4px; }
 }
+
+/* duel */
+.lead { color: var(--muted); margin: 2px 2px 10px; font-size: 13px; }
+.namefield { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.namefield input, .linkbox { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 8px 10px; font: inherit; font-size: 16px; text-transform: none; letter-spacing: 0; min-width: 0; }
+.linkbox { width: 100%; font-size: 13px; }
+.dcard { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; margin-bottom: 8px; }
+.dcard.in { border-color: var(--bad); background: linear-gradient(90deg, rgba(229,72,77,.12), var(--panel) 50%); }
+.dtop { display: flex; justify-content: space-between; align-items: baseline; }
+.dtop b { font-size: 15px; }
+.dtop span, .dsub { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dcard .foes { margin: 6px 0 2px; min-height: 36px; align-items: center; }
+.dcard .foes img { width: 36px; height: 36px; }
+.duelbar { display: flex; justify-content: space-between; align-items: center; background: rgba(229,72,77,.12); border: 1px solid #6b2a2c; border-radius: var(--r); padding: 6px 6px 6px 12px; margin-bottom: 10px; font-size: 12px; letter-spacing: 1px; color: var(--muted); }
+.duelbar b { color: var(--ink); font-size: 14px; }
+h4.sub { margin: 14px 2px 6px; font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.recrow { display: flex; justify-content: space-between; padding: 6px 10px; background: var(--panel); border-radius: 8px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
